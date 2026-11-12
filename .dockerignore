@@ -1,0 +1,41 @@
+# Keep the build context small and free of secrets / host artefacts.
+.git
+.github
+.claude
+.vscode
+.idea
+**/node_modules
+**/.pnpm-store
+**/dist
+**/build
+**/.next
+**/out
+**/coverage
+**/.turbo
+**/*.tsbuildinfo
+**/playwright-report
+**/test-results
+**/*.log
+
+# Prisma client is regenerated inside the image.
+packages/db/src/generated
+
+# Secrets and local state — never sent to the daemon. Patterns match at ANY depth:
+# Next.js standalone output copies apps/web/.env* into the runtime image (security MEDIUM-2).
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+**/*.key
+**/.local
+**/backups
+**/*.dump
+**/*.dump.sha256
+
+# Not needed to build images.
+docs
+docker-compose*.yml
+**/Dockerfile
+**/.dockerignore
+README.md
+CLAUDE.md

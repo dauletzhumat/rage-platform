@@ -1,0 +1,14 @@
+pnpm-lock.yaml
+.next
+dist
+coverage
+.turbo
+.local
+packages/db/src/generated
+packages/db/prisma/migrations/**/*.sql
+docs/*.md
+CLAUDE.md
+.claude
+*.prisma
+*.toml
+.vscode

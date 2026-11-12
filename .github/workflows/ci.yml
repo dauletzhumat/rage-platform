@@ -1,0 +1,207 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Ephemeral CI service containers; same dev-only placeholders as .env.example.
+  DATABASE_URL: postgresql://rage:rage_dev_password@127.0.0.1:5432/rage?schema=public
+  TEST_DATABASE_URL: postgresql://rage:rage_dev_password@127.0.0.1:5432/rage_test?schema=public
+  REDIS_URL: redis://127.0.0.1:6379
+  NEXT_PUBLIC_API_BASE_URL: http://localhost:4000/api/v1
+  NEXT_PUBLIC_SITE_URL: http://localhost:3000
+  API_INTERNAL_URL: http://localhost:4000/api/v1
+  TURBO_TELEMETRY_DISABLED: '1'
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  verify:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18.6-trixie
+        env:
+          POSTGRES_USER: rage
+          POSTGRES_PASSWORD: rage_dev_password
+          POSTGRES_DB: rage
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U rage -d rage"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:8.10.3-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm (version from package.json "packageManager")
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare .env from template
+        run: cp .env.example .env
+
+      - name: Create integration-test database
+        run: psql "postgresql://rage:rage_dev_password@127.0.0.1:5432/postgres" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE rage_test OWNER rage'
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Migrate fresh database
+        run: pnpm --filter @rage/db migrate:deploy
+
+      - name: Seed (base + sample data)
+        run: |
+          pnpm --filter @rage/db seed
+          pnpm --filter @rage/db seed:sample
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Integration tests
+        run: pnpm test:integration
+
+      - name: Build
+        run: pnpm build
+
+      - name: OpenAPI client drift check
+        run: |
+          pnpm openapi:generate
+          if [ -n "$(git status --porcelain -- packages/api-client)" ]; then
+            echo "::error::packages/api-client is out of date. Run 'pnpm openapi:generate' and commit the result."
+            git status --porcelain -- packages/api-client
+            git --no-pager diff --stat -- packages/api-client
+            exit 1
+          fi
+
+  e2e:
+    name: Web e2e (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Non-blocking while the M0 e2e suite stabilises; make blocking once green.
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:18.6-trixie
+        env:
+          POSTGRES_USER: rage
+          POSTGRES_PASSWORD: rage_dev_password
+          POSTGRES_DB: rage
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U rage -d rage"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:8.10.3-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare .env from template
+        run: cp .env.example .env
+
+      - name: Prepare database
+        run: |
+          pnpm db:generate
+          pnpm --filter @rage/db migrate:deploy
+          pnpm --filter @rage/db seed
+          pnpm --filter @rage/db seed:sample
+
+      - name: Build
+        run: pnpm build
+
+      - name: Install Playwright browser
+        run: pnpm --filter @rage/web exec playwright install --with-deps chromium
+
+      - name: Start API in background
+        run: |
+          nohup node apps/api/dist/main.js > api.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4000/api/v1/health/ready >/dev/null; then
+              echo "API ready"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::API did not become ready"; cat api.log; exit 1
+
+      - name: Run Playwright
+        run: pnpm --filter @rage/web test:e2e
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+            api.log
+          retention-days: 7
+          if-no-files-found: ignore

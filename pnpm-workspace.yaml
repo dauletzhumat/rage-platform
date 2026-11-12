@@ -1,0 +1,28 @@
+packages:
+  - apps/*
+  - packages/*
+  - tools/*
+
+# Supply-chain hygiene: only resolve versions published at least 7 days ago.
+minimumReleaseAge: 10080
+
+# Only these dependencies may run install scripts.
+allowBuilds:
+  '@prisma/engines': true
+  prisma: true
+  esbuild: true
+  '@embedded-postgres/windows-x64': true
+  '@embedded-postgres/linux-x64': true
+  '@embedded-postgres/darwin-arm64': true
+  '@embedded-postgres/darwin-x64': true
+  '@swc/core': true
+  sharp: true
+  unrs-resolver: true
+  # install-time telemetry (via swagger-ui-dist) — explicitly denied
+  '@scarf/scarf': false
+  # next-intl optional watcher ships prebuilt binaries; no native rebuild needed
+  '@parcel/watcher': false
+
+# Never auto-install when `pnpm run` detects stale deps (it once attempted a
+# `--production` reinstall mid-session); warn and let a human run `pnpm install`.
+verifyDepsBeforeRun: warn

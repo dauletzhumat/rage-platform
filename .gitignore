@@ -1,0 +1,34 @@
+node_modules/
+.pnpm-store/
+dist/
+build/
+.next/
+out/
+coverage/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+
+# environment & secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# local services data (embedded postgres, etc.)
+.local/
+
+# generated prisma client
+packages/db/src/generated/
+
+# test artifacts
+playwright-report/
+test-results/
+
+.DS_Store
+Thumbs.db
+*.log
+
+# Editor settings (personal)
+.vscode/

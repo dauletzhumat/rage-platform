@@ -1,0 +1,224 @@
+# RAGE Platform — local development stack.
+#
+#   docker compose up -d                          # postgres + redis (infra only)
+#   docker compose --profile storage up -d        # + S3-compatible object storage (SeaweedFS) + bucket bootstrap
+#   docker compose --profile app up -d --build    # + migrate (one-shot) + api + web containers
+#   docker compose --profile seed run --rm seed   # run the dev seed against the compose database
+#
+# Every published port is bound to 127.0.0.1 only. Never publish Postgres, Redis or
+# the object store on a public interface. Credentials below are DEV DEFAULTS that
+# match .env.example and may be overridden from `.env` (compose reads it for
+# interpolation). This file is for local development only — see docs/RUNBOOK.md.
+
+name: rage
+
+services:
+  postgres:
+    image: postgres:18.6-trixie
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-rage}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rage_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-rage}
+      # Consumed by docker/postgres/init/01-create-test-db.sh (first boot only).
+      POSTGRES_TEST_DB: ${POSTGRES_TEST_DB:-rage_test}
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --locale=C.UTF-8
+    ports:
+      - '127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432'
+    volumes:
+      # postgres >= 18 images keep PGDATA under /var/lib/postgresql/<major>/docker,
+      # so the volume is mounted at the parent directory (not .../data).
+      - postgres-data:/var/lib/postgresql
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # -h 127.0.0.1: the temporary server used while init scripts run listens on the
+      # unix socket only, so this reports healthy only after initialisation finished.
+      test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    shm_size: 256mb
+
+  redis:
+    image: redis:8.10.3-alpine
+    restart: unless-stopped
+    # AOF on so BullMQ jobs survive a container restart; noeviction is required by BullMQ.
+    command: ['redis-server', '--appendonly', 'yes', '--maxmemory-policy', 'noeviction']
+    ports:
+      - '127.0.0.1:${REDIS_HOST_PORT:-6379}:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli ping | grep -q PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # --- S3-compatible object storage (used from M5: demos, logos) --------------------
+  # SeaweedFS `weed mini` (Apache-2.0): single process running master+volume+filer+S3.
+  # S3 API listens on 8333 inside the container and is published on 127.0.0.1:9000 so
+  # that S3_ENDPOINT in .env.example works unchanged. See docs/RUNBOOK.md for rationale.
+  s3:
+    image: chrislusf/seaweedfs:4.52
+    profiles: ['storage']
+    restart: unless-stopped
+    command: ['mini', '-dir=/data']
+    environment:
+      # Static admin identity for the S3 API (dev only).
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-rage_dev_access_key}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-rage_dev_secret_key}
+    ports:
+      - '127.0.0.1:${S3_HOST_PORT:-9000}:8333'
+    volumes:
+      - s3-data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:8333/healthz >/dev/null']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+
+  # One-shot, idempotent bucket bootstrap. Backend-agnostic (plain S3 API calls).
+  s3-init:
+    image: amazon/aws-cli:2.39.3
+    profiles: ['storage']
+    depends_on:
+      s3:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-rage_dev_access_key}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-rage_dev_secret_key}
+      AWS_DEFAULT_REGION: ${S3_REGION:-us-east-1}
+      AWS_EC2_METADATA_DISABLED: 'true'
+      S3_BUCKET: ${S3_BUCKET:-rage-local}
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        set -eu
+        ep=http://s3:8333
+        if aws --endpoint-url "$$ep" s3api head-bucket --bucket "$$S3_BUCKET" 2>/dev/null; then
+          echo "bucket $$S3_BUCKET already exists"
+        else
+          aws --endpoint-url "$$ep" s3api create-bucket --bucket "$$S3_BUCKET"
+          echo "bucket $$S3_BUCKET created"
+        fi
+    restart: 'no'
+
+  # --- Application containers (profile: app) ----------------------------------------
+  # One-shot: applies committed Prisma migrations (never `migrate dev` / reset).
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: migrate
+    image: rage/api-tools:local
+    profiles: ['app', 'seed']
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-rage}:${POSTGRES_PASSWORD:-rage_dev_password}@postgres:5432/${POSTGRES_DB:-rage}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  # Dev seed (explicit opt-in): docker compose --profile seed run --rm seed
+  seed:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: migrate
+    image: rage/api-tools:local
+    profiles: ['seed']
+    command: ['pnpm', '--filter', '@rage/db', 'seed']
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-rage}:${POSTGRES_PASSWORD:-rage_dev_password}@postgres:5432/${POSTGRES_DB:-rage}?schema=public
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: 'no'
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: runtime
+    image: rage/api:local
+    profiles: ['app']
+    init: true
+    restart: unless-stopped
+    environment:
+      # The image defaults to production; this local stack serves plain-http origins,
+      # which the API's env validation (correctly) rejects in production mode.
+      NODE_ENV: ${API_CONTAINER_NODE_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      API_PORT: 4000
+      API_HOST: 0.0.0.0
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:3000}
+      API_DOCS_ENABLED: ${API_DOCS_ENABLED:-true}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-rage}:${POSTGRES_PASSWORD:-rage_dev_password}@postgres:5432/${POSTGRES_DB:-rage}?schema=public
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://s3:8333
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:-rage-local}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-rage_dev_access_key}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-rage_dev_secret_key}
+      S3_FORCE_PATH_STYLE: 'true'
+      # M1 (Steam OpenID / sessions) — empty until configured in .env.
+      STEAM_OPENID_REALM: ${STEAM_OPENID_REALM:-}
+      STEAM_OPENID_RETURN_URL: ${STEAM_OPENID_RETURN_URL:-}
+      STEAM_WEB_API_KEY: ${STEAM_WEB_API_KEY:-}
+      SESSION_SECRET: ${SESSION_SECRET:-}
+    ports:
+      - '127.0.0.1:${API_HOST_PORT:-4000}:4000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # Readiness (DB + Redis) gates `web`; the image HEALTHCHECK uses liveness.
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:4000/api/v1/health/ready').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: runtime
+      args:
+        # NEXT_PUBLIC_* are inlined into the client bundle at BUILD time.
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:4000/api/v1}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+    image: rage/web:local
+    profiles: ['app']
+    init: true
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      # Server-side rendering talks to the API over the compose network.
+      API_INTERNAL_URL: http://api:4000/api/v1
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:4000/api/v1}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+    ports:
+      - '127.0.0.1:${WEB_HOST_PORT:-3000}:3000'
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  redis-data:
+  s3-data:

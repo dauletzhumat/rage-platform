@@ -1,0 +1,48 @@
+'use client';
+
+import { useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { useTranslations } from 'next-intl';
+import { Menu, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Logo } from './logo';
+import { MainNav } from './main-nav';
+import { SignInLink } from './sign-in-link';
+
+/** Accessible slide-over navigation for small screens (focus-trapped dialog). */
+export function MobileNav() {
+  const t = useTranslations('common');
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger asChild>
+        <Button variant="ghost" size="icon" className="lg:hidden" aria-label={t('openMenu')}>
+          <Menu aria-hidden="true" className="size-5" />
+        </Button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden" />
+        <Dialog.Content className="fixed inset-y-0 right-0 z-50 flex w-[min(20rem,85vw)] flex-col gap-4 border-l border-border bg-surface p-4 shadow-2xl focus:outline-none lg:hidden">
+          <div className="flex items-center justify-between">
+            <Dialog.Title asChild>
+              <span>
+                <Logo />
+              </span>
+            </Dialog.Title>
+            <Dialog.Close asChild>
+              <Button variant="ghost" size="icon" aria-label={t('closeMenu')}>
+                <X aria-hidden="true" className="size-5" />
+              </Button>
+            </Dialog.Close>
+          </div>
+          <Dialog.Description className="sr-only">{t('tagline')}</Dialog.Description>
+          <MainNav orientation="vertical" onNavigate={() => setOpen(false)} />
+          <div className="mt-auto border-t border-border pt-4">
+            <SignInLink className="w-full" onNavigate={() => setOpen(false)} />
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}

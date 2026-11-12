@@ -1,0 +1,35 @@
+{
+  "name": "rage-platform",
+  "private": true,
+  "packageManager": "pnpm@11.1.3",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration --concurrency=1",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @rage/db generate",
+    "db:migrate": "pnpm --filter @rage/db migrate:deploy",
+    "db:migrate:dev": "pnpm --filter @rage/db migrate:dev",
+    "db:seed": "pnpm --filter @rage/db seed",
+    "local:services": "node tools/local-services/start.mjs",
+    "openapi:generate": "pnpm --filter @rage/api openapi:emit && pnpm --filter @rage/api-client generate",
+    "db:backup": "bash scripts/db-backup.sh",
+    "db:restore": "bash scripts/db-restore.sh"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "globals": "^16.5.0",
+    "prettier": "^3.9.10",
+    "turbo": "^2.11.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.70.0"
+  }
+}

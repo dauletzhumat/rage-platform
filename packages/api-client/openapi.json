@@ -1,0 +1,1368 @@
+{
+  "components": {
+    "schemas": {
+      "ApiErrorDetailDto": {
+        "properties": {
+          "field": {
+            "description": "Field path (dot notation) or \"(root)\"",
+            "example": "pageSize",
+            "type": "string"
+          },
+          "message": {
+            "example": "pageSize must not be greater than 100",
+            "type": "string"
+          }
+        },
+        "required": ["field", "message"],
+        "type": "object"
+      },
+      "ApiErrorDto": {
+        "properties": {
+          "details": {
+            "items": {
+              "$ref": "#/components/schemas/ApiErrorDetailDto"
+            },
+            "type": "array"
+          },
+          "error": {
+            "description": "HTTP reason phrase",
+            "example": "Not Found",
+            "type": "string"
+          },
+          "message": {
+            "example": "Team not found",
+            "type": "string"
+          },
+          "requestId": {
+            "example": "0b6b6c4e-7c0e-4d1b-9a43-0d8b0b0e8a11",
+            "type": "string"
+          },
+          "statusCode": {
+            "example": 404,
+            "type": "number"
+          }
+        },
+        "required": ["statusCode", "error", "message", "requestId"],
+        "type": "object"
+      },
+      "Cs2IntegrationFeatureDto": {
+        "properties": {
+          "status": {
+            "enum": ["not_implemented"],
+            "type": "string"
+          }
+        },
+        "required": ["status"],
+        "type": "object"
+      },
+      "DependencyStatusDto": {
+        "properties": {
+          "status": {
+            "enum": ["up", "down"],
+            "type": "string"
+          }
+        },
+        "required": ["status"],
+        "type": "object"
+      },
+      "FeaturesDto": {
+        "properties": {
+          "cs2Integration": {
+            "$ref": "#/components/schemas/Cs2IntegrationFeatureDto"
+          },
+          "steamAuth": {
+            "$ref": "#/components/schemas/SteamAuthFeatureDto"
+          }
+        },
+        "required": ["steamAuth", "cs2Integration"],
+        "type": "object"
+      },
+      "LivenessDto": {
+        "properties": {
+          "status": {
+            "enum": ["ok"],
+            "type": "string"
+          }
+        },
+        "required": ["status"],
+        "type": "object"
+      },
+      "MatchDetailDto": {
+        "properties": {
+          "format": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchFormat"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isSample": {
+            "type": "boolean"
+          },
+          "maps": {
+            "items": {
+              "$ref": "#/components/schemas/MatchMapDto"
+            },
+            "type": "array"
+          },
+          "scheduledAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchStatus"
+              }
+            ]
+          },
+          "teamA": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeamRefDto"
+              }
+            ],
+            "description": "Null while a bracket slot is TBD",
+            "nullable": true,
+            "type": "object"
+          },
+          "teamB": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeamRefDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "tournament": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TournamentRefDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "winnerTeamSlug": {
+            "description": "Only set once the result is server-confirmed and verified",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "format",
+          "scheduledAt",
+          "teamA",
+          "teamB",
+          "tournament",
+          "winnerTeamSlug",
+          "isSample",
+          "maps"
+        ],
+        "type": "object"
+      },
+      "MatchFormat": {
+        "enum": ["BO1", "BO3", "BO5"],
+        "type": "string"
+      },
+      "MatchMapDto": {
+        "properties": {
+          "mapName": {
+            "example": "de_mirage",
+            "type": "string"
+          },
+          "mapOrder": {
+            "minimum": 1,
+            "type": "number"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchMapStatus"
+              }
+            ]
+          },
+          "teamAScore": {
+            "nullable": true,
+            "type": "number"
+          },
+          "teamBScore": {
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "required": ["mapOrder", "mapName", "status", "teamAScore", "teamBScore"],
+        "type": "object"
+      },
+      "MatchMapStatus": {
+        "enum": ["PENDING", "WARMUP", "KNIFE", "LIVE", "PAUSED", "FINISHED", "CANCELLED"],
+        "type": "string"
+      },
+      "MatchPageDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MatchSummaryDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "example": 1,
+            "type": "number"
+          },
+          "pageSize": {
+            "example": 20,
+            "type": "number"
+          },
+          "total": {
+            "example": 0,
+            "type": "number"
+          }
+        },
+        "required": ["page", "pageSize", "total", "items"],
+        "type": "object"
+      },
+      "MatchStatus": {
+        "enum": [
+          "CREATED",
+          "SERVER_ASSIGNED",
+          "PREPARING",
+          "WARMUP",
+          "READY_CHECK",
+          "KNIFE",
+          "LIVE",
+          "PAUSED",
+          "MAP_FINISHED",
+          "COMPLETED",
+          "CANCELLED",
+          "FAILED",
+          "DISPUTED"
+        ],
+        "type": "string"
+      },
+      "MatchSummaryDto": {
+        "properties": {
+          "format": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchFormat"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isSample": {
+            "type": "boolean"
+          },
+          "scheduledAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchStatus"
+              }
+            ]
+          },
+          "teamA": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeamRefDto"
+              }
+            ],
+            "description": "Null while a bracket slot is TBD",
+            "nullable": true,
+            "type": "object"
+          },
+          "teamB": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeamRefDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "tournament": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TournamentRefDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "winnerTeamSlug": {
+            "description": "Only set once the result is server-confirmed and verified",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "format",
+          "scheduledAt",
+          "teamA",
+          "teamB",
+          "tournament",
+          "winnerTeamSlug",
+          "isSample"
+        ],
+        "type": "object"
+      },
+      "MembershipRole": {
+        "enum": ["CAPTAIN", "PLAYER", "SUBSTITUTE", "MANAGER", "COACH"],
+        "type": "string"
+      },
+      "MetaDto": {
+        "properties": {
+          "apiVersion": {
+            "enum": ["v1"],
+            "type": "string"
+          },
+          "environment": {
+            "enum": ["development", "test", "production"],
+            "type": "string"
+          },
+          "features": {
+            "$ref": "#/components/schemas/FeaturesDto"
+          },
+          "name": {
+            "enum": ["rage-api"],
+            "type": "string"
+          },
+          "version": {
+            "example": "0.0.0",
+            "type": "string"
+          }
+        },
+        "required": ["name", "version", "apiVersion", "environment", "features"],
+        "type": "object"
+      },
+      "PlayerDetailDto": {
+        "properties": {
+          "avatarUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "biography": {
+            "nullable": true,
+            "type": "string"
+          },
+          "countryCode": {
+            "example": "KZ",
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "currentTeam": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeamRefDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isSample": {
+            "description": "True for clearly-labelled demo/seed data",
+            "type": "boolean"
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "steamId64": {
+            "description": "Verified SteamID64 (string; 17 digits)",
+            "example": "76561198000000000",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "nickname",
+          "countryCode",
+          "avatarUrl",
+          "steamId64",
+          "isSample",
+          "biography",
+          "createdAt",
+          "currentTeam"
+        ],
+        "type": "object"
+      },
+      "PlayerPageDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PlayerSummaryDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "example": 1,
+            "type": "number"
+          },
+          "pageSize": {
+            "example": 20,
+            "type": "number"
+          },
+          "total": {
+            "example": 0,
+            "type": "number"
+          }
+        },
+        "required": ["page", "pageSize", "total", "items"],
+        "type": "object"
+      },
+      "PlayerSummaryDto": {
+        "properties": {
+          "avatarUrl": {
+            "nullable": true,
+            "type": "string"
+          },
+          "countryCode": {
+            "example": "KZ",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isSample": {
+            "description": "True for clearly-labelled demo/seed data",
+            "type": "boolean"
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "steamId64": {
+            "description": "Verified SteamID64 (string; 17 digits)",
+            "example": "76561198000000000",
+            "type": "string"
+          }
+        },
+        "required": ["id", "slug", "nickname", "countryCode", "avatarUrl", "steamId64", "isSample"],
+        "type": "object"
+      },
+      "ReadinessChecksDto": {
+        "properties": {
+          "database": {
+            "$ref": "#/components/schemas/DependencyStatusDto"
+          },
+          "redis": {
+            "$ref": "#/components/schemas/DependencyStatusDto"
+          }
+        },
+        "required": ["database", "redis"],
+        "type": "object"
+      },
+      "ReadinessDto": {
+        "properties": {
+          "checks": {
+            "$ref": "#/components/schemas/ReadinessChecksDto"
+          },
+          "status": {
+            "enum": ["ok", "error"],
+            "type": "string"
+          }
+        },
+        "required": ["status", "checks"],
+        "type": "object"
+      },
+      "SteamAuthFeatureDto": {
+        "properties": {
+          "status": {
+            "description": "not_implemented until milestone M1 ships real Steam OpenID verification. Never \"configured\" without a real implementation.",
+            "enum": ["not_implemented", "unconfigured", "configured"],
+            "type": "string"
+          }
+        },
+        "required": ["status"],
+        "type": "object"
+      },
+      "TeamDetailDto": {
+        "properties": {
+          "activeMemberCount": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "countryCode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isSample": {
+            "type": "boolean"
+          },
+          "logoUrl": {
+            "description": "Null until object storage lands (M5+)",
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "region": {
+            "nullable": true,
+            "type": "string"
+          },
+          "roster": {
+            "description": "Current (active) memberships",
+            "items": {
+              "$ref": "#/components/schemas/TeamRosterEntryDto"
+            },
+            "type": "array"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "tag",
+          "countryCode",
+          "region",
+          "logoUrl",
+          "isSample",
+          "activeMemberCount",
+          "description",
+          "createdAt",
+          "roster"
+        ],
+        "type": "object"
+      },
+      "TeamPageDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TeamSummaryDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "example": 1,
+            "type": "number"
+          },
+          "pageSize": {
+            "example": 20,
+            "type": "number"
+          },
+          "total": {
+            "example": 0,
+            "type": "number"
+          }
+        },
+        "required": ["page", "pageSize", "total", "items"],
+        "type": "object"
+      },
+      "TeamRefDto": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          }
+        },
+        "required": ["slug", "name", "tag"],
+        "type": "object"
+      },
+      "TeamRosterEntryDto": {
+        "properties": {
+          "countryCode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "joinedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "playerSlug": {
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MembershipRole"
+              }
+            ]
+          }
+        },
+        "required": ["playerSlug", "nickname", "countryCode", "role", "joinedAt"],
+        "type": "object"
+      },
+      "TeamSummaryDto": {
+        "properties": {
+          "activeMemberCount": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "countryCode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isSample": {
+            "type": "boolean"
+          },
+          "logoUrl": {
+            "description": "Null until object storage lands (M5+)",
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "region": {
+            "nullable": true,
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "tag",
+          "countryCode",
+          "region",
+          "logoUrl",
+          "isSample",
+          "activeMemberCount"
+        ],
+        "type": "object"
+      },
+      "TournamentDetailDto": {
+        "properties": {
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "format": {
+            "example": "SINGLE_ELIMINATION",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isSample": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "registeredTeamCount": {
+            "description": "Registrations approved by a tournament admin",
+            "minimum": 0,
+            "type": "number"
+          },
+          "registrationCloseAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "registrationOpenAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "startsAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TournamentStatus"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "format",
+          "status",
+          "startsAt",
+          "registrationOpenAt",
+          "registrationCloseAt",
+          "isSample",
+          "description",
+          "registeredTeamCount"
+        ],
+        "type": "object"
+      },
+      "TournamentPageDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TournamentSummaryDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "example": 1,
+            "type": "number"
+          },
+          "pageSize": {
+            "example": 20,
+            "type": "number"
+          },
+          "total": {
+            "example": 0,
+            "type": "number"
+          }
+        },
+        "required": ["page", "pageSize", "total", "items"],
+        "type": "object"
+      },
+      "TournamentRefDto": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": ["slug", "name"],
+        "type": "object"
+      },
+      "TournamentStatus": {
+        "enum": [
+          "DRAFT",
+          "REGISTRATION_OPEN",
+          "REGISTRATION_CLOSED",
+          "IN_PROGRESS",
+          "COMPLETED",
+          "CANCELLED"
+        ],
+        "type": "string"
+      },
+      "TournamentSummaryDto": {
+        "properties": {
+          "format": {
+            "example": "SINGLE_ELIMINATION",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isSample": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "registrationCloseAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "registrationOpenAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "startsAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TournamentStatus"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "format",
+          "status",
+          "startsAt",
+          "registrationOpenAt",
+          "registrationCloseAt",
+          "isSample"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "contact": {},
+    "description": "RAGE Platform REST API v1. Conventions: docs/API_CONVENTIONS.md. Steam authentication (M1) and CS2 integration (M4+) are not implemented yet.",
+    "title": "RAGE Platform API",
+    "version": "0.0.0"
+  },
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1/health/live": {
+      "get": {
+        "operationId": "Health_live",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LivenessDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Liveness: the process is up (no dependency checks)",
+        "tags": ["health"]
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "operationId": "Health_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Readiness: PostgreSQL and Redis reachable",
+        "tags": ["health"]
+      }
+    },
+    "/api/v1/matches": {
+      "get": {
+        "operationId": "Matches_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchPageDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "List public matches (series)",
+        "tags": ["matches"]
+      }
+    },
+    "/api/v1/matches/{id}": {
+      "get": {
+        "operationId": "Matches_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchDetailDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Public match (series) detail with per-map scores",
+        "tags": ["matches"]
+      }
+    },
+    "/api/v1/meta": {
+      "get": {
+        "operationId": "Meta_meta",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetaDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Service metadata and honest feature availability flags",
+        "tags": ["meta"]
+      }
+    },
+    "/api/v1/players": {
+      "get": {
+        "operationId": "Players_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Case-insensitive search text",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerPageDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "List public player profiles",
+        "tags": ["players"]
+      }
+    },
+    "/api/v1/players/{slug}": {
+      "get": {
+        "operationId": "Players_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerDetailDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Public player profile",
+        "tags": ["players"]
+      }
+    },
+    "/api/v1/teams": {
+      "get": {
+        "operationId": "Teams_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Case-insensitive search text",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamPageDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "List public (approved, active) teams",
+        "tags": ["teams"]
+      }
+    },
+    "/api/v1/teams/{slug}": {
+      "get": {
+        "operationId": "Teams_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamDetailDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Public team profile with current roster",
+        "tags": ["teams"]
+      }
+    },
+    "/api/v1/tournaments": {
+      "get": {
+        "operationId": "Tournaments_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Case-insensitive search text",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "REGISTRATION_OPEN",
+                "REGISTRATION_CLOSED",
+                "IN_PROGRESS",
+                "COMPLETED",
+                "CANCELLED"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentPageDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "List published tournaments (drafts are never listed)",
+        "tags": ["tournaments"]
+      }
+    },
+    "/api/v1/tournaments/{slug}": {
+      "get": {
+        "operationId": "Tournaments_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TournamentDetailDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Public tournament detail",
+        "tags": ["tournaments"]
+      }
+    }
+  },
+  "servers": [
+    {
+      "description": "This server",
+      "url": "/"
+    }
+  ],
+  "tags": []
+}
