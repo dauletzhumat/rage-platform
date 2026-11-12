@@ -81,7 +81,7 @@ services:
 
   # One-shot, idempotent bucket bootstrap. Backend-agnostic (plain S3 API calls).
   s3-init:
-    image: amazon/aws-cli:2.39.3
+    image: amazon/aws-cli:2.39.4
     profiles: ['storage']
     depends_on:
       s3:
