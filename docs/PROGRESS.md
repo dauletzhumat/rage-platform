@@ -2,7 +2,7 @@
 
 | Milestone | Status | Evidence | Blocker |
 |---|---|---|---|
-| M0 Architecture / repository scaffold | **Verified locally (QA: PASS WITH CONDITIONS — conditions closed below); GitHub CI not yet executed** | See "M0 evidence" | CI needs a git remote + first push |
+| M0 Architecture / repository scaffold | **Verified** (local + GitHub CI green; QA gate conditions closed) | See "M0 evidence"; CI run https://github.com/dauletzhumat/rage-platform/actions/runs/43248240833 | — |
 | M1 Steam Login / player accounts | Not started | Prerequisites listed in `docs/ROADMAP.md` (M1 → security prerequisites) | Real Steam login test needs a Steam account + reachable callback (see ROADMAP M1) |
 | M2 Team applications / invitation roster | Not started | DB constraints already in place (23 constraint tests) | Depends on M1 |
 | M3 Tournament registration / brackets | Not started | | Depends on M2 |
@@ -65,11 +65,10 @@ PostgreSQL 18.6 + Redis 8.10.3 via Docker Compose.
 | Docker storage | `docker compose --profile storage up -d` | S3 healthy, bucket bootstrap idempotent, anon GET 403 |
 | Docker app | `docker compose --profile app build` + `up -d migrate api web` | migrate exit 0; api ready (db+redis up, uid 1000); web SSR shows sample teams |
 | Backup/restore | `scripts/db-backup.sh` → `db-restore.sh` into scratch DB | identical row counts in all 37 tables; 7 safety refusals verified |
+| GitHub CI (ubuntu-latest) | push `8a3079e` → workflow `CI` | **success**: job "Lint, typecheck, test, build" (fresh migrate, seeds, format, lint, typecheck, unit, integration, build, OpenAPI drift) and job "Web e2e (Playwright)" against a live API — run 43248240833 |
 | Honesty | grep + DB checks | no fake Steam/CS2 code; `/meta` reports `not_implemented`; sample↔SteamID range enforced by DB CHECK |
 
 ### Blocked / not verified
-- **GitHub CI has never run** — the repository has no remote yet. The workflow mirrors the local
-  steps above; it must be executed on the first push before M0 can be called CI-verified (A11).
 - **A1/A2/A7 (real Steam / real CS2)** — out of M0 scope; not implemented and reported as such.
 - A3–A6, A8 — no business flows yet (M2–M5); DB-level constraints exist and are tested.
 
@@ -78,13 +77,13 @@ PostgreSQL 18.6 + Redis 8.10.3 via Docker Compose.
 - CSP `'unsafe-inline'`, superuser DB role, strict Steam env schema, SHA-pinned Actions,
   SSR rate-limit keying → **M1 prerequisites** (ROADMAP M1).
 - One non-reproducible Windows vitest worker crash (0xC0000409) in `packages/db` integration
-  (1 of ~10 runs; 0 recurrences in QA's 4 runs) — watch in CI.
+  (1 of ~10 runs; 0 recurrences in QA's 4 runs; not seen on Linux CI) — watch.
 - `pg` deprecation warning ("client.query() while already executing") from Prisma's adapter in batch
   transactions — upstream; no functional impact observed.
 - `rage/api-tools` (migrate/seed) image is 2.68 GB — slim later.
 
 ### Next
-1. Create a git remote, push, and run CI; make the e2e job blocking once green.
+1. ✅ Remote `github.com/dauletzhumat/rage-platform` created; first CI run green; e2e job now blocking.
 2. Decide open questions Q1–Q5 in `docs/ROADMAP.md` (e.g. `POST /teams` vs ADR-002, slug vs id) as ADRs.
 3. Start **M1 — real Steam OpenID login** with the security prerequisites listed in ROADMAP M1
    (steam-auth + backend + database + frontend agents; security + qa gates). Needs a Steam account
