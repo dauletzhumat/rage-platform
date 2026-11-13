@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { apiGet, buildUrl } from './http';
+import { apiGet, apiSend, buildUrl, parseRetryAfter } from './http';
 
 const BASE = 'http://api.test/api/v1';
 
@@ -101,5 +101,128 @@ describe('apiGet error mapping', () => {
     expect(call[0]).toBe(`${BASE}/meta`);
     expect(call[1].cache).toBe('no-store');
     expect(call[1].signal).toBeInstanceOf(AbortSignal);
+  });
+});
+
+describe('apiSend status mapping (M1)', () => {
+  it('maps 429 to rate_limited with Retry-After seconds', async () => {
+    const fetchImpl = mockFetch(async () =>
+      jsonResponse(
+        429,
+        { statusCode: 429, message: 'ThrottlerException' },
+        { 'retry-after': '30' },
+      ),
+    );
+    const result = await apiGet('/teams', { baseUrl: BASE, fetchImpl });
+    expect(result).toMatchObject({
+      ok: false,
+      kind: 'rate_limited',
+      status: 429,
+      retryAfterSeconds: 30,
+    });
+  });
+
+  it('maps 429 without Retry-After (no retryAfterSeconds)', async () => {
+    const fetchImpl = mockFetch(async () => jsonResponse(429, {}));
+    const result = await apiGet('/teams', { baseUrl: BASE, fetchImpl });
+    expect(result).toMatchObject({ ok: false, kind: 'rate_limited' });
+    if (!result.ok) expect(result.retryAfterSeconds).toBeUndefined();
+  });
+
+  it('parses Retry-After as seconds or HTTP date', () => {
+    const now = Date.parse('2026-11-12T10:00:00Z');
+    expect(parseRetryAfter('5', now)).toBe(5);
+    expect(parseRetryAfter('Thu, 12 Nov 2026 10:00:20 GMT', now)).toBe(20);
+    expect(parseRetryAfter('Thu, 12 Nov 2026 09:00:00 GMT', now)).toBe(0);
+    expect(parseRetryAfter('soon', now)).toBeUndefined();
+    expect(parseRetryAfter(null, now)).toBeUndefined();
+  });
+
+  it('maps 401 / 403', async () => {
+    expect(
+      await apiGet('/me', {
+        baseUrl: BASE,
+        fetchImpl: mockFetch(async () => jsonResponse(401, {})),
+      }),
+    ).toMatchObject({ ok: false, kind: 'unauthenticated', status: 401 });
+    expect(
+      await apiGet('/admin/users', {
+        baseUrl: BASE,
+        fetchImpl: mockFetch(async () => jsonResponse(403, { message: 'CSRF validation failed' })),
+      }),
+    ).toMatchObject({ ok: false, kind: 'forbidden', status: 403 });
+  });
+
+  it('maps 400 to validation with bounded details and the safe server message', async () => {
+    const fetchImpl = mockFetch(async () =>
+      jsonResponse(400, {
+        statusCode: 400,
+        error: 'Bad Request',
+        message: 'Validation failed',
+        requestId: 'r-1',
+        details: [{ field: 'nickname', message: 'too short' }, { bogus: true }, 'x'],
+      }),
+    );
+    const result = await apiSend('/me/profile', {
+      method: 'PATCH',
+      baseUrl: BASE,
+      body: {},
+      fetchImpl,
+    });
+    expect(result).toEqual({
+      ok: false,
+      kind: 'validation',
+      status: 400,
+      requestId: 'r-1',
+      message: 'The request was rejected by validation.',
+      serverMessage: 'Validation failed',
+      details: [{ field: 'nickname', message: 'too short' }],
+    });
+  });
+
+  it('maps 409 to conflict with the server message', async () => {
+    const fetchImpl = mockFetch(async () =>
+      jsonResponse(409, { statusCode: 409, message: 'Role already granted' }),
+    );
+    const result = await apiSend('/admin/users/x/roles', {
+      method: 'POST',
+      baseUrl: BASE,
+      body: {},
+      fetchImpl,
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      kind: 'conflict',
+      serverMessage: 'Role already granted',
+    });
+  });
+
+  it('treats 204 as success with null data', async () => {
+    const fetchImpl = mockFetch(async () => new Response(null, { status: 204 }));
+    expect(await apiSend('/auth/logout', { method: 'POST', baseUrl: BASE, fetchImpl })).toEqual({
+      ok: true,
+      data: null,
+    });
+  });
+
+  it('sends method, JSON body, extra headers and credentials', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(200, {}));
+    await apiSend('/me/profile', {
+      method: 'PATCH',
+      baseUrl: BASE,
+      body: { nickname: 'Neo' },
+      headers: { 'x-csrf-token': 'abc' },
+      credentials: 'include',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.method).toBe('PATCH');
+    expect(init.body).toBe('{"nickname":"Neo"}');
+    expect(init.credentials).toBe('include');
+    expect(init.headers).toEqual({
+      accept: 'application/json',
+      'content-type': 'application/json',
+      'x-csrf-token': 'abc',
+    });
   });
 });

@@ -18,7 +18,10 @@ export default defineConfig({
     seed: 'tsx prisma/seed.ts',
   },
   datasource: {
+    // The Prisma CLI (migrate deploy/status/diff) connects as the database OWNER:
+    // MIGRATION_DATABASE_URL wins and DATABASE_URL is the fallback. The API runtime keeps
+    // using DATABASE_URL, which points at the least-privilege application role (ADR-016).
     // Optional so that `prisma generate` works without a database URL.
-    url: process.env.DATABASE_URL,
+    url: process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL,
   },
 });

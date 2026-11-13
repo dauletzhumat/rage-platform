@@ -1,6 +1,6 @@
 # RAGE Platform — Operations Runbook
 
-Status: **M0 (foundation)**. Local development and CI are covered and verified; the production
+Status: **M0 (foundation) + M1 (Steam sign-in, DB roles)**. Local development and CI are covered and verified; the production
 section is an **outline for M7**, not a hardened deployment guide.
 
 ---
@@ -35,7 +35,7 @@ Pick **one** path — both bind the same ports (5432, 6379). Never run them at t
 | --- | --- |
 | `docker compose up -d` | `postgres` (18.6) + `redis` (8.10.3) |
 | `docker compose --profile storage up -d` | + `s3` (SeaweedFS S3 API on `127.0.0.1:9000`) + `s3-init` (creates bucket `rage-local`) |
-| `docker compose --profile app up -d --build` | + `migrate` (one-shot `prisma migrate deploy`) → `api` (:4000) → `web` (:3000) |
+| `docker compose --profile app up -d --build` | + `migrate` (one-shot, owner role: `prisma migrate deploy` → `db:grants`) → `api` (:4000, app role `rage_app`) → `web` (:3000) |
 | `docker compose --profile seed run --rm seed` | runs `pnpm --filter @rage/db seed` against the compose DB |
 | `docker compose ps` / `docker compose logs -f api` | status / logs |
 | `docker compose stop` | stop, keep data |
@@ -112,8 +112,9 @@ pnpm install                       # frozen by pnpm-lock.yaml
 cp .env.example .env               # never commit .env
 docker compose up -d               # Path A   (or: pnpm local:services in another terminal — Path B)
 pnpm db:generate                   # Prisma client
-pnpm db:migrate                    # prisma migrate deploy (committed migrations only)
-pnpm db:seed                       # base seed
+pnpm db:migrate                    # prisma migrate deploy (committed migrations only; owner role)
+pnpm --filter @rage/db db:grants   # create/update the app role rage_app (owner role; after EVERY migrate)
+pnpm db:seed                       # base seed (owner role)
 pnpm --filter @rage/db seed:sample # OPTIONAL sample data (clearly marked as sample, not real stats)
 pnpm dev                           # api + web in watch mode
 ```
@@ -145,10 +146,15 @@ pnpm --filter @rage/web test:e2e                                    # Playwright
 
 CI (`.github/workflows/ci.yml`) runs the same on `ubuntu-latest` with `postgres:18.6-trixie` and
 `redis:8.10.3-alpine` service containers: install (frozen) → generate → create `rage_test` →
-migrate fresh DB → seed + sample seed → format → lint → typecheck → unit → integration → build →
-OpenAPI drift. A separate `e2e` job (currently `continue-on-error`) builds, starts the API and runs
-Playwright, uploading the report as an artifact. Dependabot (`.github/dependabot.yml`) proposes
-weekly npm / GitHub Actions / Docker updates with a 7-day cooldown.
+migrate fresh DB (owner) → `db:grants` → assert `rage_app` connects and is not superuser/createdb/
+createrole → seed + sample seed (owner) → format → lint → typecheck → unit → integration (owner,
+`TEST_DATABASE_URL`) → build → OpenAPI drift. The blocking `e2e` job prepares the DB the same way,
+generates per-run masked `SESSION_SECRET` / `INTERNAL_SSR_TOKEN` (never stored), starts the API
+as `rage_app` with localhost realm/return URLs, asserts the API session in `pg_stat_activity` is
+`rage_app` and `/api/v1/meta` reports `steamAuth: configured`, then runs Playwright and uploads the
+report. All actions are pinned to full commit SHAs with a `# vX.Y.Z` comment (SEC-M0-L9).
+Dependabot (`.github/dependabot.yml`) proposes weekly npm / GitHub Actions (SHA + comment) /
+Docker updates with a 7-day cooldown.
 
 ---
 
@@ -223,6 +229,8 @@ Last rehearsal: 2026-11-11 (compose, M0 schema + seed): 150 770-byte dump, check
 | Line-ending errors in `docker/postgres/init/*.sh` | `.gitattributes` forces LF; re-checkout if a tool converted to CRLF |
 | `next start` warns "does not work with output: standalone" | Harmless for local runs/e2e (it still serves the build). The Docker image runs the standalone server (`node apps/web/server.js`); to mirror it locally: `node apps/web/.next/standalone/apps/web/server.js` after copying `.next/static` + `public` as the Dockerfile does |
 | `docker compose --profile app up` restarted `postgres` | Compose recreates a service when its resolved config changed (e.g. after a Docker restart or `.env` edit). Data lives in the `postgres-data` volume and survives; never add `-v` unless you intend to wipe it |
+| API fails readiness / `password authentication failed for user "rage_app"` | `db:grants` not run yet, or `RAGE_APP_DB_PASSWORD` differs from the password in `DATABASE_URL` — see §10.3 |
+| `permission denied for table …` from the API | a migration added a table after the last `db:grants` run — re-run `pnpm --filter @rage/db db:grants` (compose: `docker compose --profile app run --rm migrate`) |
 | Detail page for a missing slug returns HTTP 200 | Known M0 limitation: `(public)/loading.tsx` starts streaming, so Next 16 keeps 200 and injects `robots noindex` ("soft 404"). Real 404 status planned for M6 |
 
 ---
@@ -233,13 +241,23 @@ Last rehearsal: 2026-11-11 (compose, M0 schema + seed): 150 770-byte dump, check
   only 22 (restricted), 80, 443.
 - **Reverse proxy with TLS** (Caddy or nginx + Let's Encrypt) in front of `web` and `api`; HSTS;
   forward `X-Forwarded-*`; WebSocket upgrade for Socket.IO; request size limits.
+- **Client IP trust**: set `TRUST_PROXY_HOPS` (api) and `WEB_TRUST_PROXY_HOPS` (web) to the
+  exact number of proxies in front of each service that append to `X-Forwarded-For` (usually
+  `1`). Too high → visitors can choose their own rate-limit bucket; `0` (default) → SSR traffic
+  shares one bucket. Prefer an edge proxy that **overwrites** XFF / `X-Real-IP` with the peer
+  address (docs/AUTH.md §8).
+- **Compose ops**: `docker compose --profile app up -d migrate api web` also recreates
+  `postgres`/`redis` if their compose config changed (data volume is kept); add `--no-deps`
+  when you only want to roll the app services.
 - **Never expose PostgreSQL, Redis, object-storage admin, or RCON publicly.** Bind them to a
   private network / localhost; Redis with ACL password; Postgres with `scram-sha-256` and a
   least-privilege app role separate from the migration role.
 - **Secrets** from a secret manager or root-only env files (never in images, git, or client
-  bundles): `DATABASE_URL`, `SESSION_SECRET`, `STEAM_WEB_API_KEY`, S3 keys, agent signing keys.
+  bundles): `DATABASE_URL`, `MIGRATION_DATABASE_URL`, `RAGE_APP_DB_PASSWORD`, `SESSION_SECRET`,
+  `INTERNAL_SSR_TOKEN`, `STEAM_WEB_API_KEY`, S3 keys, agent signing keys.
   Disable `API_DOCS_ENABLED` or protect it.
-- **Migrations**: one-shot `prisma migrate deploy` job before rolling out the API; back up first.
+- **Migrations**: one-shot job as the owner role (`migrate deploy` → `db:grants`) before rolling
+  out the API; back up first. The API never receives owner credentials.
 - **Game servers are separate** from the web/API host. Each CS2 server runs the RAGE **server
   agent** that connects **outbound** to the API (signed, short-lived channel); RCON secrets stay on
   the game host. LAN-hosted servers work behind NAT for the same reason.
@@ -257,8 +275,114 @@ Last rehearsal: 2026-11-11 (compose, M0 schema + seed): 150 770-byte dump, check
 
 | Milestone | What | Notes |
 | --- | --- | --- |
-| M1 | Steam OpenID realm + return URL | `STEAM_OPENID_REALM` must exactly prefix `STEAM_OPENID_RETURN_URL`; for local testing `http://localhost:4000` works with Steam OpenID; production needs the public HTTPS origin |
+| M1 | Steam OpenID realm + return URL | `STEAM_OPENID_REALM` must prefix `STEAM_OPENID_RETURN_URL`; local: `http://localhost:4000` (fallback: HTTPS tunnel, §10.6); production needs the public HTTPS origin |
 | M1 | Steam Web API key (optional) | https://steamcommunity.com/dev/apikey — only for public profile name/avatar sync; server-side only (`STEAM_WEB_API_KEY`) |
-| M1 | `SESSION_SECRET` | ≥ 32 random bytes, e.g. `openssl rand -base64 48` |
+| M1 | `SESSION_SECRET`, `INTERNAL_SSR_TOKEN` | ≥ 32 random bytes each — generation command in §10.2 |
+| M1 | One real Steam login (A1) | manual procedure §10.5; record date + redacted SteamID in `docs/PROGRESS.md` |
 | M4 | CS2 dedicated server | SteamCMD app 730 dedicated server + Game Server Login Token, Metamod:Source, CounterStrikeSharp, MatchZy — versions verified for compatibility at M4 time; reachable test server required to verify the real handshake |
 | M5 | Object storage | dev: `--profile storage`; prod: managed S3-compatible bucket + credentials |
+
+---
+
+## 10. Steam sign-in (M1) local setup
+
+Contract: `docs/AUTH.md`; decisions ADR-014 … ADR-018. Steam OpenID is the **only** sign-in; there
+is no dev login or bypass. Without a valid realm, return URL and `SESSION_SECRET`, `/api/v1/meta`
+reports `features.steamAuth.status = "unconfigured"` and `/api/v1/auth/*` returns 503.
+
+### 10.1 Environment values (`.env`, never committed)
+
+| Var | Local value | Notes |
+| --- | --- | --- |
+| `MIGRATION_DATABASE_URL` | `postgresql://rage:rage_dev_password@127.0.0.1:5432/rage?schema=public` | owner; Prisma CLI, `db:grants`, seeds |
+| `DATABASE_URL` | `postgresql://rage_app:rage_app_dev_password@127.0.0.1:5432/rage?schema=public` | app role; API runtime |
+| `RAGE_APP_DB_PASSWORD` | `rage_app_dev_password` | must equal the password in `DATABASE_URL`; 12–256 printable ASCII, no spaces |
+| `RAGE_APP_DB_ROLE` | unset (`rage_app`) | optional override; must equal the user in `DATABASE_URL` |
+| `TEST_DATABASE_URL` | owner on `rage_test` | integration tests reset schemas |
+| `WEB_PUBLIC_URL` | `http://localhost:3000` | must be in `API_CORS_ORIGINS` |
+| `STEAM_OPENID_REALM` | `http://localhost:4000` | |
+| `STEAM_OPENID_RETURN_URL` | `http://localhost:4000/api/v1/auth/steam/callback` | must be under the realm |
+| `SESSION_SECRET` | generated (§10.2) | required for sign-in |
+| `SESSION_TTL_HOURS` / `SESSION_IDLE_HOURS` | `336` / `72` | absolute / idle lifetime |
+| `COOKIE_SECURE` | unset (false outside production) | set `true` behind HTTPS |
+| `STEAM_WEB_API_KEY` | optional | name/avatar sync only; server-side only |
+| `BOOTSTRAP_SUPER_ADMIN_STEAM_ID64` | your own SteamID64 (optional) | §10.4 |
+| `INTERNAL_SSR_TOKEN` | generated (§10.2) | same value for api and web; server-side only |
+
+Compose passes these from `.env` to `api` (and `INTERNAL_SSR_TOKEN` to `web`, read at **runtime**,
+never baked into the image). Localhost realm/return/web URLs have compose defaults; secrets have
+none. Compose builds its own in-network URLs (`@postgres:5432`) from `POSTGRES_*` and
+`RAGE_APP_DB_*`, so the `127.0.0.1` URLs in `.env` are only for host processes. After editing
+`.env`: `docker compose --profile app up -d api web` (recreates the containers).
+
+### 10.2 Generating secrets
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"   # SESSION_SECRET
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"   # INTERNAL_SSR_TOKEN (a different value)
+```
+
+Use a different value per variable and per environment. Never paste them into tickets, logs or
+chat. Rotating `SESSION_SECRET` invalidates in-flight logins and CSRF tokens (users sign in again);
+rotating `INTERNAL_SSR_TOKEN` requires restarting api and web together.
+
+### 10.3 Database roles (ADR-016)
+
+- Owner `rage` (`MIGRATION_DATABASE_URL`) runs `migrate deploy`, `db:grants` and seeds.
+- App role `rage_app` (`DATABASE_URL`): LOGIN, no superuser/createdb/createrole; DML on application
+  tables; `audit_logs` and `match_events` are INSERT/SELECT only.
+- `pnpm --filter @rage/db db:grants` is idempotent. Run it **after every `migrate deploy`** (new
+  tables need grants). Compose `migrate` and CI do this automatically. Path B
+  (`pnpm local:services`) too: `pnpm db:migrate && pnpm --filter @rage/db db:grants`.
+- Which role is the running API using?
+  `docker compose exec -T postgres psql -U rage -d rage -c "select usename, application_name from pg_stat_activity where datname='rage'"`
+- **Rotate `RAGE_APP_DB_PASSWORD`:** put the new value in `RAGE_APP_DB_PASSWORD` **and** in
+  `DATABASE_URL`, run `db:grants` (compose: `docker compose --profile app run --rm migrate`), then
+  restart the API (`docker compose --profile app up -d api` / restart `pnpm dev`). Already-open
+  connections survive until the restart; new connections need the new password.
+- Existing M0 databases need no manual step — `db:grants` creates the role on first run. Until it
+  has run, an API using the `rage_app` URL fails readiness.
+
+### 10.4 Bootstrap super admin (ADR-017)
+
+Set `BOOTSTRAP_SUPER_ADMIN_STEAM_ID64` to **your own** individual SteamID64 (17 digits, starting
+`7656119`). It is the number in a `steamcommunity.com/profiles/<SteamID64>` profile URL; for a
+custom `/id/<name>` URL use any public SteamID lookup site with the profile URL. No site ever needs
+your Steam password. The first verified Steam login of that SteamID receives `SUPER_ADMIN` (audited
+as `role_grant.bootstrap`); further admins are granted through the audited admin API. Removing the
+variable does not revoke the grant.
+
+### 10.5 Manual real-login verification (acceptance A1 — cannot be automated)
+
+1. `.env` filled per §10.1/§10.2; `docker compose up -d`; `pnpm db:migrate && pnpm --filter @rage/db db:grants`.
+2. Start api + web: `pnpm dev` (or `docker compose --profile app up -d --build`).
+3. `curl -s http://localhost:4000/api/v1/meta` → `features.steamAuth.status` is `configured`.
+4. Open http://localhost:3000/login → sign in through Steam → the browser is on
+   `https://steamcommunity.com/openid/...` (check the address bar); sign in there.
+5. Expect a redirect back to http://localhost:3000/me showing your profile.
+6. Sign out and sign in again: the same user is reused (no second row):
+   `docker compose exec -T postgres psql -U rage -d rage -c "select count(*) from users where is_sample = false"`
+7. Record the date and a **redacted** SteamID (e.g. `7656119********42`) in `docs/PROGRESS.md`.
+
+### 10.6 Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `/meta` says `unconfigured` | realm/return URL/`SESSION_SECRET` missing or invalid (return URL under the realm; secret ≥ 32 bytes). API boot logs name the key, never the value |
+| `/login?error=state_mismatch` | the `rage_oidc` cookie was lost: same browser profile, cookies enabled, do not mix `localhost` and `127.0.0.1` |
+| `/login?error=provider_unavailable` | Redis down (nonce store fails closed) or `steamcommunity.com` unreachable from the API host/container |
+| Steam rejects the localhost realm | Use an HTTPS tunnel, e.g. `cloudflared tunnel --url http://localhost:4000`; set `STEAM_OPENID_REALM=https://<tunnel-host>`, `STEAM_OPENID_RETURN_URL=https://<tunnel-host>/api/v1/auth/steam/callback`, `COOKIE_SECURE=true`. Cookies are then issued for the tunnel host, so web and API must be same-site: serve both through one host (reverse proxy routing `/api/v1` to the API) and update `WEB_PUBLIC_URL`, `API_CORS_ORIGINS`, `NEXT_PUBLIC_API_BASE_URL` (rebuild `web`). A tunnel exposes your local API publicly — stop it right after testing |
+| Signed in but SSR pages show signed-out | web and API must share the host in dev (`localhost` for both) so the browser sends `rage_session` to web SSR |
+| SSR requests throttled as one client | `INTERNAL_SSR_TOKEN` missing or different between api and web |
+
+### 10.7 Production (OUTLINE — M7)
+
+- Same-site deployment: the reverse proxy serves web and `/api/v1` on one HTTPS origin; https realm
+  and return URL (enforced by production env validation); `COOKIE_SECURE=true`;
+  `API_DOCS_ENABLED=false`.
+- `SESSION_SECRET`, `INTERNAL_SSR_TOKEN`, `RAGE_APP_DB_PASSWORD` and the owner URL come from a secret
+  manager; the API container receives only the app-role `DATABASE_URL`; the migrate job receives the
+  owner URL.
+- Secret rotation schedule and the leaked-secret incident procedure (revoke sessions, rotate, review
+  audit log) are written and rehearsed in M7. WebAuthn step-up for SUPER_ADMIN is planned for M7
+  (ADR-018 Q8).

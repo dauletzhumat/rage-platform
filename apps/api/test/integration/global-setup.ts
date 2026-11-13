@@ -31,7 +31,8 @@ export default async function setup(): Promise<void> {
   // Fixed command string (no interpolated input); a shell is needed for pnpm.cmd on Windows.
   execSync('pnpm --filter @rage/db exec prisma migrate deploy', {
     cwd: repoRoot,
-    env: { ...process.env, DATABASE_URL: url },
+    // Prisma CLI prefers MIGRATION_DATABASE_URL (ADR-016): point BOTH at the test database.
+    env: { ...process.env, DATABASE_URL: url, MIGRATION_DATABASE_URL: url },
     stdio: 'inherit',
   });
 }

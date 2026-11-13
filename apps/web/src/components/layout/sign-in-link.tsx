@@ -1,15 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { LogIn } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
+import { loginHref } from '@/lib/auth/return-to';
 import { cn } from '@/lib/utils';
 
-/**
- * M0: Steam sign-in does not exist yet. This links to /login, which explains
- * that sign-in arrives in M1 — it never pretends to authenticate.
- */
+/** Links to /login, carrying the current page as a (sanitised) returnTo. */
 export function SignInLink({
   className,
   onNavigate,
@@ -18,19 +17,16 @@ export function SignInLink({
   onNavigate?: () => void;
 }) {
   const t = useTranslations('nav');
-  const tc = useTranslations('common');
+  const pathname = usePathname() ?? '/';
   return (
     <Link
-      href="/login"
+      href={loginHref(pathname)}
       onClick={onNavigate}
       className={cn(buttonVariants({ variant: 'secondary', size: 'sm' }), className)}
-      title={t('signInUnavailable')}
+      data-testid="sign-in-link"
     >
       <LogIn aria-hidden="true" />
       <span>{t('signInWithSteam')}</span>
-      <span className="rounded-sm bg-overlay px-1 py-0.5 font-mono text-[10px] uppercase text-muted">
-        {tc('comingInM1')}
-      </span>
     </Link>
   );
 }

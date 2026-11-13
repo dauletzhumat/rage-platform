@@ -30,6 +30,24 @@ export type MatchMap = Schemas['MatchMapDto'];
 export type TeamRef = Schemas['TeamRefDto'];
 export type TournamentRef = Schemas['TournamentRefDto'];
 
+// ---- auth / me / admin (M1, docs/AUTH.md) ----
+export type MeResponse = Schemas['MeDto'];
+export type MeUser = Schemas['MeUserDto'];
+export type MeProfile = Schemas['MeProfileDto'];
+export type MeSteamProfile = Schemas['MeSteamProfileDto'];
+export type MeRole = Schemas['MeRoleDto'];
+export type UpdateMyProfileRequest = Schemas['UpdateMyProfileDto'];
+export type CsrfTokenResponse = Schemas['CsrfTokenDto'];
+export type AdminUser = Schemas['AdminUserDto'];
+export type RoleGrant = Schemas['RoleGrantDto'];
+export type GrantRoleRequest = Schemas['GrantRoleDto'];
+export type RevokeRoleRequest = Schemas['RevokeRoleDto'];
+export type AuditLogEntry = Schemas['AuditLogDto'];
+export type RoleType = Schemas['RoleType'];
+export type RoleScopeType = Schemas['RoleScopeType'];
+export type UserStatus = Schemas['UserStatus'];
+export type SteamAuthStatus = Schemas['SteamAuthFeatureDto']['status'];
+
 export type MatchStatus = MatchSummary['status'];
 export type MatchFormat = MatchSummary['format'];
 export type TournamentStatus = TournamentSummary['status'];

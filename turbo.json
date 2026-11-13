@@ -24,7 +24,22 @@
     "test:integration": {
       "dependsOn": ["^build", "^generate", "generate"],
       "cache": false,
-      "env": ["DATABASE_URL", "REDIS_URL", "TEST_DATABASE_URL"]
+      "env": [
+        "DATABASE_URL",
+        "REDIS_URL",
+        "TEST_DATABASE_URL",
+        "MIGRATION_DATABASE_URL",
+        "RAGE_APP_DB_PASSWORD",
+        "RAGE_APP_DB_ROLE"
+      ],
+      "passThroughEnv": [
+        "STEAM_*",
+        "SESSION_*",
+        "WEB_PUBLIC_URL",
+        "COOKIE_SECURE",
+        "INTERNAL_SSR_TOKEN",
+        "BOOTSTRAP_SUPER_ADMIN_STEAM_ID64"
+      ]
     },
     "dev": {
       "dependsOn": ["^build", "^generate"],

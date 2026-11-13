@@ -1,9 +1,10 @@
-import type { ApiErrorBody, ApiFailure, ApiResult } from './types';
+import type { ApiErrorBody, ApiFailure, ApiFieldError, ApiResult } from './types';
 
 export const DEFAULT_API_BASE_URL = 'http://localhost:4000/api/v1';
 export const DEFAULT_TIMEOUT_MS = 5000;
 
 export type QueryValue = string | number | boolean | null | undefined;
+export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 
 export interface ApiRequestOptions {
   baseUrl: string;
@@ -11,7 +12,17 @@ export interface ApiRequestOptions {
   timeoutMs?: number;
   /** HTTP statuses (besides 2xx) whose JSON body is a valid payload, e.g. 503 for /health/ready. */
   acceptStatuses?: number[];
+  /** Extra request headers (SSR token, forwarded cookie, CSRF token …). */
+  headers?: Record<string, string>;
+  /** Browser-only: `include` sends the API's cookies cross-port (same-site). */
+  credentials?: RequestCredentials;
   fetchImpl?: typeof fetch;
+}
+
+export interface ApiSendOptions extends ApiRequestOptions {
+  method: HttpMethod;
+  /** JSON body; omitted when undefined. */
+  body?: unknown;
 }
 
 export function buildUrl(
@@ -52,19 +63,73 @@ function failure(
 }
 
 /**
- * GET a JSON resource from the RAGE API and map every outcome onto `ApiResult`:
- *  - 2xx (or an accepted status)  → `{ ok: true, data }`
- *  - 404                          → `not_found`
+ * `Retry-After` is either delta-seconds or an HTTP date (RFC 9110 §10.2.3).
+ * Returns whole seconds ≥ 0, or undefined when absent/unparseable.
+ */
+export function parseRetryAfter(
+  value: string | null,
+  now: number = Date.now(),
+): number | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) return Number.parseInt(trimmed, 10);
+  const date = Date.parse(trimmed);
+  if (Number.isNaN(date)) return undefined;
+  return Math.max(0, Math.ceil((date - now) / 1000));
+}
+
+const MAX_DETAILS = 50;
+const MAX_TEXT = 500;
+
+/** Keep only well-formed `{ field, message }` entries (bounded) from an error envelope. */
+function readDetails(body: Partial<ApiErrorBody>): ApiFieldError[] | undefined {
+  const raw = (body as { details?: unknown }).details;
+  if (!Array.isArray(raw)) return undefined;
+  const details = raw
+    .filter(
+      (d): d is ApiFieldError =>
+        typeof d === 'object' &&
+        d !== null &&
+        typeof (d as ApiFieldError).field === 'string' &&
+        typeof (d as ApiFieldError).message === 'string',
+    )
+    .slice(0, MAX_DETAILS)
+    .map((d) => ({ field: d.field.slice(0, 200), message: d.message.slice(0, MAX_TEXT) }));
+  return details.length > 0 ? details : undefined;
+}
+
+function readServerMessage(body: Partial<ApiErrorBody>): string | undefined {
+  const message = (body as { message?: unknown }).message;
+  if (typeof message === 'string' && message.trim()) return message.slice(0, MAX_TEXT);
+  if (Array.isArray(message) && typeof message[0] === 'string')
+    return message[0].slice(0, MAX_TEXT);
+  return undefined;
+}
+
+/**
+ * Send a request to the RAGE API and map every outcome onto `ApiResult`:
+ *  - 2xx (or an accepted status)  → `{ ok: true, data }` (204 → `data: null`)
+ *  - 400 → `validation` (+ `details`, `serverMessage`)
+ *  - 401 → `unauthenticated`
+ *  - 403 → `forbidden`
+ *  - 404 → `not_found`
+ *  - 409 → `conflict` (+ `serverMessage`)
+ *  - 429 → `rate_limited` (+ `retryAfterSeconds`)
  *  - network error / timeout / 502 / 503 / 504 → `unavailable`
  *  - anything else (incl. invalid JSON) → `error`
- * Never throws.
+ * Never throws. Server messages are only surfaced for 400/409 (documented as safe to display);
+ * 5xx bodies are never shown.
  */
-export async function apiGet<T>(path: string, options: ApiRequestOptions): Promise<ApiResult<T>> {
+export async function apiSend<T>(path: string, options: ApiSendOptions): Promise<ApiResult<T>> {
   const {
+    method,
+    body,
     baseUrl,
     query,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     acceptStatuses = [],
+    headers = {},
+    credentials,
     fetchImpl = fetch,
   } = options;
 
@@ -75,13 +140,18 @@ export async function apiGet<T>(path: string, options: ApiRequestOptions): Promi
     return failure('error', 'Invalid API base URL configuration.');
   }
 
+  const requestHeaders: Record<string, string> = { accept: 'application/json', ...headers };
+  if (body !== undefined) requestHeaders['content-type'] = 'application/json';
+
   let response: Response;
   try {
     response = await fetchImpl(url, {
-      method: 'GET',
-      headers: { accept: 'application/json' },
+      method,
+      headers: requestHeaders,
       cache: 'no-store',
       signal: AbortSignal.timeout(timeoutMs),
+      ...(credentials ? { credentials } : {}),
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
   } catch (cause) {
     const timedOut =
@@ -94,29 +164,71 @@ export async function apiGet<T>(path: string, options: ApiRequestOptions): Promi
   }
 
   const requestId = response.headers.get('x-request-id') ?? undefined;
-  const body = await readJson(response);
+
+  if (response.status === 204) {
+    return { ok: true, data: null as T };
+  }
+
+  const json = await readJson(response);
 
   if (response.ok || acceptStatuses.includes(response.status)) {
-    if (body === undefined) {
+    if (json === undefined) {
       return failure('error', 'The API returned an invalid response.', {
         status: response.status,
         ...(requestId ? { requestId } : {}),
       });
     }
-    return { ok: true, data: body as T };
+    return { ok: true, data: json as T };
   }
 
-  const errorBody = isErrorBody(body) ? body : {};
+  const errorBody = isErrorBody(json) ? json : {};
+  const effectiveRequestId =
+    typeof errorBody.requestId === 'string' ? errorBody.requestId : requestId;
   const extra = {
     status: response.status,
-    ...((errorBody.requestId ?? requestId) ? { requestId: errorBody.requestId ?? requestId } : {}),
+    ...(effectiveRequestId ? { requestId: effectiveRequestId } : {}),
   };
 
-  if (response.status === 404) {
-    return failure('not_found', 'The requested resource was not found.', extra);
+  switch (response.status) {
+    case 400: {
+      const details = readDetails(errorBody);
+      const serverMessage = readServerMessage(errorBody);
+      return failure('validation', 'The request was rejected by validation.', {
+        ...extra,
+        ...(details ? { details } : {}),
+        ...(serverMessage ? { serverMessage } : {}),
+      });
+    }
+    case 401:
+      return failure('unauthenticated', 'Sign-in required.', extra);
+    case 403:
+      return failure('forbidden', 'You do not have permission for this action.', extra);
+    case 404:
+      return failure('not_found', 'The requested resource was not found.', extra);
+    case 409: {
+      const serverMessage = readServerMessage(errorBody);
+      return failure('conflict', 'The request conflicts with the current state.', {
+        ...extra,
+        ...(serverMessage ? { serverMessage } : {}),
+      });
+    }
+    case 429: {
+      const retryAfterSeconds = parseRetryAfter(response.headers.get('retry-after'));
+      return failure('rate_limited', 'Too many requests.', {
+        ...extra,
+        ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
+      });
+    }
+    case 502:
+    case 503:
+    case 504:
+      return failure('unavailable', 'The API is temporarily unavailable.', extra);
+    default:
+      return failure('error', `The API returned an error (HTTP ${response.status}).`, extra);
   }
-  if (response.status === 502 || response.status === 503 || response.status === 504) {
-    return failure('unavailable', 'The API is temporarily unavailable.', extra);
-  }
-  return failure('error', `The API returned an error (HTTP ${response.status}).`, extra);
+}
+
+/** GET a JSON resource (see `apiSend` for the outcome mapping). Never throws. */
+export function apiGet<T>(path: string, options: ApiRequestOptions): Promise<ApiResult<T>> {
+  return apiSend<T>(path, { ...options, method: 'GET' });
 }

@@ -4,6 +4,151 @@
  */
 
 export interface paths {
+  '/api/v1/admin/audit': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Audit log, newest first */
+    get: operations['AdminAudit_list'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List users (search by nickname or exact SteamID64) */
+    get: operations['AdminUsers_list'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users/{id}/roles': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Grant a role (audited) */
+    post: operations['AdminUsers_grant'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users/{id}/roles/{grantId}/revoke': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Revoke a role grant (audited) */
+    post: operations['AdminUsers_revoke'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/csrf': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** CSRF token for the current session (for clients that cannot read the cookie) */
+    get: operations['Auth_csrf'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/logout': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Sign out: revoke the current session and clear cookies (idempotent)
+     * @description With a valid session, requires `x-csrf-token` and an allowlisted Origin. Without a session it only clears cookies and still returns 204.
+     */
+    post: operations['Auth_logout'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/steam': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Start Steam sign-in (top-level navigation). 302 to steamcommunity.com
+     * @description Sets the short-lived signed `rage_oidc` state cookie. `returnTo` must be a relative path (`/…`, no `//`, no backslash, max 512); anything else falls back to `/`.
+     */
+    get: operations['Auth_start'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/steam/callback': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Steam OpenID callback. Always 302 to the web app
+     * @description Success: sets `rage_session` (httpOnly) + `rage_csrf` cookies and redirects to `WEB_PUBLIC_URL + returnTo`. Failure: redirects to `WEB_PUBLIC_URL/login?error=<code>` with code in state_mismatch | cancelled | invalid_assertion | replay | unsupported_account | account_suspended | provider_unavailable | not_configured.
+     */
+    get: operations['Auth_callback'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/health/live': {
     parameters: {
       query?: never;
@@ -70,6 +215,40 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  '/api/v1/me': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Current user (identity, profile, Steam profile, active roles) */
+    get: operations['Me_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/me/profile': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Update own nickname / country / biography (audited) */
+    patch: operations['Me_update'];
     trace?: never;
   };
   '/api/v1/meta': {
@@ -195,6 +374,32 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    AdminUserDto: {
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: uuid */
+      id: string;
+      /** @description Clearly-labelled demo/seed account (ADR-011) */
+      isSample: boolean;
+      /** Format: date-time */
+      lastLoginAt: string | null;
+      nickname: string | null;
+      /** @description All grants, active and revoked (revokedAt set), newest first */
+      roles: components['schemas']['RoleGrantDto'][];
+      slug: string | null;
+      status: components['schemas']['UserStatus'];
+      /** @example 76561198000000000 */
+      steamId64: string;
+    };
+    AdminUserPageDto: {
+      items: components['schemas']['AdminUserDto'][];
+      /** @example 1 */
+      page: number;
+      /** @example 20 */
+      pageSize: number;
+      /** @example 0 */
+      total: number;
+    };
     ApiErrorDetailDto: {
       /**
        * @description Field path (dot notation) or "(root)"
@@ -205,6 +410,11 @@ export interface components {
       message: string;
     };
     ApiErrorDto: {
+      /**
+       * @description Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED. New codes may be added.
+       * @example CSRF_FAILED
+       */
+      code?: string;
       details?: components['schemas']['ApiErrorDetailDto'][];
       /**
        * @description HTTP reason phrase
@@ -218,9 +428,40 @@ export interface components {
       /** @example 404 */
       statusCode: number;
     };
+    AuditLogDto: {
+      /** @example role_grant.create */
+      action: string;
+      /** Format: uuid */
+      actorUserId: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      detail: {
+        [key: string]: unknown;
+      };
+      /** Format: uuid */
+      id: string;
+      /** @description Server-generated request id */
+      requestId: string | null;
+      resourceId: string | null;
+      /** @example user_role_grant */
+      resourceType: string;
+    };
+    AuditLogPageDto: {
+      items: components['schemas']['AuditLogDto'][];
+      /** @example 1 */
+      page: number;
+      /** @example 20 */
+      pageSize: number;
+      /** @example 0 */
+      total: number;
+    };
     Cs2IntegrationFeatureDto: {
       /** @enum {string} */
       status: 'not_implemented';
+    };
+    CsrfTokenDto: {
+      /** @description Send as `x-csrf-token` on unsafe requests */
+      csrfToken: string;
     };
     DependencyStatusDto: {
       /** @enum {string} */
@@ -229,6 +470,16 @@ export interface components {
     FeaturesDto: {
       cs2Integration: components['schemas']['Cs2IntegrationFeatureDto'];
       steamAuth: components['schemas']['SteamAuthFeatureDto'];
+    };
+    GrantRoleDto: {
+      reason: string;
+      role: components['schemas']['RoleType'];
+      /**
+       * Format: uuid
+       * @description Required for non-GLOBAL scopes; must be absent/null for GLOBAL
+       */
+      scopeId?: string | null;
+      scopeType: components['schemas']['RoleScopeType'];
     };
     LivenessDto: {
       /** @enum {string} */
@@ -301,8 +552,38 @@ export interface components {
       /** @description Only set once the result is server-confirmed and verified */
       winnerTeamSlug: string | null;
     };
+    MeDto: {
+      profile: components['schemas']['MeProfileDto'];
+      /** @description Active role grants */
+      roles: components['schemas']['MeRoleDto'][];
+      steamProfile: components['schemas']['MeSteamProfileDto'] | null;
+      user: components['schemas']['MeUserDto'];
+    };
     /** @enum {string} */
     MembershipRole: 'CAPTAIN' | 'PLAYER' | 'SUBSTITUTE' | 'MANAGER' | 'COACH';
+    MeProfileDto: {
+      biography: string | null;
+      /** @example KZ */
+      countryCode: string | null;
+      nickname: string;
+      slug: string;
+    };
+    MeRoleDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: date-time */
+      issuedAt: string;
+      role: components['schemas']['RoleType'];
+      /** Format: uuid */
+      scopeId: string | null;
+      scopeType: components['schemas']['RoleScopeType'];
+    };
+    MeSteamProfileDto: {
+      /** @description https Steam CDN URL only */
+      avatarUrl: string | null;
+      displayName: string | null;
+      profileUrl: string | null;
+    };
     MetaDto: {
       /** @enum {string} */
       apiVersion: 'v1';
@@ -313,6 +594,20 @@ export interface components {
       name: 'rage-api';
       /** @example 0.0.0 */
       version: string;
+    };
+    MeUserDto: {
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: uuid */
+      id: string;
+      /** Format: date-time */
+      lastLoginAt: string | null;
+      status: components['schemas']['UserStatus'];
+      /**
+       * @description Verified SteamID64 (immutable identity)
+       * @example 76561198000000000
+       */
+      steamId64: string;
     };
     PlayerDetailDto: {
       avatarUrl: string | null;
@@ -368,12 +663,37 @@ export interface components {
       /** @enum {string} */
       status: 'ok' | 'error';
     };
+    RevokeRoleDto: {
+      reason: string;
+    };
+    RoleGrantDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: date-time */
+      issuedAt: string;
+      /**
+       * Format: uuid
+       * @description null = bootstrap
+       */
+      issuedById: string | null;
+      reason: string | null;
+      /** Format: date-time */
+      revokedAt: string | null;
+      role: components['schemas']['RoleType'];
+      /** Format: uuid */
+      scopeId: string | null;
+      scopeType: components['schemas']['RoleScopeType'];
+    };
+    /** @enum {string} */
+    RoleScopeType: 'GLOBAL' | 'TEAM' | 'TOURNAMENT' | 'MATCH';
+    /** @enum {string} */
+    RoleType: 'SUPER_ADMIN' | 'TOURNAMENT_ADMIN' | 'MATCH_ADMIN' | 'OBSERVER' | 'TEAM_MANAGER';
     SteamAuthFeatureDto: {
       /**
-       * @description not_implemented until milestone M1 ships real Steam OpenID verification. Never "configured" without a real implementation.
+       * @description "configured" when realm, return URL, web URL and SESSION_SECRET are valid (Steam sign-in routes work); "unconfigured" otherwise (auth routes answer 503). Says nothing about whether a real Steam login has been verified manually.
        * @enum {string}
        */
-      status: 'not_implemented' | 'unconfigured' | 'configured';
+      status: 'unconfigured' | 'configured';
     };
     TeamDetailDto: {
       activeMemberCount: number;
@@ -484,6 +804,18 @@ export interface components {
       startsAt: string | null;
       status: components['schemas']['TournamentStatus'];
     };
+    UpdateMyProfileDto: {
+      biography?: string | null;
+      /**
+       * @description ISO 3166-1 alpha-2, uppercase; null clears it
+       * @example KZ
+       */
+      countryCode?: string | null;
+      /** @example player_one */
+      nickname?: string;
+    };
+    /** @enum {string} */
+    UserStatus: 'ACTIVE' | 'SUSPENDED' | 'BANNED';
   };
   responses: never;
   parameters: never;
@@ -493,6 +825,379 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  AdminAudit_list: {
+    parameters: {
+      query?: {
+        action?: string;
+        actorUserId?: string;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuditLogPageDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Missing role */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminUsers_list: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+        /** @description Case-insensitive search text */
+        q?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminUserPageDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Missing role */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminUsers_grant: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['GrantRoleDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RoleGrantDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Missing role or CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Active duplicate grant / sample user */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminUsers_revoke: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        grantId: string;
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RevokeRoleDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RoleGrantDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Missing role or CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Already revoked, own SUPER_ADMIN grant, or last SUPER_ADMIN */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  Auth_csrf: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CsrfTokenDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  Auth_logout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Signed out */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  Auth_start: {
+    parameters: {
+      query?: {
+        returnTo?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Redirect to the Steam OpenID provider */
+      302: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Steam sign-in unconfigured */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  Auth_callback: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Redirect to the web app (success or /login?error=…) */
+      302: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Steam sign-in unconfigured */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   Health_live: {
     parameters: {
       query?: never;
@@ -597,6 +1302,83 @@ export interface operations {
         };
       };
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  Me_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MeDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  Me_update: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateMyProfileDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MeDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CSRF validation failed */
+      403: {
         headers: {
           [name: string]: unknown;
         };

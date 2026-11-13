@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { STATUS_CODES } from 'node:http';
 import type { Request, Response } from 'express';
-import type { ApiErrorDto } from './api-error.js';
+import { API_ERROR_CODES, type ApiErrorDto } from './api-error.js';
 import { RequestValidationException } from './validation.js';
 
 type RequestWithId = Request & { id?: string | number };
@@ -21,6 +21,23 @@ export function prismaKnownCode(err: unknown): string | undefined {
   if (!(err instanceof Error) || err.name !== 'PrismaClientKnownRequestError') return undefined;
   const code: unknown = (err as Error & { code?: unknown }).code;
   return typeof code === 'string' ? code : undefined;
+}
+
+/**
+ * Named throttlers emit `Retry-After-<name>` only; clients (and the web app) read the
+ * standard `Retry-After`. Copy the largest named value when the standard one is missing
+ * (QA gate M1 P3-1).
+ */
+export function setStandardRetryAfter(res: Partial<Response>): void {
+  if (typeof res.getHeaderNames !== 'function' || typeof res.setHeader !== 'function') return;
+  if (res.getHeader?.('retry-after') !== undefined) return;
+  let seconds: number | undefined;
+  for (const name of res.getHeaderNames()) {
+    if (!name.toLowerCase().startsWith('retry-after-')) continue;
+    const value = Number(res.getHeader?.(name));
+    if (Number.isFinite(value) && value >= 0) seconds = Math.max(seconds ?? 0, Math.ceil(value));
+  }
+  if (seconds !== undefined) res.setHeader('Retry-After', String(seconds));
 }
 
 /**
@@ -40,13 +57,19 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
     let details: ApiErrorDto['details'];
+    let code: string | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const body = exception.getResponse();
+      if (body && typeof body === 'object' && 'code' in body) {
+        const c = (body as { code: unknown }).code;
+        if (typeof c === 'string' && /^[A-Z][A-Z0-9_]{1,63}$/.test(c)) code = c;
+      }
       if (exception instanceof RequestValidationException) {
         message = exception.message;
         details = exception.details;
+        code = API_ERROR_CODES.validationFailed;
       } else if (typeof body === 'string') {
         message = body;
       } else if (body && typeof body === 'object' && 'message' in body) {
@@ -58,10 +81,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
       if (status === HttpStatus.TOO_MANY_REQUESTS) {
         // Throttler's default text includes its class name; keep the envelope clean.
         message = 'Too many requests, please retry later';
+        code = API_ERROR_CODES.rateLimited;
+        setStandardRetryAfter(res);
       }
+      if (status === HttpStatus.UNAUTHORIZED) code ??= API_ERROR_CODES.unauthenticated;
       if (status >= 500) {
         // Never echo internal exception text for server errors.
         message = STATUS_CODES[status] ?? 'Internal server error';
+        code = undefined;
         this.logger.error({ err: exception, requestId }, 'HTTP 5xx exception');
       }
     } else if (prismaKnownCode(exception) === 'P2002') {
@@ -81,6 +108,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message,
       requestId,
       ...(details ? { details } : {}),
+      ...(code ? { code } : {}),
     };
     if (!res.headersSent) {
       res.status(status).json(payload);

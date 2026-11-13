@@ -3,12 +3,26 @@ import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import type { Viewer } from '@/lib/auth/viewer';
+import { AccountMenu } from './account-menu';
 import { AdminNav } from './admin-nav';
 import { LanguageSwitcher } from './language-switcher';
 import { Logo } from './logo';
 import { MAIN_CONTENT_ID, SkipLink } from './skip-link';
 
-export function AdminShell({ children }: { children: ReactNode }) {
+/**
+ * Admin chrome. The navigation is only rendered for users the layout has resolved as admins
+ * (`showNav`); the API still authorises every admin request.
+ */
+export function AdminShell({
+  children,
+  viewer = null,
+  showNav = false,
+}: {
+  children: ReactNode;
+  viewer?: Viewer | null;
+  showNav?: boolean;
+}) {
   const t = useTranslations('admin');
   return (
     <div className="flex min-h-dvh flex-col">
@@ -21,6 +35,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <Badge tone="accent">{t('title')}</Badge>
           <div className="ml-auto flex items-center gap-2">
             <LanguageSwitcher />
+            {viewer ? <AccountMenu viewer={viewer} /> : null}
             <Link
               href="/"
               className="inline-flex items-center gap-1 text-sm text-muted hover:text-foreground"
@@ -33,9 +48,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <div className="flex flex-1 flex-col lg:flex-row">
-        <aside className="border-b border-border bg-surface/60 px-3 py-3 lg:w-60 lg:shrink-0 lg:border-b-0 lg:border-r lg:py-6">
-          <AdminNav />
-        </aside>
+        {showNav ? (
+          <aside className="border-b border-border bg-surface/60 px-3 py-3 lg:w-60 lg:shrink-0 lg:border-b-0 lg:border-r lg:py-6">
+            <AdminNav />
+          </aside>
+        ) : null}
         <main id={MAIN_CONTENT_ID} tabIndex={-1} className="min-w-0 flex-1 focus:outline-none">
           {children}
         </main>

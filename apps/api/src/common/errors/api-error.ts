@@ -1,5 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+export const API_ERROR_CODES = {
+  unauthenticated: 'UNAUTHENTICATED',
+  csrfFailed: 'CSRF_FAILED',
+  forbiddenRole: 'FORBIDDEN_ROLE',
+  roleAlreadyGranted: 'ROLE_ALREADY_GRANTED',
+  lastSuperAdmin: 'LAST_SUPER_ADMIN',
+  validationFailed: 'VALIDATION_FAILED',
+  rateLimited: 'RATE_LIMITED',
+} as const;
+export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];
+
 export class ApiErrorDetailDto {
   @ApiProperty({ description: 'Field path (dot notation) or "(root)"', example: 'pageSize' })
   field!: string;
@@ -24,4 +35,18 @@ export class ApiErrorDto {
 
   @ApiPropertyOptional({ type: [ApiErrorDetailDto] })
   details?: ApiErrorDetailDto[];
+
+  @ApiPropertyOptional({
+    description:
+      'Stable machine-readable code (branch on this, never on `message`). Known values: ' +
+      Object.values(API_ERROR_CODES).join(', ') +
+      '. New codes may be added.',
+    example: 'CSRF_FAILED',
+  })
+  code?: string;
+}
+
+/** Body helper for HttpExceptions that carry a machine-readable code. */
+export function errorBody(message: string, code: ApiErrorCode): { message: string; code: string } {
+  return { message, code };
 }

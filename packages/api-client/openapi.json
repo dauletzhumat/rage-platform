@@ -1,6 +1,89 @@
 {
   "components": {
     "schemas": {
+      "AdminUserDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isSample": {
+            "description": "Clearly-labelled demo/seed account (ADR-011)",
+            "type": "boolean"
+          },
+          "lastLoginAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "nickname": {
+            "nullable": true,
+            "type": "string"
+          },
+          "roles": {
+            "description": "All grants, active and revoked (revokedAt set), newest first",
+            "items": {
+              "$ref": "#/components/schemas/RoleGrantDto"
+            },
+            "type": "array"
+          },
+          "slug": {
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserStatus"
+              }
+            ]
+          },
+          "steamId64": {
+            "example": "76561198000000000",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "steamId64",
+          "status",
+          "isSample",
+          "nickname",
+          "slug",
+          "createdAt",
+          "lastLoginAt",
+          "roles"
+        ],
+        "type": "object"
+      },
+      "AdminUserPageDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminUserDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "example": 1,
+            "type": "number"
+          },
+          "pageSize": {
+            "example": 20,
+            "type": "number"
+          },
+          "total": {
+            "example": 0,
+            "type": "number"
+          }
+        },
+        "required": ["page", "pageSize", "total", "items"],
+        "type": "object"
+      },
       "ApiErrorDetailDto": {
         "properties": {
           "field": {
@@ -18,6 +101,11 @@
       },
       "ApiErrorDto": {
         "properties": {
+          "code": {
+            "description": "Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED. New codes may be added.",
+            "example": "CSRF_FAILED",
+            "type": "string"
+          },
           "details": {
             "items": {
               "$ref": "#/components/schemas/ApiErrorDetailDto"
@@ -45,6 +133,79 @@
         "required": ["statusCode", "error", "message", "requestId"],
         "type": "object"
       },
+      "AuditLogDto": {
+        "properties": {
+          "action": {
+            "example": "role_grant.create",
+            "type": "string"
+          },
+          "actorUserId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "requestId": {
+            "description": "Server-generated request id",
+            "nullable": true,
+            "type": "string"
+          },
+          "resourceId": {
+            "nullable": true,
+            "type": "string"
+          },
+          "resourceType": {
+            "example": "user_role_grant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "resourceType",
+          "resourceId",
+          "actorUserId",
+          "requestId",
+          "detail",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "AuditLogPageDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditLogDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "example": 1,
+            "type": "number"
+          },
+          "pageSize": {
+            "example": 20,
+            "type": "number"
+          },
+          "total": {
+            "example": 0,
+            "type": "number"
+          }
+        },
+        "required": ["page", "pageSize", "total", "items"],
+        "type": "object"
+      },
       "Cs2IntegrationFeatureDto": {
         "properties": {
           "status": {
@@ -53,6 +214,16 @@
           }
         },
         "required": ["status"],
+        "type": "object"
+      },
+      "CsrfTokenDto": {
+        "properties": {
+          "csrfToken": {
+            "description": "Send as `x-csrf-token` on unsafe requests",
+            "type": "string"
+          }
+        },
+        "required": ["csrfToken"],
         "type": "object"
       },
       "DependencyStatusDto": {
@@ -75,6 +246,37 @@
           }
         },
         "required": ["steamAuth", "cs2Integration"],
+        "type": "object"
+      },
+      "GrantRoleDto": {
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RoleType"
+              }
+            ]
+          },
+          "scopeId": {
+            "description": "Required for non-GLOBAL scopes; must be absent/null for GLOBAL",
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "scopeType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RoleScopeType"
+              }
+            ]
+          }
+        },
+        "required": ["role", "scopeType", "reason"],
         "type": "object"
       },
       "LivenessDto": {
@@ -323,6 +525,138 @@
         ],
         "type": "object"
       },
+      "MeDto": {
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/MeProfileDto"
+          },
+          "roles": {
+            "description": "Active role grants",
+            "items": {
+              "$ref": "#/components/schemas/MeRoleDto"
+            },
+            "type": "array"
+          },
+          "steamProfile": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MeSteamProfileDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "user": {
+            "$ref": "#/components/schemas/MeUserDto"
+          }
+        },
+        "required": ["user", "profile", "steamProfile", "roles"],
+        "type": "object"
+      },
+      "MeProfileDto": {
+        "properties": {
+          "biography": {
+            "nullable": true,
+            "type": "string"
+          },
+          "countryCode": {
+            "example": "KZ",
+            "nullable": true,
+            "type": "string"
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": ["slug", "nickname", "countryCode", "biography"],
+        "type": "object"
+      },
+      "MeRoleDto": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "issuedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RoleType"
+              }
+            ]
+          },
+          "scopeId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "scopeType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RoleScopeType"
+              }
+            ]
+          }
+        },
+        "required": ["id", "role", "scopeType", "scopeId", "issuedAt"],
+        "type": "object"
+      },
+      "MeSteamProfileDto": {
+        "properties": {
+          "avatarUrl": {
+            "description": "https Steam CDN URL only",
+            "nullable": true,
+            "type": "string"
+          },
+          "displayName": {
+            "nullable": true,
+            "type": "string"
+          },
+          "profileUrl": {
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": ["displayName", "avatarUrl", "profileUrl"],
+        "type": "object"
+      },
+      "MeUserDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lastLoginAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UserStatus"
+              }
+            ]
+          },
+          "steamId64": {
+            "description": "Verified SteamID64 (immutable identity)",
+            "example": "76561198000000000",
+            "type": "string"
+          }
+        },
+        "required": ["id", "steamId64", "status", "createdAt", "lastLoginAt"],
+        "type": "object"
+      },
       "MembershipRole": {
         "enum": ["CAPTAIN", "PLAYER", "SUBSTITUTE", "MANAGER", "COACH"],
         "type": "string"
@@ -497,11 +831,87 @@
         "required": ["status", "checks"],
         "type": "object"
       },
+      "RevokeRoleDto": {
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": ["reason"],
+        "type": "object"
+      },
+      "RoleGrantDto": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "issuedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "issuedById": {
+            "description": "null = bootstrap",
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "reason": {
+            "nullable": true,
+            "type": "string"
+          },
+          "revokedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RoleType"
+              }
+            ]
+          },
+          "scopeId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "scopeType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RoleScopeType"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "scopeType",
+          "scopeId",
+          "issuedAt",
+          "issuedById",
+          "reason",
+          "revokedAt"
+        ],
+        "type": "object"
+      },
+      "RoleScopeType": {
+        "enum": ["GLOBAL", "TEAM", "TOURNAMENT", "MATCH"],
+        "type": "string"
+      },
+      "RoleType": {
+        "enum": ["SUPER_ADMIN", "TOURNAMENT_ADMIN", "MATCH_ADMIN", "OBSERVER", "TEAM_MANAGER"],
+        "type": "string"
+      },
       "SteamAuthFeatureDto": {
         "properties": {
           "status": {
-            "description": "not_implemented until milestone M1 ships real Steam OpenID verification. Never \"configured\" without a real implementation.",
-            "enum": ["not_implemented", "unconfigured", "configured"],
+            "description": "\"configured\" when realm, return URL, web URL and SESSION_SECRET are valid (Steam sign-in routes work); \"unconfigured\" otherwise (auth routes answer 503). Says nothing about whether a real Steam login has been verified manually.",
+            "enum": ["unconfigured", "configured"],
             "type": "string"
           }
         },
@@ -857,17 +1267,589 @@
           "isSample"
         ],
         "type": "object"
+      },
+      "UpdateMyProfileDto": {
+        "properties": {
+          "biography": {
+            "maxLength": 500,
+            "nullable": true,
+            "type": "string"
+          },
+          "countryCode": {
+            "description": "ISO 3166-1 alpha-2, uppercase; null clears it",
+            "example": "KZ",
+            "nullable": true,
+            "type": "string"
+          },
+          "nickname": {
+            "example": "player_one",
+            "maxLength": 32,
+            "minLength": 2,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UserStatus": {
+        "enum": ["ACTIVE", "SUSPENDED", "BANNED"],
+        "type": "string"
+      }
+    },
+    "securitySchemes": {
+      "csrf": {
+        "in": "header",
+        "name": "x-csrf-token",
+        "type": "apiKey"
+      },
+      "session": {
+        "in": "cookie",
+        "name": "rage_session",
+        "type": "apiKey"
       }
     }
   },
   "info": {
     "contact": {},
-    "description": "RAGE Platform REST API v1. Conventions: docs/API_CONVENTIONS.md. Steam authentication (M1) and CS2 integration (M4+) are not implemented yet.",
+    "description": "RAGE Platform REST API v1. Conventions: docs/API_CONVENTIONS.md. Authentication: Steam OpenID 2.0 sign-in sets the httpOnly `rage_session` cookie; unsafe methods additionally require the `x-csrf-token` header (docs/AUTH.md). CS2 integration (M4+) is not implemented yet.",
     "title": "RAGE Platform API",
     "version": "0.0.0"
   },
   "openapi": "3.0.0",
   "paths": {
+    "/api/v1/admin/audit": {
+      "get": {
+        "operationId": "AdminAudit_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "example": "auth.login",
+              "maxLength": 96,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actorUserId",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogPageDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Missing role"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Audit log, newest first",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/users": {
+      "get": {
+        "operationId": "AdminUsers_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Case-insensitive search text",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserPageDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Missing role"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "List users (search by nickname or exact SteamID64)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/users/{id}/roles": {
+      "post": {
+        "operationId": "AdminUsers_grant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantRoleDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleGrantDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Missing role or CSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Active duplicate grant / sample user"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Grant a role (audited)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/users/{id}/roles/{grantId}/revoke": {
+      "post": {
+        "operationId": "AdminUsers_revoke",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "grantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeRoleDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleGrantDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Missing role or CSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Already revoked, own SUPER_ADMIN grant, or last SUPER_ADMIN"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Revoke a role grant (audited)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/auth/csrf": {
+      "get": {
+        "operationId": "Auth_csrf",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CsrfTokenDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "CSRF token for the current session (for clients that cannot read the cookie)",
+        "tags": ["auth"]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "description": "With a valid session, requires `x-csrf-token` and an allowlisted Origin. Without a session it only clears cookies and still returns 204.",
+        "operationId": "Auth_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "Signed out"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "CSRF validation failed"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Sign out: revoke the current session and clear cookies (idempotent)",
+        "tags": ["auth"]
+      }
+    },
+    "/api/v1/auth/steam": {
+      "get": {
+        "description": "Sets the short-lived signed `rage_oidc` state cookie. `returnTo` must be a relative path (`/…`, no `//`, no backslash, max 512); anything else falls back to `/`.",
+        "operationId": "Auth_start",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "returnTo",
+            "required": false,
+            "schema": {
+              "example": "/me",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the Steam OpenID provider"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Steam sign-in unconfigured"
+          }
+        },
+        "summary": "Start Steam sign-in (top-level navigation). 302 to steamcommunity.com",
+        "tags": ["auth"]
+      }
+    },
+    "/api/v1/auth/steam/callback": {
+      "get": {
+        "description": "Success: sets `rage_session` (httpOnly) + `rage_csrf` cookies and redirects to `WEB_PUBLIC_URL + returnTo`. Failure: redirects to `WEB_PUBLIC_URL/login?error=<code>` with code in state_mismatch | cancelled | invalid_assertion | replay | unsupported_account | account_suspended | provider_unavailable | not_configured.",
+        "operationId": "Auth_callback",
+        "parameters": [],
+        "responses": {
+          "302": {
+            "description": "Redirect to the web app (success or /login?error=…)"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Steam sign-in unconfigured"
+          }
+        },
+        "summary": "Steam OpenID callback. Always 302 to the web app",
+        "tags": ["auth"]
+      }
+    },
     "/api/v1/health/live": {
       "get": {
         "operationId": "Health_live",
@@ -1017,6 +1999,107 @@
         },
         "summary": "Public match (series) detail with per-map scores",
         "tags": ["matches"]
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "operationId": "Me_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Current user (identity, profile, Steam profile, active roles)",
+        "tags": ["me"]
+      }
+    },
+    "/api/v1/me/profile": {
+      "patch": {
+        "operationId": "Me_update",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMyProfileDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "CSRF validation failed"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Update own nickname / country / biography (audited)",
+        "tags": ["me"]
       }
     },
     "/api/v1/meta": {

@@ -39,7 +39,9 @@ function pgConnectionString(url: string): string {
 export function runPrismaCli(args: string[], url = getTestDatabaseUrl()): string {
   return execFileSync(process.execPath, [PRISMA_CLI, ...args], {
     cwd: PACKAGE_ROOT,
-    env: { ...process.env, DATABASE_URL: url },
+    // Pin BOTH variables: prisma.config.ts prefers MIGRATION_DATABASE_URL, which may point at
+    // the dev database in .env; tests must never touch it.
+    env: { ...process.env, DATABASE_URL: url, MIGRATION_DATABASE_URL: url },
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });

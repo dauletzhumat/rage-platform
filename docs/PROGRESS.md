@@ -3,7 +3,7 @@
 | Milestone | Status | Evidence | Blocker |
 |---|---|---|---|
 | M0 Architecture / repository scaffold | **Verified** (local + GitHub CI green; QA gate conditions closed) | See "M0 evidence"; CI run https://github.com/dauletzhumat/rage-platform/actions/runs/43248240833 | — |
-| M1 Steam Login / player accounts | Not started | Prerequisites listed in `docs/ROADMAP.md` (M1 → security prerequisites) | Real Steam login test needs a Steam account + reachable callback (see ROADMAP M1) |
+| M1 Steam Login / player accounts | **Implemented — awaiting real Steam login** (branch `m1-steam-auth`) | See "M1 evidence"; security gate 0 Critical/High; QA gate PASS WITH CONDITIONS | A1/A2 need one real Steam login by a human (AUTH.md §13 / RUNBOOK §10.5) and green GitHub CI on the M1 commit |
 | M2 Team applications / invitation roster | Not started | DB constraints already in place (23 constraint tests) | Depends on M1 |
 | M3 Tournament registration / brackets | Not started | | Depends on M2 |
 | M4 Server Agent / match control | Not started | | Needs a CS2 dedicated server + MatchZy/CounterStrikeSharp compatibility check |
@@ -12,6 +12,57 @@
 | M7 CS2 E2E / hardening / deploy | Not started | | Production host, domain/TLS |
 
 Update this table after every milestone. `Verified` requires actual test evidence.
+
+---
+
+## M1 evidence (2026-11-12 → 2026-11-13)
+
+### Done
+- Steam OpenID 2.0 sign-in (`check_authentication` against the real Steam endpoint only, strict
+  assertion rules, signed state cookie, single-use Redis nonce, fail-closed), opaque sessions
+  (SHA-256 at rest, absolute + idle expiry, rotation on re-login), CSRF (HMAC token bound to the
+  session + Origin/Referer allowlist), RBAC from `user_role_grants`, `/me` + profile editing,
+  admin users/roles/audit API and UI, bootstrap SUPER_ADMIN (ADR-017), DB app role `rage_app`
+  (ADR-016), nonce CSP on web, SSR token channel, 429 UI state. Contract: `docs/AUTH.md`.
+- M0-carried prerequisites closed: SEC-M0-M3 (nonce CSP), M4 (least-privilege DB role), L6
+  (strict prod env), L9 (SHA-pinned Actions), QA-M0-P2-1 (SSR rate-limit keying; Redis storage
+  remains M7).
+- **Security gate** (0 Critical/High). Fixed with regression tests:
+  - M-1 revoked bootstrap SUPER_ADMIN re-granted on next login → bootstrap is one-shot per user;
+  - M-2 SSR client IP taken from the client-controlled first XFF hop → `WEB_TRUST_PROXY_HOPS`
+    (right-most trusted hop, default 0 = no forwarded IP);
+  - L-1 `returnTo` dot segments / encoded separators rejected (API + web);
+  - L-2 role grant re-checks the actor's SUPER_ADMIN under `FOR SHARE` (race test);
+  - L-3 only post-`check_authentication` rejections are audited (no anonymous audit flooding);
+  - L-5 nickname NFC, biography rejects control/bidi characters.
+  Open (follow-up): L-4 enumerate all controllers in the CSRF wiring test (before M2 adds
+  controllers); mixed-script nickname lookalikes; Info items (session row cleanup, digest-pinned
+  images, `__Host-` cookies, nonce for prerendered global-error page).
+- **QA gate** PASS WITH CONDITIONS (no P0–P2). P3 fixed: standard `Retry-After` on 429
+  (P3-1), audit flooding (P3-2 = L-3), `REVOKE TEMPORARY` for the app role (P3-4), RUNBOOK
+  `--no-deps` note (P3-6). Open P3: HSTS sent over local http (harmless), `next start` vs
+  standalone warning.
+
+### Verified (commands actually run)
+- QA gate run (before gate fixes): format, lint 8/8, typecheck 8/8, unit 349, integration 116 ×2
+  (no flakes), build 6/6, OpenAPI drift none (21 paths), `db:grants` idempotent, `rage_app`
+  privilege checks via psql, e2e live API 38 passed / 5 skipped and API down 34 / 9 skipped,
+  Docker app profile (api connects as `rage_app`, SSR token absent from image and bundle).
+- Live probes: forged/garbled callbacks, host-suffix, op_endpoint, return_to, unsigned
+  claimed_id, parameter pollution, replay, state swap → all rejected; one forged assertion sent
+  to Steam → `invalid_assertion`, no session.
+- After gate fixes (2026-11-13): format ✓; lint 8/8; typecheck 8/8; unit api 199 + web 144
+  + db 32 + client 4; integration db 42 + api 76 (incl. M-1 revoke-sticks and L-2 grant/revoke
+  race tests); build 6/6; e2e live API 38 passed / 5 skipped (opt-in session spec). Live: hostile
+  `returnTo=/..//evil.com` signed as `/`; 429 carries `Retry-After: 60`; anonymous garbage
+  callback → `state_mismatch` with 0 new audit rows.
+
+### Blocked / not verified
+- **A1/A2 real Steam login** — requires a human with a Steam account: set
+  `BOOTSTRAP_SUPER_ADMIN_STEAM_ID64`, start api + web, sign in at `/login`, confirm exactly one
+  user and reuse on repeat login, then run `auth-session.spec.ts` with `E2E_SESSION_COOKIE`.
+  M1 must not be marked Verified before this.
+- GitHub CI on the M1 commit.
 
 ---
 

@@ -1,4 +1,4 @@
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -27,11 +27,13 @@ export function testEnv(overrides: Record<string, string> = {}): Env {
 export async function createTestApp(
   overrides: Record<string, string> = {},
   moduleOptions: AppModuleOptions = {},
+  /** Test hook, e.g. `(b) => b.overrideProvider(OPENID_TRANSPORT).useValue(stub)`. */
+  configure: (builder: TestingModuleBuilder) => TestingModuleBuilder = (b) => b,
 ): Promise<NestExpressApplication> {
   const env = testEnv(overrides);
-  const moduleRef = await Test.createTestingModule({
-    imports: [AppModule.forRoot(env, moduleOptions)],
-  }).compile();
+  const moduleRef = await configure(
+    Test.createTestingModule({ imports: [AppModule.forRoot(env, moduleOptions)] }),
+  ).compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({ bufferLogs: true });
   configureApp(app, env);
   if (env.API_DOCS_ENABLED) setupSwagger(app);

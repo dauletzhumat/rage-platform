@@ -7,6 +7,7 @@
  */
 import type {
   ApiError,
+  Paginated,
   MatchFormat,
   MatchMapStatus,
   MatchStatus,
@@ -105,8 +106,76 @@ export interface TournamentListParams extends ListParams {
   status?: TournamentStatus;
 }
 
+// ---------- auth / admin (M1) ----------
+// Generated from the API OpenAPI document via @rage/api-client (docs/AUTH.md §9).
+import type {
+  AdminUser,
+  AuditLogEntry,
+  GrantRoleRequest as GeneratedGrantRoleRequest,
+  MeResponse,
+  MeRole as GeneratedMeRole,
+  RevokeRoleRequest as GeneratedRevokeRoleRequest,
+  RoleGrant,
+  RoleScopeType as GeneratedRoleScopeType,
+  RoleType as GeneratedRoleType,
+  UpdateMyProfileRequest,
+  UserStatus as GeneratedUserStatus,
+} from '@rage/api-client';
+
+export type RoleType = GeneratedRoleType;
+export type RoleScopeType = GeneratedRoleScopeType;
+export type UserStatus = GeneratedUserStatus;
+export type MeRole = GeneratedMeRole;
+export type MeDto = MeResponse;
+export type UpdateProfileRequest = UpdateMyProfileRequest;
+export type RoleGrantDto = RoleGrant;
+export type AdminUserDto = AdminUser;
+export type GrantRoleRequest = GeneratedGrantRoleRequest;
+export type RevokeRoleRequest = GeneratedRevokeRoleRequest;
+export type AuditLogDto = AuditLogEntry;
+export type PaginatedResponse<T> = Paginated<T>;
+
+const roleTypes = [
+  'SUPER_ADMIN',
+  'TOURNAMENT_ADMIN',
+  'MATCH_ADMIN',
+  'OBSERVER',
+  'TEAM_MANAGER',
+] as const;
+export const ROLE_TYPES: Exhaustive<RoleType, typeof roleTypes> = roleTypes;
+
+const userStatuses = ['ACTIVE', 'SUSPENDED', 'BANNED'] as const;
+export const USER_STATUSES: Exhaustive<UserStatus, typeof userStatuses> = userStatuses;
+
+export type AdminUserListParams = ListParams;
+
+export interface AuditListParams {
+  page?: number;
+  pageSize?: number;
+  action?: string;
+  actorUserId?: string;
+}
+
 // ---------- result type ----------
-export type ApiFailureKind = 'not_found' | 'unavailable' | 'error';
+export type ApiFailureKind =
+  | 'not_found'
+  | 'unavailable'
+  | 'error'
+  /** 400 — request validation failed (`details` lists field errors). */
+  | 'validation'
+  /** 401 — no valid session. */
+  | 'unauthenticated'
+  /** 403 — authenticated but not allowed (or CSRF validation failed). */
+  | 'forbidden'
+  /** 409 — conflict / invalid state transition. */
+  | 'conflict'
+  /** 429 — throttled; `retryAfterSeconds` when the API sent Retry-After. */
+  | 'rate_limited';
+
+export interface ApiFieldError {
+  field: string;
+  message: string;
+}
 
 export interface ApiFailure {
   ok: false;
@@ -116,6 +185,12 @@ export interface ApiFailure {
   /** Safe, user-presentable summary (never a stack trace). */
   message: string;
   requestId?: string;
+  /** Field errors from a 400 response (`ApiErrorDto.details`). */
+  details?: ApiFieldError[];
+  /** The API's own `message` for 400/409 (documented as safe to display; English). */
+  serverMessage?: string;
+  /** Parsed `Retry-After` for 429, in whole seconds. */
+  retryAfterSeconds?: number;
 }
 
 export type ApiResult<T> = { ok: true; data: T } | ApiFailure;
