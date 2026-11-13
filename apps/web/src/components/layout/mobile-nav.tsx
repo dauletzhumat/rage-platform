@@ -1,18 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type MouseEvent, type ReactNode } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useTranslations } from 'next-intl';
 import { Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from './logo';
 import { MainNav } from './main-nav';
-import { SignInLink } from './sign-in-link';
 
-/** Accessible slide-over navigation for small screens (focus-trapped dialog). */
-export function MobileNav() {
+/**
+ * Accessible slide-over navigation for small screens (focus-trapped dialog).
+ * `account` is the server-rendered, session-aware account section.
+ */
+export function MobileNav({ account }: { account: ReactNode }) {
   const t = useTranslations('common');
   const [open, setOpen] = useState(false);
+
+  // Close the dialog when any link inside the account section is followed.
+  function onAccountClick(event: MouseEvent<HTMLDivElement>) {
+    if ((event.target as HTMLElement).closest('a')) setOpen(false);
+  }
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -38,8 +45,9 @@ export function MobileNav() {
           </div>
           <Dialog.Description className="sr-only">{t('tagline')}</Dialog.Description>
           <MainNav orientation="vertical" onNavigate={() => setOpen(false)} />
-          <div className="mt-auto border-t border-border pt-4">
-            <SignInLink className="w-full" onNavigate={() => setOpen(false)} />
+          {/* Click delegation only: links inside handle keyboard activation themselves. */}
+          <div className="mt-auto border-t border-border pt-4" onClick={onAccountClick}>
+            {account}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

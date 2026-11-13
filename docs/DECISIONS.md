@@ -70,3 +70,43 @@ Add new ADRs with date, context, considered alternatives, decision, tradeoffs an
 - **Decision:** Local/CI object storage is **SeaweedFS `chrislusf/seaweedfs:4.52`** (`weed mini`), compose profile `storage`, S3 API published on `127.0.0.1:9000`, bucket created idempotently by an `amazon/aws-cli` one-shot job using plain S3 calls. Application code must use only the AWS SDK v3 S3 API with `S3_ENDPOINT`/`S3_FORCE_PATH_STYLE` so the backend stays swappable (managed S3/R2/B2 are candidates for production at M7).
 - **Tradeoffs:** SeaweedFS S3 coverage of presigned multipart + lifecycle must be confirmed when demo upload lands (M5); swap is configuration-only.
 - **Validation:** 2026-11-11 on Docker Desktop: `s3` healthy; `s3-init` created `rage-local` (re-run → "already exists"); put/get/delete round-trip OK; anonymous GET → 403. To add at M5: CI smoke test (bucket, presigned upload/download, sha256 match).
+
+## ADR-014: Sessions, cookies and CSRF
+- **Date:** 2026-11-12 · **Status:** Accepted (M1)
+- **Context:** Players authenticate via Steam OpenID; the web (Next.js SSR) and API are separate processes; A1/A9 require replay-resistant sessions, revocation and CSRF protection.
+- **Alternatives:** stateless JWT in cookie (no server-side revocation, rotation complexity); Next.js-managed session (auth logic split across apps); bearer tokens in localStorage (XSS-exfiltrable).
+- **Decision:** opaque 32-byte session token in an httpOnly `rage_session` cookie; only its SHA-256 is stored in `auth_sessions`; absolute TTL 14 d, idle 72 h; new session per login; logout/suspension revoke rows. CSRF: session-bound HMAC token in readable `rage_csrf` cookie + required `x-csrf-token` header on unsafe methods + Origin/Referer allowlist; SameSite=Lax. Details: `docs/AUTH.md` §4–5.
+- **Tradeoffs:** a DB lookup per authenticated request (indexed hash; `last_seen_at` write throttled to 5 min); web and API must be same-site in production.
+- **Validation:** integration tests for expiry, idle timeout, revocation, CSRF missing/wrong/cross-origin, cookie flags.
+
+## ADR-015: Steam OpenID 2.0 verification rules and replay store
+- **Date:** 2026-11-12 · **Status:** Accepted (M1)
+- **Context:** Steam is an OpenID 2.0 OP; trusting `claimed_id` without verification is a known account-takeover bug class.
+- **Alternatives:** third-party passport-steam style libraries (unmaintained/unverified internals); stateful associations (Diffie-Hellman; unnecessary complexity).
+- **Decision:** stateless verification via `check_authentication` plus the full rule list in `docs/AUTH.md` §3 (state cookie bound to the browser, exact `return_to`, op_endpoint, claimed_id == identity regex, signed-field coverage, nonce ±5 min + single use). Nonces stored in Redis (`SET NX EX 900`, AOF enabled in compose); Redis unavailable ⇒ fail closed. The OP HTTP transport is an injectable interface; a stub is allowed **only in tests**.
+- **Tradeoffs:** login depends on Redis availability; one extra outbound HTTPS call per login.
+- **Validation:** adversarial tests (forged/mismatched claimed_id, wrong return_to/op_endpoint, unsigned fields, stale/replayed nonce, is_valid:false, OP timeout, state mismatch, sample/non-individual IDs) + one manual real Steam login (A1).
+
+## ADR-016: Separate database owner and application roles
+- **Date:** 2026-11-12 · **Status:** Accepted (M1) — closes SEC-M0-M4
+- **Context:** In M0 the API connected as a superuser, so append-only triggers and audit integrity could be bypassed by any application-level compromise.
+- **Decision:** owner `rage` runs migrations/seeds; API runs as `rage_app` (no superuser/createdb/createrole), DML on app tables, INSERT/SELECT only on `audit_logs` and `match_events`. Idempotent `db:grants` script (run as owner after `migrate deploy`) creates/updates the role and grants, including default privileges for future tables. `MIGRATION_DATABASE_URL` (owner) vs `DATABASE_URL` (app).
+- **Tradeoffs:** one more secret (`RAGE_APP_DB_PASSWORD`) and a deploy step; every new append-only table must be added to the grants script.
+- **Validation:** integration test connecting as `rage_app`: UPDATE/DELETE/TRUNCATE on `audit_logs` fail even with `rage.allow_append_only_maintenance='on'`; normal DML works; role is not superuser.
+
+## ADR-017: Bootstrap super administrator via environment + verified login
+- **Date:** 2026-11-12 · **Status:** Accepted (M1)
+- **Context:** The first SUPER_ADMIN cannot be granted through the admin API. Seeding an admin row without a verified login would be a backdoor.
+- **Alternatives:** CLI command granting to an existing user; first-user-is-admin (race-prone, unsafe).
+- **Decision:** `BOOTSTRAP_SUPER_ADMIN_STEAM_ID64`: the verified Steam login of exactly that individual SteamID64 receives SUPER_ADMIN (GLOBAL, `issued_by NULL`, reason `bootstrap:env`) idempotently inside the login transaction, audited as `role_grant.bootstrap`. Further admins are granted via the audited admin API.
+- **Tradeoffs:** whoever controls server env controls bootstrap (acceptable: they control the DB too); removing the env var does not revoke. **Amended after the M1 security gate (M-1):** bootstrap is one-shot per user — if the user has ever held a global SUPER_ADMIN grant (active or revoked) nothing is issued, so a revocation sticks while the env var is still set.
+- **Validation:** tests: matching verified login gets the grant once; non-matching, sample and repeated logins do not duplicate; audit row present.
+
+## ADR-018: Resolution of ROADMAP open questions Q1–Q5, Q8
+- **Date:** 2026-11-12 · **Status:** Accepted (lead decision; revisit on product feedback)
+- **Q1 `POST /teams`:** exists only for SUPER_ADMIN with mandatory reason, audited (administrative creation, e.g. migrations of legacy teams). Captains create teams only through approved applications (ADR-002). Implemented in M2.
+- **Q2 player route id:** `/players/[slug]` with `player_profiles.slug`; SteamID lookup only via `GET /players?steamId=` (M2+).
+- **Q3 slug vs UUID path segments:** accepted; slugs can never be UUID-shaped (slug pattern + generation rule).
+- **Q4 team manager:** a `user_role_grants` row `TEAM_MANAGER` scoped `TEAM:<teamId>`, granted by captain/admin and audited; `team_staff` is public display only.
+- **Q5 series vs map states:** `matches.status` keeps series-level states; map-level progress (`KNIFE`, `MAP_FINISHED`) lives in `match_maps.status`. The current `MatchStatus` enum still contains `KNIFE`/`MAP_FINISHED`; they will not be used for series and will be removed by an M3 migration together with the state machine.
+- **Q8 MFA for privileged accounts:** Steam OpenID provides no MFA signal; WebAuthn step-up for SUPER_ADMIN actions is planned for M7. Until then, admin actions are audited and admin sessions follow the same TTLs.

@@ -1,14 +1,23 @@
 import 'server-only';
 
 import { cache } from 'react';
+import { cookies, headers } from 'next/headers';
+import { isWellFormedToken, SESSION_COOKIE } from '@/lib/auth/cookies';
 import { apiGet, DEFAULT_API_BASE_URL, type QueryValue } from './http';
+import { buildServerHeaders, parseTrustedHops } from './ssr-headers';
 import type {
+  AdminUserDto,
+  AdminUserListParams,
   ApiResult,
+  AuditListParams,
+  AuditLogDto,
   ListParams,
   MatchDetail,
+  MeDto,
   MatchSummary,
   MetaResponse,
   Paginated,
+  PaginatedResponse,
   PlayerDetail,
   PlayerSummary,
   ReadinessResponse,
@@ -31,20 +40,63 @@ function baseUrl(): string {
   return process.env.API_INTERNAL_URL || DEFAULT_API_BASE_URL;
 }
 
-function get<T>(path: string, query?: Record<string, QueryValue>, acceptStatuses?: number[]) {
-  return apiGet<T>(path, {
+interface IncomingRequest {
+  forwardedFor: string | null;
+  realIp: string | null;
+  sessionToken: string | null;
+}
+
+/**
+ * Visitor context of the current request. Outside a request scope (unit tests, build-time)
+ * `headers()`/`cookies()` throw — then nothing is forwarded.
+ */
+async function incomingRequest(): Promise<IncomingRequest> {
+  try {
+    const [headerStore, cookieStore] = await Promise.all([headers(), cookies()]);
+    return {
+      forwardedFor: headerStore.get('x-forwarded-for'),
+      realIp: headerStore.get('x-real-ip'),
+      sessionToken: cookieStore.get(SESSION_COOKIE)?.value ?? null,
+    };
+  } catch {
+    return { forwardedFor: null, realIp: null, sessionToken: null };
+  }
+}
+
+interface GetOptions {
+  acceptStatuses?: number[];
+  /** Forward the visitor's `rage_session` cookie (only /me and admin reads). */
+  withSession?: boolean;
+}
+
+async function get<T>(
+  path: string,
+  query?: Record<string, QueryValue>,
+  options: GetOptions = {},
+): Promise<ApiResult<T>> {
+  const incoming = await incomingRequest();
+  const result = await apiGet<T>(path, {
     baseUrl: baseUrl(),
     ...(query ? { query } : {}),
-    ...(acceptStatuses ? { acceptStatuses } : {}),
-  }).then((result) => {
-    if (!result.ok && result.kind !== 'not_found') {
-      // Server log only; the client never sees internal details.
-      console.error(
-        `[api] GET ${path} failed: ${result.kind} status=${result.status ?? '-'} requestId=${result.requestId ?? '-'}`,
-      );
-    }
-    return result;
+    ...(options.acceptStatuses ? { acceptStatuses: options.acceptStatuses } : {}),
+    headers: buildServerHeaders({
+      // Server-only secret: this module imports 'server-only', so it never reaches the client.
+      ssrToken: process.env.INTERNAL_SSR_TOKEN,
+      forwardedFor: incoming.forwardedFor,
+      realIp: incoming.realIp,
+      // Reverse proxies in front of the web server; 0 = never forward a client IP (gate M-2).
+      trustedHops: parseTrustedHops(process.env.WEB_TRUST_PROXY_HOPS),
+      sessionToken: incoming.sessionToken,
+      withSession: options.withSession === true,
+    }),
   });
+  if (!result.ok && result.kind !== 'not_found' && result.kind !== 'unauthenticated') {
+    // Server log only; the client never sees internal details.
+    console.error(
+      `[api] GET ${path} failed: ${result.kind} status=${result.status ?? '-'} requestId=${result.requestId ?? '-'}`,
+    );
+  }
+  return result;
 }
 
 function listQuery(params: ListParams = {}): Record<string, QueryValue> {
@@ -78,7 +130,7 @@ export const getMeta = cache((): Promise<ApiResult<MetaResponse>> => get('/meta'
 
 /** 503 is a valid readiness payload (`status: "error"`). */
 export const getReadiness = cache((): Promise<ApiResult<ReadinessResponse>> =>
-  get('/health/ready', undefined, [503]),
+  get('/health/ready', undefined, { acceptStatuses: [503] }),
 );
 
 export const getPlayers = cache(
@@ -114,4 +166,44 @@ export const getMatches = cache(
 
 export const getMatch = cache((id: string): Promise<ApiResult<MatchDetail>> =>
   UUID_PATTERN.test(id) ? get(`/matches/${seg(id)}`) : notFoundWithoutFetch(),
+);
+
+// ---------- session-aware reads (M1) ----------
+
+function unauthenticatedWithoutFetch<T>(): ApiResult<T> {
+  return { ok: false, kind: 'unauthenticated', message: 'Sign-in required.' };
+}
+
+/**
+ * Current user from `GET /me`, forwarding only the visitor's `rage_session` cookie.
+ * No (well-formed) session cookie → `unauthenticated` without any API request; 401 → `unauthenticated`.
+ */
+export const getMe = cache(async (): Promise<ApiResult<MeDto>> => {
+  const { sessionToken } = await incomingRequest();
+  if (!isWellFormedToken(sessionToken)) return unauthenticatedWithoutFetch();
+  return get<MeDto>('/me', undefined, { withSession: true });
+});
+
+export const getAdminUsers = cache(
+  (params?: AdminUserListParams): Promise<ApiResult<PaginatedResponse<AdminUserDto>>> =>
+    get('/admin/users', listQuery(params), { withSession: true }),
+);
+
+/** Audit action filter values are dotted snake-case identifiers (e.g. `role_grant.create`). */
+export const AUDIT_ACTION_PATTERN = /^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)*$/;
+
+export const getAuditLogs = cache(
+  (params?: AuditListParams): Promise<ApiResult<PaginatedResponse<AuditLogDto>>> => {
+    const action =
+      params?.action && params.action.length <= 64 && AUDIT_ACTION_PATTERN.test(params.action)
+        ? params.action
+        : undefined;
+    const actorUserId =
+      params?.actorUserId && UUID_PATTERN.test(params.actorUserId) ? params.actorUserId : undefined;
+    return get(
+      '/admin/audit',
+      { page: params?.page, pageSize: params?.pageSize, action, actorUserId },
+      { withSession: true },
+    );
+  },
 );

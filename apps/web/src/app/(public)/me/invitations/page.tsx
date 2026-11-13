@@ -1,14 +1,36 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { AuthRequired } from '@/components/states/auth-required';
+import { Inbox } from 'lucide-react';
+import { ApiErrorState } from '@/components/states/api-error-state';
+import { Container } from '@/components/ui/container';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageHeader } from '@/components/ui/page-header';
+import { getMe } from '@/lib/api/server';
+import { loginHref } from '@/lib/auth/return-to';
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations('protected');
   return { title: t('invitationsTitle'), robots: { index: false, follow: false } };
 }
 
-/** Protected route. M0: no session exists yet, so render the honest sign-in-required state (no data, no forms). */
+/** Authenticated invitation inbox. Invitations do not exist until M2 — honest empty state. */
 export default async function InvitationsPage() {
-  const t = await getTranslations('protected');
-  return <AuthRequired pageTitle={t('invitationsTitle')} />;
+  const [me, t] = await Promise.all([getMe(), getTranslations('protected')]);
+  if (!me.ok && me.kind === 'unauthenticated') redirect(loginHref('/me/invitations'));
+
+  return (
+    <Container className="space-y-6 py-8">
+      <PageHeader title={t('invitationsTitle')} />
+      {!me.ok ? (
+        <ApiErrorState failure={me} />
+      ) : (
+        <EmptyState
+          icon={Inbox}
+          title={t('invitationsEmpty')}
+          description={t('invitationsComing')}
+        />
+      )}
+    </Container>
+  );
 }

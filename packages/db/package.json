@@ -26,6 +26,7 @@
     "migrate:deploy": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
     "migrate:status": "prisma migrate status",
+    "db:grants": "tsx prisma/grants.ts",
     "seed": "tsx prisma/seed.ts",
     "seed:sample": "tsx prisma/seed-sample.ts"
   },

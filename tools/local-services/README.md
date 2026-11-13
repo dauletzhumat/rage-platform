@@ -42,7 +42,22 @@ in `.local/` (gitignored). To reset, stop the process and delete `.local/postgre
 | `LOCAL_PG_DATABASES` | `rage,rage_test`    |
 | `LOCAL_REDIS_PORT`   | `6379`              |
 
-If you change these, update `DATABASE_URL`, `TEST_DATABASE_URL` and `REDIS_URL` in `.env`.
+If you change these, update `MIGRATION_DATABASE_URL`, `TEST_DATABASE_URL` (owner role) and
+`REDIS_URL` in `.env`.
+
+### Database roles (M1, ADR-016)
+
+The cluster created here has only the owner role (`LOCAL_PG_USER`). The API connects as the
+non-superuser app role `rage_app` (`DATABASE_URL`), which is created/updated by `db:grants`.
+After starting the services, and **after every migration**, run as the owner:
+
+```bash
+pnpm db:migrate                       # uses MIGRATION_DATABASE_URL (owner)
+pnpm --filter @rage/db db:grants      # creates/updates rage_app with RAGE_APP_DB_PASSWORD
+```
+
+Until `db:grants` has run, an API configured with the `rage_app` `DATABASE_URL` fails readiness.
+See `docs/RUNBOOK.md` §10.3.
 
 ## Redis on Windows via WSL
 

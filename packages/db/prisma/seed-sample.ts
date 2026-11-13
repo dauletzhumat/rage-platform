@@ -14,7 +14,7 @@ import {
   type Prisma,
   type PrismaClient,
 } from '../src/index.js';
-import { loadRootEnv } from './load-env.js';
+import { loadRootEnv, ownerDatabaseUrl } from './load-env.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -332,7 +332,7 @@ export async function runSampleSeed(prisma: PrismaClient): Promise<SampleSeedSum
 async function main(): Promise<void> {
   loadRootEnv();
   assertSampleSeedAllowed();
-  const prisma = createPrismaClient();
+  const prisma = createPrismaClient({ databaseUrl: ownerDatabaseUrl() });
   try {
     const summary = await runSampleSeed(prisma);
     console.warn(`[seed:sample] DEMO data ensured (is_sample=true): ${JSON.stringify(summary)}`);

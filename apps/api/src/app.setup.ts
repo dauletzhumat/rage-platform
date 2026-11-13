@@ -4,9 +4,11 @@ import { DocumentBuilder, type OpenAPIObject, SwaggerModule } from '@nestjs/swag
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
+import { CSRF_HEADER, SESSION_COOKIE } from './auth/auth.constants.js';
+import { CSRF_SECURITY, SESSION_SECURITY } from './auth/auth.decorators.js';
 import { ApiErrorDto } from './common/errors/api-error.js';
 import { flattenValidationErrors, RequestValidationException } from './common/errors/validation.js';
-import { resolveRequestId } from './common/http/request-id.js';
+import { type RequestWithIds, resolveRequestIds } from './common/http/request-id.js';
 import { type Env } from './config/env.js';
 import { APP_VERSION } from './version.js';
 
@@ -22,8 +24,11 @@ export function configureApp(app: NestExpressApplication, env: Env): void {
   app.set('trust proxy', env.TRUST_PROXY_HOPS);
   app.disable('x-powered-by');
 
-  app.use((req: Request & { id?: string }, res: Response, next: NextFunction) => {
-    req.id = resolveRequestId(req, res);
+  app.use((req: Request & RequestWithIds, res: Response, next: NextFunction) => {
+    const ids = resolveRequestIds(req, res);
+    req.id = ids.id;
+    req.serverRequestId = ids.serverId;
+    req.clientRequestId = ids.clientId;
     next();
   });
 
@@ -79,9 +84,17 @@ export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
     .setTitle('RAGE Platform API')
     .setDescription(
       'RAGE Platform REST API v1. Conventions: docs/API_CONVENTIONS.md. ' +
-        'Steam authentication (M1) and CS2 integration (M4+) are not implemented yet.',
+        'Authentication: Steam OpenID 2.0 sign-in sets the httpOnly `rage_session` cookie; ' +
+        'unsafe methods additionally require the `x-csrf-token` header (docs/AUTH.md). ' +
+        'CS2 integration (M4+) is not implemented yet.',
     )
     .setVersion(APP_VERSION)
+    .addCookieAuth(
+      SESSION_COOKIE,
+      { type: 'apiKey', in: 'cookie', name: SESSION_COOKIE },
+      SESSION_SECURITY,
+    )
+    .addApiKey({ type: 'apiKey', in: 'header', name: CSRF_HEADER }, CSRF_SECURITY)
     .addServer('/', 'This server')
     .build();
   return SwaggerModule.createDocument(app, config, {

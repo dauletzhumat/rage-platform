@@ -54,8 +54,13 @@ describe('parseEnv', () => {
       parseEnv({ ...base, NODE_ENV: 'production', API_CORS_ORIGINS: 'http://rage.example' }),
     ).toThrow(/https/);
     expect(
-      parseEnv({ ...base, NODE_ENV: 'production', API_CORS_ORIGINS: 'https://rage.example' })
-        .API_CORS_ORIGINS,
+      parseEnv({
+        ...base,
+        SESSION_SECRET: 's'.repeat(43),
+        INTERNAL_SSR_TOKEN: 't'.repeat(43),
+        NODE_ENV: 'production',
+        API_CORS_ORIGINS: 'https://rage.example',
+      }).API_CORS_ORIGINS,
     ).toEqual(['https://rage.example']);
   });
 

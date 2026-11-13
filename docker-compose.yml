@@ -2,13 +2,18 @@
 #
 #   docker compose up -d                          # postgres + redis (infra only)
 #   docker compose --profile storage up -d        # + S3-compatible object storage (SeaweedFS) + bucket bootstrap
-#   docker compose --profile app up -d --build    # + migrate (one-shot) + api + web containers
+#   docker compose --profile app up -d --build    # + migrate (one-shot: migrations + db:grants) + api + web
 #   docker compose --profile seed run --rm seed   # run the dev seed against the compose database
 #
 # Every published port is bound to 127.0.0.1 only. Never publish Postgres, Redis or
 # the object store on a public interface. Credentials below are DEV DEFAULTS that
 # match .env.example and may be overridden from `.env` (compose reads it for
-# interpolation). This file is for local development only — see docs/RUNBOOK.md.
+# interpolation). Secrets (SESSION_SECRET, INTERNAL_SSR_TOKEN, STEAM_WEB_API_KEY) have
+# NO defaults: without them the API reports steamAuth `unconfigured`.
+# This file is for local development only — see docs/RUNBOOK.md.
+#
+# Database roles (ADR-016): `migrate`/`seed` connect as the OWNER (POSTGRES_USER);
+# `api` connects as the non-superuser app role created by `db:grants` in `migrate`.
 
 name: rage
 
@@ -106,7 +111,8 @@ services:
     restart: 'no'
 
   # --- Application containers (profile: app) ----------------------------------------
-  # One-shot: applies committed Prisma migrations (never `migrate dev` / reset).
+  # One-shot, as the OWNER role: applies committed Prisma migrations (never
+  # `migrate dev` / reset), then creates/updates the app role and its grants (idempotent).
   migrate:
     build:
       context: .
@@ -114,8 +120,18 @@ services:
       target: migrate
     image: rage/api-tools:local
     profiles: ['app', 'seed']
+    command:
+      - sh
+      - -c
+      - >-
+        set -e;
+        pnpm --filter @rage/db migrate:deploy;
+        pnpm --filter @rage/db db:grants
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-rage}:${POSTGRES_PASSWORD:-rage_dev_password}@postgres:5432/${POSTGRES_DB:-rage}?schema=public
+      MIGRATION_DATABASE_URL: postgresql://${POSTGRES_USER:-rage}:${POSTGRES_PASSWORD:-rage_dev_password}@postgres:5432/${POSTGRES_DB:-rage}?schema=public
+      DATABASE_URL: postgresql://${RAGE_APP_DB_ROLE:-rage_app}:${RAGE_APP_DB_PASSWORD:-rage_app_dev_password}@postgres:5432/${POSTGRES_DB:-rage}?schema=public
+      RAGE_APP_DB_PASSWORD: ${RAGE_APP_DB_PASSWORD:-rage_app_dev_password}
+      RAGE_APP_DB_ROLE: ${RAGE_APP_DB_ROLE:-rage_app}
     depends_on:
       postgres:
         condition: service_healthy
@@ -131,7 +147,9 @@ services:
     profiles: ['seed']
     command: ['pnpm', '--filter', '@rage/db', 'seed']
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-rage}:${POSTGRES_PASSWORD:-rage_dev_password}@postgres:5432/${POSTGRES_DB:-rage}?schema=public
+      # Seeds run as the OWNER (Prisma CLI/seeds prefer MIGRATION_DATABASE_URL).
+      MIGRATION_DATABASE_URL: postgresql://${POSTGRES_USER:-rage}:${POSTGRES_PASSWORD:-rage_dev_password}@postgres:5432/${POSTGRES_DB:-rage}?schema=public
+      DATABASE_URL: postgresql://${RAGE_APP_DB_ROLE:-rage_app}:${RAGE_APP_DB_PASSWORD:-rage_app_dev_password}@postgres:5432/${POSTGRES_DB:-rage}?schema=public
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -155,7 +173,8 @@ services:
       API_HOST: 0.0.0.0
       API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:3000}
       API_DOCS_ENABLED: ${API_DOCS_ENABLED:-true}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-rage}:${POSTGRES_PASSWORD:-rage_dev_password}@postgres:5432/${POSTGRES_DB:-rage}?schema=public
+      # Non-superuser app role (created by `db:grants` in `migrate`), never the owner.
+      DATABASE_URL: postgresql://${RAGE_APP_DB_ROLE:-rage_app}:${RAGE_APP_DB_PASSWORD:-rage_app_dev_password}@postgres:5432/${POSTGRES_DB:-rage}?schema=public
       REDIS_URL: redis://redis:6379
       S3_ENDPOINT: http://s3:8333
       S3_REGION: ${S3_REGION:-us-east-1}
@@ -163,11 +182,19 @@ services:
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:-rage_dev_access_key}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:-rage_dev_secret_key}
       S3_FORCE_PATH_STYLE: 'true'
-      # M1 (Steam OpenID / sessions) — empty until configured in .env.
-      STEAM_OPENID_REALM: ${STEAM_OPENID_REALM:-}
-      STEAM_OPENID_RETURN_URL: ${STEAM_OPENID_RETURN_URL:-}
-      STEAM_WEB_API_KEY: ${STEAM_WEB_API_KEY:-}
+      # M1 Steam OpenID / sessions (docs/AUTH.md §2). Localhost URLs default for dev;
+      # secrets have no default (empty = unset => steamAuth `unconfigured`, auth routes 503).
+      WEB_PUBLIC_URL: ${WEB_PUBLIC_URL:-http://localhost:3000}
+      STEAM_OPENID_REALM: ${STEAM_OPENID_REALM:-http://localhost:4000}
+      STEAM_OPENID_RETURN_URL: ${STEAM_OPENID_RETURN_URL:-http://localhost:4000/api/v1/auth/steam/callback}
       SESSION_SECRET: ${SESSION_SECRET:-}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-336}
+      SESSION_IDLE_HOURS: ${SESSION_IDLE_HOURS:-72}
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
+      STEAM_WEB_API_KEY: ${STEAM_WEB_API_KEY:-}
+      BOOTSTRAP_SUPER_ADMIN_STEAM_ID64: ${BOOTSTRAP_SUPER_ADMIN_STEAM_ID64:-}
+      # Shared with `web` (same value). Authenticates SSR calls (client-IP throttling).
+      INTERNAL_SSR_TOKEN: ${INTERNAL_SSR_TOKEN:-}
     ports:
       - '127.0.0.1:${API_HOST_PORT:-4000}:4000'
     depends_on:
@@ -212,6 +239,11 @@ services:
       API_INTERNAL_URL: http://api:4000/api/v1
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:4000/api/v1}
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
+      # Server-side only, read at RUNTIME (not a build arg, never NEXT_PUBLIC_*): sent as
+      # `x-rage-ssr-token` on SSR calls to the API. Must equal the api value.
+      INTERNAL_SSR_TOKEN: ${INTERNAL_SSR_TOKEN:-}
+      # Reverse proxies in front of web that append to X-Forwarded-For (0 = trust none).
+      WEB_TRUST_PROXY_HOPS: ${WEB_TRUST_PROXY_HOPS:-0}
     ports:
       - '127.0.0.1:${WEB_HOST_PORT:-3000}:3000'
     depends_on:

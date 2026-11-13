@@ -27,20 +27,21 @@ const prisma = createPrismaClient(); // reads process.env.DATABASE_URL; wires @p
 
 ## Scripts
 
-| Script                              | What it does                                                                                                                                 |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `generate`                          | `prisma generate` → `src/generated/prisma` (gitignored)                                                                                      |
-| `build`                             | generate + `tsc -p tsconfig.build.json` → `dist/` (generated client included)                                                                |
-| `typecheck`                         | `tsc --noEmit` (src, prisma, test, configs)                                                                                                  |
-| `lint`                              | `eslint .` (root flat config)                                                                                                                |
-| `test`                              | unit tests, no DB                                                                                                                            |
-| `test:integration`                  | resets `TEST_DATABASE_URL` (its name **must** end in `_test`), applies migrations, tests constraints, triggers, seeds and fresh-DB migration |
-| `migrate:deploy` / `migrate:status` | apply / inspect migrations on `DATABASE_URL`                                                                                                 |
-| `migrate:dev`                       | create a migration during development (see below)                                                                                            |
-| `seed`                              | production-safe base seed (currently no rows; documents the bootstrap-admin plan)                                                            |
-| `seed:sample`                       | **dev-only** demo dataset; refuses to run when `NODE_ENV=production`                                                                         |
+| Script                              | What it does                                                                                                                                                     |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `generate`                          | `prisma generate` → `src/generated/prisma` (gitignored)                                                                                                          |
+| `build`                             | generate + `tsc -p tsconfig.build.json` → `dist/` (generated client included)                                                                                    |
+| `typecheck`                         | `tsc --noEmit` (src, prisma, test, configs)                                                                                                                      |
+| `lint`                              | `eslint .` (root flat config)                                                                                                                                    |
+| `test`                              | unit tests, no DB                                                                                                                                                |
+| `test:integration`                  | resets `TEST_DATABASE_URL` (its name **must** end in `_test`), applies migrations, tests constraints, triggers, seeds and fresh-DB migration                     |
+| `migrate:deploy` / `migrate:status` | apply / inspect migrations as the owner (`MIGRATION_DATABASE_URL`, else `DATABASE_URL`)                                                                          |
+| `migrate:dev`                       | create a migration during development (see below)                                                                                                                |
+| `db:grants`                         | create/update the least-privilege application role and its grants; run as the owner after every `migrate:deploy` (see [Database roles](#database-roles-adr-016)) |
+| `seed`                              | production-safe base seed (currently no rows; documents the bootstrap-admin plan)                                                                                |
+| `seed:sample`                       | **dev-only** demo dataset; refuses to run when `NODE_ENV=production`                                                                                             |
 
-`prisma.config.ts` and the seed entrypoints load the repo-root `.env` through `process.loadEnvFile`. Variables that are already set in the environment take precedence.
+`prisma.config.ts`, the seed entrypoints and `db:grants` load the repo-root `.env` through `process.loadEnvFile`. Variables that are already set in the environment take precedence. All of them connect with `MIGRATION_DATABASE_URL` when it is set (non-empty) and fall back to `DATABASE_URL`. The API runtime always uses `DATABASE_URL`.
 
 ## Model overview
 
@@ -76,7 +77,7 @@ const prisma = createPrismaClient(); // reads process.env.DATABASE_URL; wires @p
 
 The API should match on the constraint names exported as `DB_CONSTRAINTS`. An integration test checks that every exported name exists.
 
-**Append-only escape hatch:** for deliberate maintenance such as retention pruning, run the change in a transaction with `SET LOCAL rage.allow_append_only_maintenance = 'on'`. The trigger guards against accidents only. It is not a security boundary, because the table owner can drop it. M7 hardening should also `REVOKE UPDATE, DELETE, TRUNCATE` from the application role.
+**Append-only escape hatch:** for deliberate maintenance such as retention pruning, run the change in a transaction with `SET LOCAL rage.allow_append_only_maintenance = 'on'`. The trigger guards against accidents only. It is not a security boundary, because the table owner can drop it. The security boundary is the application role: it has no UPDATE/DELETE/TRUNCATE on these tables at all, so the escape hatch only works for the owner (see [Database roles](#database-roles-adr-016)).
 
 ### Enforced by services (API), not the database
 
@@ -87,6 +88,46 @@ The API should match on the constraint names exported as `DB_CONSTRAINTS`. An in
 - Invitation expiry (`expires_at`), with a periodic job or a check at accept time.
 - Strict SteamID validation before it reaches the database. Note that Postgres `varchar(17)` silently truncates _trailing spaces_ that overflow the length, so `"7656119…0 "` with 18 characters would be stored. Always validate with `isSteamId64Format` and only accept IDs from verified Steam OpenID.
 - Concurrency: run approvals, invitation acceptance, allocation and result commits in transactions. The partial unique indexes are the final arbiter, so map `P2002` on them to `409 Conflict`.
+
+## Database roles (ADR-016)
+
+| Role                     | Connects via                                       | Used by                                    | Privileges                                                                                                                                                               |
+| ------------------------ | -------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| owner (`rage`)           | `MIGRATION_DATABASE_URL` (fallback `DATABASE_URL`) | Prisma CLI (`migrate`), seeds, `db:grants` | owns every object in `public`                                                                                                                                            |
+| application (`rage_app`) | `DATABASE_URL`                                     | API runtime (later also workers)           | `LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS`; CONNECT; schema USAGE (no CREATE); table DML; sequence USAGE/SELECT; restrictions below |
+
+Restrictions that every run re-applies to the application role:
+
+- `audit_logs` and `match_events` (`APPEND_ONLY_TABLES`): SELECT and INSERT only. UPDATE, DELETE and TRUNCATE fail with `permission denied`, even with `rage.allow_append_only_maintenance = 'on'`.
+- `_prisma_migrations` (`NO_ACCESS_TABLES`): no privileges.
+- TRUNCATE, REFERENCES, TRIGGER and MAINTAIN are revoked on every table. The role cannot create, alter or drop objects.
+
+### Running `db:grants`
+
+```sh
+# Order: migrate deploy -> db:grants -> seed (all as the owner)
+pnpm --filter @rage/db migrate:deploy
+RAGE_APP_DB_PASSWORD=... pnpm --filter @rage/db db:grants
+pnpm --filter @rage/db seed
+```
+
+- Env: `RAGE_APP_DB_PASSWORD` is required (12–256 printable ASCII characters, no spaces) and is never logged. `RAGE_APP_DB_ROLE` defaults to `rage_app` and must match `^[a-z_][a-z0-9_]{0,62}$`. `MIGRATION_DATABASE_URL` is the owner connection and falls back to `DATABASE_URL`.
+- **Run it after every `migrate:deploy`.** It is idempotent and runs in one advisory-locked transaction. It creates the role if missing, re-applies the role's attributes and password, revokes everything on `public` tables, grants the exact set again, then checks the result. It refuses to run if migrations are missing, if it is connected as the app role, if an object in `public` is not owned by the connecting role, or if the app role is a member of a privileged role.
+- `ALTER DEFAULT PRIVILEGES FOR ROLE <owner> IN SCHEMA public` gives tables and sequences created by later migrations DML (or USAGE/SELECT for sequences) automatically. Default privileges are tied to the role that _creates_ the objects, so migrations must always run as the same owner that ran `db:grants`.
+- The password is sent as a SCRAM-SHA-256 verifier computed locally and passed as a bind parameter into `format('%L')`, so the cleartext never reaches the server or its logs. node-postgres does not apply SASLprep, which is why passwords must be ASCII.
+- **The local-services fallback** (`tools/local-services`, ADR-009) and any freshly created database also need `db:grants`. Without it, an API whose `DATABASE_URL` uses `rage_app` cannot log in. Recreating a database with `DROP SCHEMA public CASCADE` (as `migrate reset` and the test helpers do) loses its grants and default privileges, so re-run `db:grants` afterwards.
+- Prisma ignores grants: `migrate diff` stays empty, and `migrate deploy` never revokes them.
+
+### Rotating the application password
+
+1. Run `db:grants` with the new `RAGE_APP_DB_PASSWORD`. The change takes effect immediately for the whole cluster, because roles are cluster-wide.
+2. Update `DATABASE_URL` for the API and workers, then restart them. Existing connections stay open until they close. For zero-downtime rotation, create a second app role with `RAGE_APP_DB_ROLE`, switch the API to it, then remove the old role as the owner in each database: `DROP OWNED BY old_role; DROP ROLE old_role;`.
+
+### Adding a new append-only table
+
+1. Write the migration, including its `BEFORE UPDATE/DELETE/TRUNCATE` triggers (copy the pattern used for `audit_logs`).
+2. Add the table to `APPEND_ONLY_TABLES` in [`prisma/grants.ts`](prisma/grants.ts) and extend `test/roles.int.test.ts`.
+3. Deploy with `migrate:deploy`, then `db:grants`. Between those two steps the default privileges give the app role UPDATE/DELETE on the new table (only the trigger blocks it), so never skip `db:grants`.
 
 ## Migrations: forward-only
 

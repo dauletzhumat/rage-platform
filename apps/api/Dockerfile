@@ -6,8 +6,9 @@
 #
 # Targets:
 #   runtime — minimal production image: `node dist/main.js`, non-root, no pnpm, no dev deps.
-#   migrate — tooling image (full workspace deps for @rage/api + @rage/db) that runs
-#             `prisma migrate deploy` via `pnpm --filter @rage/db migrate:deploy`.
+#   migrate — tooling image (full workspace deps for @rage/api + @rage/db) that runs, as
+#             the database OWNER (MIGRATION_DATABASE_URL), `migrate:deploy` and then
+#             `db:grants` (creates/updates the non-superuser app role; ADR-016).
 # No secrets are baked into any layer: all credentials arrive as runtime env vars.
 
 ARG PNPM_VERSION=11.1.3
@@ -59,7 +60,8 @@ RUN DATABASE_URL="postgresql://build:build@127.0.0.1:5432/build" \
 FROM build AS migrate
 ENV NODE_ENV=production
 USER node
-CMD ["pnpm", "--filter", "@rage/db", "migrate:deploy"]
+# Requires MIGRATION_DATABASE_URL (owner) and RAGE_APP_DB_PASSWORD at runtime.
+CMD ["sh", "-c", "set -e; pnpm --filter @rage/db migrate:deploy; pnpm --filter @rage/db db:grants"]
 
 # ---------------------------------------------------------------------------------
 # Self-contained production tree: apps/api files + prod node_modules, with workspace

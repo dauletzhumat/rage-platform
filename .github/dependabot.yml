@@ -21,6 +21,8 @@ updates:
       lint-format:
         patterns: ['eslint', '@eslint/*', 'typescript-eslint', 'prettier', 'globals']
 
+  # Actions are pinned to full commit SHAs with a `# vX.Y.Z` comment (SEC-M0-L9);
+  # Dependabot bumps both the SHA and the comment.
   - package-ecosystem: github-actions
     directory: /
     schedule:

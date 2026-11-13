@@ -29,14 +29,14 @@ describe('platform (real PostgreSQL + Redis)', () => {
     expect(res.headers['cache-control']).toBe('no-store');
   });
 
-  it('GET /api/v1/meta reports Steam auth and CS2 as NOT implemented (no fake integration)', async () => {
+  it('GET /api/v1/meta: Steam auth unconfigured without env; CS2 not implemented', async () => {
     const res = await request(app.getHttpServer()).get('/api/v1/meta').expect(200);
     expect(res.body).toMatchObject({
       name: 'rage-api',
       apiVersion: 'v1',
       environment: 'test',
       features: {
-        steamAuth: { status: 'not_implemented' },
+        steamAuth: { status: 'unconfigured' },
         cs2Integration: { status: 'not_implemented' },
       },
     });

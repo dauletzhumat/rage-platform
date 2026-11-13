@@ -6,11 +6,13 @@ import { APP_VERSION } from '../version.js';
 
 export class SteamAuthFeatureDto {
   @ApiProperty({
-    enum: ['not_implemented', 'unconfigured', 'configured'],
+    enum: ['unconfigured', 'configured'],
     description:
-      'not_implemented until milestone M1 ships real Steam OpenID verification. Never "configured" without a real implementation.',
+      '"configured" when realm, return URL, web URL and SESSION_SECRET are valid (Steam sign-in ' +
+      'routes work); "unconfigured" otherwise (auth routes answer 503). Says nothing about ' +
+      'whether a real Steam login has been verified manually.',
   })
-  status!: 'not_implemented' | 'unconfigured' | 'configured';
+  status!: 'unconfigured' | 'configured';
 }
 
 export class Cs2IntegrationFeatureDto {
@@ -58,9 +60,7 @@ export class MetaController {
       apiVersion: 'v1',
       environment: this.env.NODE_ENV,
       features: {
-        // M0: Steam OpenID is deliberately NOT implemented. Do not report "configured"
-        // merely because env vars exist — that would misrepresent a live integration.
-        steamAuth: { status: 'not_implemented' },
+        steamAuth: { status: this.env.steamAuth ? 'configured' : 'unconfigured' },
         cs2Integration: { status: 'not_implemented' },
       },
     };

@@ -14,7 +14,7 @@
  */
 import { pathToFileURL } from 'node:url';
 import { createPrismaClient, type PrismaClient } from '../src/index.js';
-import { loadRootEnv } from './load-env.js';
+import { loadRootEnv, ownerDatabaseUrl } from './load-env.js';
 
 export interface BaseSeedSummary {
   referenceRowsUpserted: number;
@@ -30,7 +30,7 @@ export async function runBaseSeed(prisma: PrismaClient): Promise<BaseSeedSummary
 
 async function main(): Promise<void> {
   loadRootEnv();
-  const prisma = createPrismaClient();
+  const prisma = createPrismaClient({ databaseUrl: ownerDatabaseUrl() });
   try {
     const summary = await runBaseSeed(prisma);
     console.warn(`[seed] base seed complete: ${JSON.stringify(summary)}`);

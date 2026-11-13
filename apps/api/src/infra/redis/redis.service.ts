@@ -25,11 +25,23 @@ export class RedisService implements OnModuleDestroy {
     this.client.on('error', (err) => this.logger.debug({ err: errorSummary(err) }, 'redis error'));
   }
 
+  private connecting?: Promise<void>;
+
+  /**
+   * Connect on first use. Concurrent callers share one in-flight connect (ioredis rejects a
+   * second `connect()` while connecting). Throws on failure/timeout.
+   */
+  async ensureConnected(timeoutMs = 2000): Promise<void> {
+    if (this.client.status !== 'wait' && this.client.status !== 'end') return;
+    this.connecting ??= this.client.connect().finally(() => {
+      this.connecting = undefined;
+    });
+    await withTimeout(this.connecting, timeoutMs);
+  }
+
   async ping(timeoutMs = 2000): Promise<boolean> {
     try {
-      if (this.client.status === 'wait' || this.client.status === 'end') {
-        await withTimeout(this.client.connect(), timeoutMs);
-      }
+      await this.ensureConnected(timeoutMs);
       const pong = await withTimeout(this.client.ping(), timeoutMs);
       return pong === 'PONG';
     } catch (err) {

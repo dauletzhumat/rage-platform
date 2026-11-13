@@ -6,7 +6,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
-import { AllExceptionsFilter } from '../../src/common/errors/all-exceptions.filter.js';
+import {
+  AllExceptionsFilter,
+  setStandardRetryAfter,
+} from '../../src/common/errors/all-exceptions.filter.js';
 import { RequestValidationException } from '../../src/common/errors/validation.js';
 
 function run(exception: unknown) {
@@ -55,6 +58,26 @@ describe('AllExceptionsFilter', () => {
     );
     expect(status).toBe(400);
     expect(body?.details).toEqual([{ field: 'pageSize', message: 'too big' }]);
+    expect(body?.code).toBe('VALIDATION_FAILED');
+  });
+
+  it('passes through machine-readable codes and defaults 401 to UNAUTHENTICATED', () => {
+    expect(
+      run(new ForbiddenException({ message: 'CSRF validation failed', code: 'CSRF_FAILED' })).body,
+    ).toMatchObject({ statusCode: 403, message: 'CSRF validation failed', code: 'CSRF_FAILED' });
+    expect(run(new HttpException('nope', HttpStatus.UNAUTHORIZED)).body?.code).toBe(
+      'UNAUTHENTICATED',
+    );
+    expect(run(new HttpException('x', HttpStatus.TOO_MANY_REQUESTS)).body?.code).toBe(
+      'RATE_LIMITED',
+    );
+    // Malformed codes are dropped; 5xx never carry codes.
+    expect(
+      run(new ForbiddenException({ message: 'x', code: 'bad code<>' })).body?.code,
+    ).toBeUndefined();
+    expect(
+      run(new HttpException({ message: 'x', code: 'SOME_CODE' }, 503)).body?.code,
+    ).toBeUndefined();
   });
 
   it('hides internals of unknown errors', () => {
@@ -88,6 +111,23 @@ describe('AllExceptionsFilter', () => {
     );
     expect(status).toBe(429);
     expect(body?.message).toBe('Too many requests, please retry later');
+  });
+
+  it('mirrors named Retry-After-<throttler> into the standard Retry-After', () => {
+    const headers = new Map<string, unknown>([
+      ['retry-after-auth', '42'],
+      ['retry-after-default', 7],
+    ]);
+    const res = {
+      getHeaderNames: () => [...headers.keys()],
+      getHeader: (n: string) => headers.get(n.toLowerCase()),
+      setHeader: (n: string, v: unknown) => headers.set(n.toLowerCase(), v),
+    };
+    setStandardRetryAfter(res as never);
+    expect(headers.get('retry-after')).toBe('42');
+    headers.set('retry-after', '5');
+    setStandardRetryAfter(res as never);
+    expect(headers.get('retry-after')).toBe('5');
   });
 
   it('never echoes internal text of 5xx HttpExceptions', () => {
