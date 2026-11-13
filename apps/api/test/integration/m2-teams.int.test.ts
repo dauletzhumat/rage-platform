@@ -91,6 +91,10 @@ describe('M2 teams API (real PostgreSQL + Redis)', () => {
 
   beforeAll(async () => {
     ({ app, op } = await createAuthTestApp({ BOOTSTRAP_SUPER_ADMIN_STEAM_ID64: adminSteamId }));
+    // Listen once: otherwise supertest calls listen()/close() on the same http.Server for every
+    // request, and the many parallel requests of the concurrency tests race on it (observed as
+    // sporadic native worker crashes on Windows).
+    await app.listen(0, '127.0.0.1');
     await truncateAll(app);
     admin = await user(adminSteamId);
   });
@@ -374,42 +378,61 @@ describe('M2 teams API (real PostgreSQL + Redis)', () => {
       await get('/admin/team-applications?status=BOGUS', admin).expect(400);
     });
 
-    it('SUPER_ADMIN POST /teams creates a team with captain (audited)', async () => {
+    it('POST /teams no longer exists: teams come only from approved applications (gate M-1)', async () => {
       const cap = await user();
-      const s = uniq();
-      const res = await post('/teams', admin, {
-        name: `Direct ${s}`,
+      await post('/teams', admin, {
+        name: `Direct ${uniq()}`,
         tag: newTag(),
         captainUserId: cap.id,
-        reason: 'Invited partner org',
-      }).expect(201);
-      expect(res.body.roster).toEqual([
-        expect.objectContaining({ userId: cap.id, role: 'CAPTAIN' }),
-      ]);
-      const audit = await db().auditLog.findFirstOrThrow({
-        where: { action: 'team.create', resourceId: res.body.id },
-      });
-      expect(audit.detailJson).toMatchObject({ source: 'admin', reason: 'Invited partner org' });
-      const again = await post('/teams', admin, {
-        name: `Direct2 ${s}`,
-        tag: newTag(),
-        captainUserId: cap.id,
-        reason: 'second team',
-      }).expect(409);
-      expect(again.body.code).toBe('ALREADY_IN_TEAM');
-      const missing = await post('/teams', admin, {
-        name: `Direct3 ${s}`,
-        tag: newTag(),
-        captainUserId: randomUUID(),
-        reason: 'nobody',
+        reason: 'should not exist',
       }).expect(404);
-      expect(missing.body.code).toBe('PLAYER_NOT_FOUND');
-      await post('/teams', cap, {
-        name: `Direct4 ${s}`,
+      expect(await db().teamMembership.count({ where: { userId: cap.id } })).toBe(0);
+    });
+
+    it('per-applicant quota: at most 5 submissions per rolling 24 h → 409 APPLICATION_LIMIT', async () => {
+      const u = await user();
+      for (let i = 0; i < 5; i++) {
+        const appl = await apply(u);
+        await post(`/team-applications/${appl.id}/withdraw`, u).expect(200);
+      }
+      const res = await post('/team-applications', u, {
+        name: `Quota ${uniq()}`,
         tag: newTag(),
-        captainUserId: cap.id,
-        reason: 'self',
-      }).expect(403);
+      }).expect(409);
+      expect(res.body.code).toBe('APPLICATION_LIMIT');
+      // Outside the rolling window the quota frees up again.
+      await db().teamApplication.updateMany({
+        where: { applicantUserId: u.id },
+        data: { createdAt: new Date(Date.now() - 25 * 3600_000) },
+      });
+      await apply(u);
+    });
+
+    it('sample applications cannot be rejected (409 SAMPLE_RESOURCE) and are flagged isSample', async () => {
+      const sampleUser = await db().user.create({
+        data: {
+          steamId64: sampleSteamId(),
+          isSample: true,
+          playerProfile: { create: { nickname: 'sample-app', slug: `sample-app-${uniq()}` } },
+        },
+      });
+      const s = uniq();
+      const appl = await db().teamApplication.create({
+        data: {
+          applicantUserId: sampleUser.id,
+          requestedName: `Sample App ${s}`,
+          requestedTag: newTag(),
+          requestedSlug: `sample-app-${s}`,
+        },
+      });
+      const res = await post(`/admin/team-applications/${appl.id}/reject`, admin, {
+        reason: 'demo data',
+      }).expect(409);
+      expect(res.body.code).toBe('SAMPLE_RESOURCE');
+      const list = await get('/admin/team-applications?pageSize=100', admin).expect(200);
+      const items = list.body.items as { id: string; isSample: boolean }[];
+      expect(items.find((i) => i.id === appl.id)?.isSample).toBe(true);
+      expect(items.filter((i) => i.id !== appl.id).every((i) => i.isSample === false)).toBe(true);
     });
   });
 
@@ -689,6 +712,130 @@ describe('M2 teams API (real PostgreSQL + Redis)', () => {
       expect(view.body.permissions.canTransfer).toBe(true);
     });
 
+    it('re-invite cooldown: 24 h after a DECLINED or REVOKED invitation → 409 INVITATION_COOLDOWN', async () => {
+      const team = await makeTeam();
+      const u = await user();
+      const i1 = await invite(team.id, team.captain, u);
+      await post(`/invitations/${i1.id}/decline`, u).expect(200);
+      const again = await post(`/teams/${team.id}/invitations`, team.captain, {
+        steamId64: u.steamId64,
+        role: 'PLAYER',
+      }).expect(409);
+      expect(again.body.code).toBe('INVITATION_COOLDOWN');
+      const v = await user();
+      const i2 = await invite(team.id, team.captain, v);
+      await post(`/teams/${team.id}/invitations/${i2.id}/revoke`, team.captain, {}).expect(200);
+      const revoked = await post(`/teams/${team.id}/invitations`, admin, {
+        steamId64: v.steamId64,
+        role: 'PLAYER',
+      }).expect(409);
+      expect(revoked.body.code).toBe('INVITATION_COOLDOWN');
+      // Other teams are unaffected; after 24 h the same team may invite again.
+      const other = await makeTeam();
+      await invite(other.id, other.captain, u);
+      await db().teamInvitation.update({
+        where: { id: i1.id },
+        data: { respondedAt: new Date(Date.now() - 25 * 3600_000) },
+      });
+      await invite(team.id, team.captain, u);
+    });
+
+    it('the same invitation accepted twice in parallel ⇒ [200, 409], one membership, one audit', async () => {
+      const team = await makeTeam();
+      const u = await user();
+      const inv = await invite(team.id, team.captain, u);
+      const results = await Promise.all([
+        post(`/invitations/${inv.id}/accept`, u),
+        post(`/invitations/${inv.id}/accept`, u),
+      ]);
+      expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
+      expect(results.find((r) => r.status === 409)!.body.code).toBe('INVITATION_NOT_PENDING');
+      expect(await db().teamMembership.count({ where: { userId: u.id } })).toBe(1);
+      expect(await auditCount('team_invitation.accept', inv.id)).toBe(1);
+    });
+
+    it('concurrent invites at the pending cap ⇒ exactly one more invitation', async () => {
+      const team = await makeTeam();
+      for (let i = 0; i < 9; i++) await invite(team.id, team.captain, await user());
+      const invitees = [await user(), await user(), await user()];
+      const results = await Promise.all(
+        invitees.map((u) =>
+          post(`/teams/${team.id}/invitations`, team.captain, {
+            steamId64: u.steamId64,
+            role: 'PLAYER',
+          }),
+        ),
+      );
+      expect(results.map((r) => r.status).sort()).toEqual([201, 409, 409]);
+      for (const r of results.filter((x) => x.status === 409)) {
+        expect(r.body.code).toBe('INVITATION_LIMIT');
+      }
+      expect(
+        await db().teamInvitation.count({ where: { teamId: team.id, status: 'PENDING' } }),
+      ).toBe(10);
+    });
+
+    it('grant revocation racing operator actions never yields 5xx (lock order, gate L-1)', async () => {
+      const otherAdmin = await user();
+      await post(`/admin/users/${otherAdmin.id}/roles`, admin, {
+        role: 'SUPER_ADMIN',
+        scopeType: 'GLOBAL',
+        reason: 'second admin',
+      }).expect(201);
+      for (let round = 0; round < 3; round++) {
+        const team = await makeTeam();
+        const saManager = await user();
+        const manager = await user();
+        await post(`/admin/users/${saManager.id}/roles`, admin, {
+          role: 'SUPER_ADMIN',
+          scopeType: 'GLOBAL',
+          reason: 'sa manager',
+        }).expect(201);
+        const grants: Record<string, string> = {};
+        for (const m of [saManager, manager]) {
+          const g = await post(`/admin/users/${m.id}/roles`, admin, {
+            role: 'TEAM_MANAGER',
+            scopeType: 'TEAM',
+            scopeId: team.id,
+            reason: 'team manager',
+          }).expect(201);
+          grants[m.id] = g.body.id as string;
+        }
+        const targets = [await user(), await user(), await user()];
+        const [i1, i2, r1, i3, r2] = await Promise.all([
+          post(`/teams/${team.id}/invitations`, saManager, {
+            steamId64: targets[0]!.steamId64,
+            role: 'PLAYER',
+          }),
+          post(`/teams/${team.id}/invitations`, manager, {
+            steamId64: targets[1]!.steamId64,
+            role: 'PLAYER',
+          }),
+          post(`/admin/users/${saManager.id}/roles/${grants[saManager.id]}/revoke`, otherAdmin, {
+            reason: 'race revoke',
+          }),
+          post(`/teams/${team.id}/invitations`, saManager, {
+            steamId64: targets[2]!.steamId64,
+            role: 'SUBSTITUTE',
+          }),
+          post(`/admin/users/${manager.id}/roles/${grants[manager.id]}/revoke`, otherAdmin, {
+            reason: 'race revoke',
+          }),
+        ]);
+        for (const r of [i1, i2, r1, i3, r2]) expect(r.status).toBeLessThan(500);
+        expect(i1.status).toBe(201); // still SUPER_ADMIN
+        expect(i3.status).toBe(201);
+        expect([201, 403]).toContain(i2.status);
+        expect(r1.status).toBe(200);
+        expect(r2.status).toBe(200);
+        // After revocation the plain manager has no authority left.
+        await post(`/teams/${team.id}/invitations`, manager, {
+          steamId64: (await user()).steamId64,
+          role: 'PLAYER',
+        }).expect(403);
+      }
+    });
+
     it('sample teams are never mutated (409 SAMPLE_RESOURCE)', async () => {
       const sampleTeam = await db().team.create({
         data: { slug: `sample-${uniq()}`, name: `Sample ${uniq()}`, tag: 'SMP', isSample: true },
@@ -805,6 +952,39 @@ describe('M2 teams API (real PostgreSQL + Redis)', () => {
       }).expect(403);
       expect((await get('/me', p).expect(200)).body.membership.role).toBe('CAPTAIN');
       await post(`/teams/${team.id}/leave`, team.captain).expect(204);
+    });
+
+    it('transfer to a suspended member → 409 MEMBER_INELIGIBLE (gate L-6)', async () => {
+      const team = await makeTeam();
+      const p = await addMember(team.id, team.captain);
+      await db().user.update({ where: { id: p.id }, data: { status: 'SUSPENDED' } });
+      const res = await post(`/teams/${team.id}/transfer-captain`, team.captain, {
+        newCaptainUserId: p.id,
+      }).expect(409);
+      expect(res.body.code).toBe('MEMBER_INELIGIBLE');
+      const captain = await db().teamMembership.findFirstOrThrow({
+        where: { teamId: team.id, role: 'CAPTAIN', leftAt: null },
+      });
+      expect(captain.userId).toBe(team.captain.id);
+    });
+
+    it('leave vs remove race closes the membership exactly once', async () => {
+      for (let round = 0; round < 3; round++) {
+        const team = await makeTeam();
+        const p = await addMember(team.id, team.captain);
+        const [leave, remove] = await Promise.all([
+          post(`/teams/${team.id}/leave`, p),
+          post(`/teams/${team.id}/members/${p.id}/remove`, team.captain, { reason: 'race test' }),
+        ]);
+        expect([leave.status, remove.status].sort()).toEqual([204, 404]);
+        expect((leave.status === 404 ? leave : remove).body.code).toBe('NOT_TEAM_MEMBER');
+        const rows = await db().teamMembership.findMany({
+          where: { teamId: team.id, userId: p.id },
+        });
+        expect(rows).toHaveLength(1);
+        expect(rows[0]!.leftAt).not.toBeNull();
+        expect(['left', 'removed']).toContain(rows[0]!.leftReason);
+      }
     });
 
     it('transfer vs remove race leaves exactly one captain and a consistent roster', async () => {
@@ -971,6 +1151,37 @@ describe('M2 teams API (real PostgreSQL + Redis)', () => {
         if (r.body.code === 'IDEMPOTENCY_IN_PROGRESS') expect(r.headers['retry-after']).toBe('1');
       }
       expect(await auditCount('team_invitation.create', [...ids][0])).toBe(1);
+    });
+
+    it('reserve opportunistically purges long-expired keys (gate L-4)', async () => {
+      const u = await user();
+      const row = (k: string, hash: string, createdH: number, expiresH: number) => ({
+        userId: u.id,
+        key: k,
+        method: 'POST',
+        route: '/api/v1/team-applications',
+        requestHash: hash.repeat(64),
+        status: 'COMPLETED' as const,
+        responseStatus: 201,
+        responseBody: { id: k },
+        createdAt: new Date(Date.now() - createdH * 3600_000),
+        expiresAt: new Date(Date.now() - expiresH * 3600_000),
+      });
+      const old = await db().idempotencyKey.create({
+        data: row(`purge-${randomUUID()}`, 'a', 50, 26),
+      });
+      // Expired, but still inside the one-hour grace period: kept.
+      const recent = await db().idempotencyKey.create({
+        data: row(`recent-${randomUUID()}`, 'b', 24.5, 0.5),
+      });
+      await post(
+        '/team-applications',
+        u,
+        { name: `Purge ${uniq()}`, tag: newTag() },
+        { 'Idempotency-Key': key() },
+      ).expect(201);
+      expect(await db().idempotencyKey.count({ where: { id: old.id } })).toBe(0);
+      expect(await db().idempotencyKey.count({ where: { id: recent.id } })).toBe(1);
     });
 
     it('204 responses replay with a null body; expired keys are reusable', async () => {

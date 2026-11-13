@@ -57,7 +57,6 @@ export type TeamApplicant = Schemas['TeamApplicantDto'];
 export type CreateTeamApplicationRequest = Schemas['CreateTeamApplicationDto'];
 export type ApproveTeamApplicationRequest = Schemas['ApproveTeamApplicationDto'];
 export type RejectTeamApplicationRequest = Schemas['RejectTeamApplicationDto'];
-export type AdminCreateTeamRequest = Schemas['AdminCreateTeamDto'];
 export type TeamInvitation = Schemas['TeamInvitationDto'];
 export type MyInvitation = Schemas['MyInvitationDto'];
 export type CreateInvitationRequest = Schemas['CreateInvitationDto'];

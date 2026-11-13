@@ -73,7 +73,7 @@ Status code policy:
 ## 8. Idempotency (design; implemented from M2)
 - Header **`Idempotency-Key`** (UUID v4 or 16–64 safe chars) on state-changing action POSTs: approve/reject, accept/decline/revoke, register, generate-bracket, assign-server, prepare/pause/resume, server commands, forfeit, result override. Required for server commands and generate-bracket; optional (recommended) elsewhere — the web client always sends one per user intent.
 - Storage `idempotency_keys(user_id|agent_id, key, method, route, request_hash, status, response_status, response_body, created_at, expires_at)`, unique `(principal, key)`; retention 24 h.
-- Semantics: first request records `IN_PROGRESS` in the same transaction as the mutation; replay with same hash ⇒ stored response (same status, header `Idempotency-Replayed: true`); same key different hash ⇒ 409; concurrent in-progress ⇒ 409 with `Retry-After`.
+- Semantics (as built in M2, `docs/TEAMS.md` §12.13): the first request atomically reserves an `IN_PROGRESS` row in its own statement, the business transaction runs, and the 2xx response is stored after commit (errors release the key; an abandoned `IN_PROGRESS` row can be taken over after 120 s); correctness never depends on this layer; replay with same hash ⇒ stored response (same status, header `Idempotency-Replayed: true`); same key different hash ⇒ 409; concurrent in-progress ⇒ 409 with `Retry-After`.
 - Idempotency keys are a convenience layer; correctness still comes from DB constraints and state checks (approve twice ⇒ second sees non-PENDING ⇒ 409 or returns existing result for the same key).
 - Server commands additionally carry a server-generated `commandId` (ARCHITECTURE §Server adapter).
 

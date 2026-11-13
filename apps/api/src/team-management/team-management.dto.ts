@@ -2,21 +2,8 @@ import { ApiProperty } from '@nestjs/swagger';
 import { InvitationStatus } from '@rage/db';
 import { IsIn, IsString, IsUUID, Matches } from 'class-validator';
 import { TeamDetailDto } from '../teams/teams.dto.js';
-import {
-  OptionalReasonField,
-  ReasonField,
-  TeamIdentityInputDto,
-} from '../team-domain/team-input.dto.js';
+import { OptionalReasonField, ReasonField } from '../team-domain/team-input.dto.js';
 import { INVITATION_ROLES, type InvitationRole } from '../team-domain/team-policy.js';
-
-export class AdminCreateTeamDto extends TeamIdentityInputDto {
-  @ApiProperty({ format: 'uuid', description: 'Existing ACTIVE non-sample user without a team' })
-  @IsUUID()
-  captainUserId!: string;
-
-  @ReasonField('Why the team is created directly (audited)')
-  reason!: string;
-}
 
 export class CreateInvitationDto {
   @ApiProperty({

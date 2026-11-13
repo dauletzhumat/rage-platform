@@ -6,6 +6,11 @@ export const ROSTER_CAP = 7;
 export const INVITATION_TTL_MS = 7 * 24 * 3600_000;
 export const MAX_PENDING_INVITATIONS_PER_TEAM = 10;
 export const MY_APPLICATIONS_LIMIT = 20;
+/** Gate L-3: application submissions per applicant per rolling 24 h. */
+export const APPLICATION_QUOTA_PER_DAY = 5;
+export const APPLICATION_QUOTA_WINDOW_MS = 24 * 3600_000;
+/** Gate L-5: re-invite cooldown after a REVOKED / DECLINED invitation (same team + invitee). */
+export const INVITATION_COOLDOWN_MS = 24 * 3600_000;
 export const MY_INVITATIONS_LIMIT = 50;
 
 export const TEAM_NAME_MIN = 3;

@@ -216,11 +216,13 @@ DTO shapes:
 last SUPER_ADMIN grant), `VALIDATION_FAILED` (400 with `details`), `RATE_LIMITED` (429). Other
 errors may omit `code`; 5xx never carry one. New codes may be added within v1.
 
+M2 adds the team/invitation codes listed in `docs/TEAMS.md` §8.
+
 ## 10. Audit actions (M1)
 `auth.login`, `auth.logout`, `auth.login_rejected` (code plus the verified SteamID; written
 only for rejections AFTER Steam `check_authentication`, i.e. `unsupported_account` /
 `account_suspended` — earlier anonymous failures such as `state_mismatch` are logged, not
-audited, so they cannot flood the append-only table; M1 security gate L-3), `profile.update`, `role_grant.create`, `role_grant.revoke`, `role_grant.bootstrap`.
+audited, so they cannot flood the append-only table; M1 security gate L-3), `profile.update`, `role_grant.create`, `role_grant.revoke`, `role_grant.bootstrap`. M2 actions: `docs/TEAMS.md` §9.
 `request_id` is the **server-generated** id (client `x-request-id` is stored only as
 `detail.clientRequestId` if present). The server id is also logged as `serverRequestId`.
 Rejected logins are audited with `actor_user_id NULL` and `resource_type = 'auth'`.

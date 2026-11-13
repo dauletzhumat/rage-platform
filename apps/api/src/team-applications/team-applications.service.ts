@@ -13,7 +13,12 @@ import {
   TEAM_IDENTITY_CONSTRAINTS,
 } from '../team-domain/team-errors.js';
 import { assertTeamIdentityFree, chooseFreeSlug } from '../team-domain/team-identity.js';
-import { MY_APPLICATIONS_LIMIT, slugBaseFromName } from '../team-domain/team-policy.js';
+import {
+  APPLICATION_QUOTA_PER_DAY,
+  APPLICATION_QUOTA_WINDOW_MS,
+  MY_APPLICATIONS_LIMIT,
+  slugBaseFromName,
+} from '../team-domain/team-policy.js';
 import type {
   AdminTeamApplicationDto,
   AdminTeamApplicationsQueryDto,
@@ -42,7 +47,11 @@ const applicationSelect = {
 const adminApplicationSelect = {
   ...applicationSelect,
   applicant: {
-    select: { steamId64: true, playerProfile: { select: { nickname: true, slug: true } } },
+    select: {
+      steamId64: true,
+      isSample: true,
+      playerProfile: { select: { nickname: true, slug: true } },
+    },
   },
 } satisfies Prisma.TeamApplicationSelect;
 
@@ -77,6 +86,8 @@ function toAdminDto(row: AdminApplicationRow): AdminTeamApplicationDto {
       playerSlug: row.applicant.playerProfile?.slug ?? '',
     },
     reviewedById: row.reviewedById,
+    // Applications carry no own sample flag: an application is sample iff its applicant is.
+    isSample: row.applicant.isSample,
   };
 }
 
@@ -147,6 +158,19 @@ export class TeamApplicationsService {
             select: { id: true },
           });
           if (pending) throw applicationAlreadyPending();
+          // Gate L-3: per-applicant quota, rolling window, counted under the user row lock.
+          const recent = await tx.teamApplication.count({
+            where: {
+              applicantUserId: userId,
+              createdAt: { gt: new Date(Date.now() - APPLICATION_QUOTA_WINDOW_MS) },
+            },
+          });
+          if (recent >= APPLICATION_QUOTA_PER_DAY) {
+            throw conflict(
+              API_ERROR_CODES.applicationLimit,
+              `At most ${APPLICATION_QUOTA_PER_DAY} applications per 24 hours`,
+            );
+          }
           await assertTeamIdentityFree(tx, dto.name, dto.tag, { includePendingApplications: true });
           const slug = await chooseFreeSlug(tx, slugBaseFromName(dto.name), {
             includePendingApplications: true,
@@ -361,9 +385,13 @@ export class TeamApplicationsService {
   ): Promise<TeamApplicationDto> {
     return this.prisma.client.$transaction(async (tx) => {
       await assertSuperAdminLocked(tx, actorUserId);
-      const locked = await tx.$queryRaw<{ status: string }[]>`
-        SELECT status FROM team_applications WHERE id = ${applicationId}::uuid FOR UPDATE`;
+      const locked = await tx.$queryRaw<{ status: string; is_sample: boolean }[]>`
+        SELECT a.status, u.is_sample FROM team_applications a
+        JOIN users u ON u.id = a.applicant_user_id
+        WHERE a.id = ${applicationId}::uuid
+        FOR UPDATE OF a`;
       if (!locked[0]) throw new NotFoundException('Application not found');
+      if (locked[0].is_sample) throw sampleResource();
       if (locked[0].status !== 'PENDING') throw applicationNotPending();
       const row = await tx.teamApplication.update({
         where: { id: applicationId },

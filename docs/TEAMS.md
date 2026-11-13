@@ -4,8 +4,8 @@ Status: **contract for M2** (ADR-019). Source of truth for API, DB and web work 
 `docs/AUTH.md` (sessions, CSRF, RBAC, error envelope) and `docs/API_CONVENTIONS.md`.
 
 ## 1. Principles
-- A team exists **only** after a SUPER_ADMIN approves a captain's application (ADR-002), or via the
-  audited super-admin `POST /teams` (ADR-018 Q1). No team is ever created from client input alone.
+- A team exists **only** after a SUPER_ADMIN approves a captain's application (ADR-002). There is no
+  direct team-creation endpoint (`POST /teams` was removed in M2, ADR-018 Q1 amendment).
 - Players join **only** by explicitly accepting an invitation in their own signed-in session. No
   captain, manager or admin can add a player to a roster on their behalf (no impersonation).
 - Identity is the verified SteamID64 (M1). Sample users/teams (`is_sample`) never take part in
@@ -39,7 +39,6 @@ Status: **contract for M2** (ADR-019). Source of truth for API, DB and web work 
 | Submit application | signed-in ACTIVE non-sample user, **no active membership**, no PENDING application | |
 | Withdraw application | its applicant, while PENDING | |
 | List/approve/reject applications | SUPER_ADMIN | |
-| Create team directly (`POST /teams`) | SUPER_ADMIN | requires captain user + reason |
 | Invite / revoke invitation | team operator | |
 | Accept / decline invitation | **only the invitee** | other users get **404** (hide existence) |
 | Remove member | team operator; a TEAM_MANAGER cannot remove the captain; nobody removes the captain (transfer first) | |
@@ -83,7 +82,6 @@ idempotent replay).
 | `GET /teams`, `GET /teams/:slug` | public | existing M0 DTOs; roster = active memberships of ACTIVE users |
 | `GET /teams/:slug/roster-history?page&pageSize` | public | paginated `RosterHistoryEntryDto { playerSlug, nickname, role, joinedAt, leftAt, leftReason }` (newest first; `leftReason` only `left` / `removed` / `role_change` / `captain_transfer` / `admin`, never free text) |
 | `GET /teams/:slug/manage` | team operator | `TeamManageDto { team: TeamDetailDto, pendingInvitations: TeamInvitationDto[], permissions: { canInvite, canRemove, canTransfer }, rosterCap, pendingInvitationCap }` |
-| `POST /teams` | SUPER_ADMIN+CSRF | `{ name, tag, countryCode?, description?, captainUserId, reason }` → 201 `TeamDetailDto` |
 | `POST /teams/:teamId/invitations` | operator+CSRF | `{ steamId64, role: PLAYER\|SUBSTITUTE }` → 201 `TeamInvitationDto` |
 | `POST /teams/:teamId/invitations/:invitationId/revoke` | operator+CSRF | `{ reason? }` → `TeamInvitationDto` (REVOKED) |
 | `POST /teams/:teamId/members/:userId/remove` | operator+CSRF | `{ reason }` → 204 |
@@ -164,7 +162,8 @@ BullMQ sweep may be added later.
 `APPLICANT_INELIGIBLE`, `TEAM_NAME_TAKEN`, `TEAM_TAG_TAKEN`, `TEAM_NOT_ACTIVE`,
 `PLAYER_NOT_FOUND`, `ALREADY_MEMBER`, `INVITATION_ALREADY_PENDING`, `INVITATION_LIMIT`,
 `INVITATION_NOT_PENDING`, `INVITATION_EXPIRED`, `ALREADY_IN_TEAM`, `ROSTER_FULL`,
-`NOT_TEAM_MEMBER`, `CAPTAIN_MUST_TRANSFER`, `IDEMPOTENCY_KEY_REUSED`, `IDEMPOTENCY_IN_PROGRESS`.
+`NOT_TEAM_MEMBER`, `CAPTAIN_MUST_TRANSFER`, `IDEMPOTENCY_KEY_REUSED`, `IDEMPOTENCY_IN_PROGRESS`,
+`APPLICATION_LIMIT`, `INVITATION_COOLDOWN`, `MEMBER_INELIGIBLE` (§13).
 Plus M1 `UNAUTHENTICATED`, `CSRF_FAILED`, `FORBIDDEN_ROLE`, `VALIDATION_FAILED`, `RATE_LIMITED`.
 
 ## 9. Audit actions (M2)
@@ -193,3 +192,42 @@ A3 (applications, concurrent approvals), A4 (invitations, expiry, revoke, cap, o
 policy, history), A9 (object-level auth, 404 for others' invitations/applications), A10
 (public pages, states, i18n). Concurrency tests are mandatory for: double approve, double accept
 (same and different users at the last slot), accept vs revoke, transfer vs remove.
+
+## 12. Implementation notes (M2 as built)
+Clarifications made during implementation; they are part of the contract.
+1. `NOT_TEAM_MEMBER` is returned as **404** (remove target, leave, transfer target).
+2. The requested slug must be unique among PENDING applications too, so submission already picks
+   `-2`, `-3`… (retrying on a race); approval re-picks against existing teams.
+3. Reserved slugs (`apply`, `new`, `manage`, `admin`, …) get a suffix so they never shadow
+   `/teams/apply`; UUID-shaped slugs get a `team-` prefix.
+4. Self-invite: actor already a member → 409 `ALREADY_MEMBER`; otherwise (manager/admin inviting
+   themselves) → 400 `VALIDATION_FAILED`. Transfer to the current captain → 400.
+5. The approve `note` is stored as `review_reason`, so the applicant sees it.
+6. `POST /teams` was removed before merge (security gate M-1: it assigned a captain without that
+   user's consent).
+7. Free-text reasons (reject, remove, revoke, note) are trimmed, NFC-normalised and reject
+   control/bidi characters (biography rule).
+8. M2 writes only `left`, `removed`, `captain_transfer` as `left_reason`; `role_change` and
+   `admin` are reserved.
+9. Lazy-expiry audit rows have `actor_user_id = NULL` and `detail.triggeredByUserId`.
+   `GET /me/invitations` and `GET /teams/:slug/manage` may persist expiry (documented exception
+   to "GET has no side effects"; idempotent, bounded by existing PENDING rows).
+10. `override: true` is set when a SUPER_ADMIN acts on a team they neither captain nor manage.
+11. Roster history hides suspended/banned users, like the current roster.
+12. Sample teams: every mutation → 409 `SAMPLE_RESOURCE`; operators can still read the manage view.
+13. Idempotency: the response is stored **after** the business transaction commits. A crash in
+    between leaves the key IN_PROGRESS; after 120 s it can be taken over. Correctness still comes
+    from row locks, state checks and DB constraints, so a re-run can only end in the contract's 409.
+14. CORS exposes `x-request-id`, `retry-after`, `idempotency-replayed`.
+
+## 13. Abuse limits and hardening added after the M2 gates
+- Max **5 application submissions per user per rolling 24 h** → 409 `APPLICATION_LIMIT`.
+- Re-inviting the same player within **24 h** of a REVOKED or DECLINED invitation from the same
+  team → 409 `INVITATION_COOLDOWN`.
+- Transfer target must be an ACTIVE user → 409 `MEMBER_INELIGIBLE`.
+- Team names (and M1 nicknames) reject invisible/filler code points (e.g. U+3164) and need at
+  least one visible letter or digit. Mixed-script look-alikes are a tracked follow-up.
+- Rejecting a sample application → 409 `SAMPLE_RESOURCE`; `AdminTeamApplicationDto.isSample` flags
+  sample entries in the admin queue.
+- Expired idempotency rows are purged opportunistically on reserve.
+- Lock order everywhere: team row → SUPER_ADMIN grants → scoped grants → invitation/membership rows.

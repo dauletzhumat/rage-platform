@@ -11,6 +11,7 @@ import { ApplicationStatusBadge } from '@/components/teams/status-badges';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
+import { SampleDataBadge } from '@/components/ui/sample-data-badge';
 import {
   Table,
   TableBody,
@@ -150,6 +151,7 @@ export default async function AdminTeamApplicationsPage({
                         <Badge tone="outline" className="font-mono">
                           {application.tag}
                         </Badge>
+                        {application.isSample ? <SampleDataBadge /> : null}
                       </div>
                       <div className="mt-1 text-xs text-muted">
                         <Country code={application.countryCode} />
@@ -189,7 +191,7 @@ export default async function AdminTeamApplicationsPage({
                       <ApplicationStatusBadge status={application.status} />
                     </TableCell>
                     <TableCell className="align-top">
-                      {application.status === 'PENDING' ? (
+                      {application.status === 'PENDING' && !application.isSample ? (
                         <div className="flex flex-wrap justify-end gap-1.5">
                           <ApproveApplicationButton
                             applicationId={application.id}

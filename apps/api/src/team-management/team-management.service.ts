@@ -1,10 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { DB_CONSTRAINTS, isUniqueViolation } from '@rage/db';
+import { DB_CONSTRAINTS } from '@rage/db';
 import { type AuditRequestContext, AuditService } from '../audit/audit.service.js';
 import { API_ERROR_CODES } from '../common/errors/api-error.js';
 import { errorSummary, PrismaService } from '../infra/prisma/prisma.service.js';
 import {
-  assertSuperAdminLocked,
   assertTeamActive,
   lockTeam,
   requireOperator,
@@ -21,10 +20,7 @@ import {
   notFoundWithCode,
   notTeamMember,
   rethrowMapped,
-  sampleResource,
-  TEAM_IDENTITY_CONSTRAINTS,
 } from '../team-domain/team-errors.js';
-import { assertTeamIdentityFree, chooseFreeSlug } from '../team-domain/team-identity.js';
 import {
   expireStaleInvitations,
   teamInvitationSelect,
@@ -34,18 +30,15 @@ import {
   INVITATION_TTL_MS,
   MAX_PENDING_INVITATIONS_PER_TEAM,
   ROSTER_CAP,
-  slugBaseFromName,
+  INVITATION_COOLDOWN_MS,
 } from '../team-domain/team-policy.js';
 import type { TeamDetailDto } from '../teams/teams.dto.js';
 import { TeamsService } from '../teams/teams.service.js';
 import type {
-  AdminCreateTeamDto,
   CreateInvitationDto,
   TeamInvitationDto,
   TeamManageDto,
 } from './team-management.dto.js';
-
-const SLUG_RACE_RETRIES = 3;
 
 const invitationAlreadyPending = () =>
   conflict(
@@ -114,103 +107,6 @@ export class TeamManagementService {
     };
   }
 
-  /** Audited SUPER_ADMIN shortcut (ADR-018 Q1): team + captain membership in one transaction. */
-  async createTeam(
-    actorUserId: string,
-    dto: AdminCreateTeamDto,
-    ctx: AuditRequestContext,
-  ): Promise<TeamDetailDto> {
-    let teamId: string | undefined;
-    for (let attempt = 1; teamId === undefined; attempt++) {
-      try {
-        teamId = await this.prisma.client.$transaction(async (tx) => {
-          await assertSuperAdminLocked(tx, actorUserId);
-          const users = await tx.$queryRaw<{ status: string; is_sample: boolean }[]>`
-            SELECT status, is_sample FROM users WHERE id = ${dto.captainUserId}::uuid FOR UPDATE`;
-          const captainUser = users[0];
-          if (!captainUser) throw playerNotFound();
-          if (captainUser.is_sample) throw sampleResource();
-          if (captainUser.status !== 'ACTIVE') {
-            throw conflict(API_ERROR_CODES.applicantIneligible, 'Captain account is not active');
-          }
-          const membership = await tx.teamMembership.findFirst({
-            where: { userId: dto.captainUserId, leftAt: null },
-            select: { id: true },
-          });
-          if (membership) {
-            throw conflict(API_ERROR_CODES.alreadyInTeam, 'Captain is already in a team');
-          }
-          await assertTeamIdentityFree(tx, dto.name, dto.tag, { includePendingApplications: true });
-          const slug = await chooseFreeSlug(tx, slugBaseFromName(dto.name), {
-            includePendingApplications: false,
-          });
-          const now = new Date();
-          const team = await tx.team.create({
-            data: {
-              slug,
-              name: dto.name,
-              tag: dto.tag,
-              countryCode: dto.countryCode ?? null,
-              description: dto.description ?? null,
-              status: 'ACTIVE',
-            },
-            select: { id: true, slug: true, name: true },
-          });
-          const captain = await tx.teamMembership.create({
-            data: { teamId: team.id, userId: dto.captainUserId, role: 'CAPTAIN', joinedAt: now },
-            select: { id: true },
-          });
-          await this.audit.write(
-            {
-              action: 'team.create',
-              actorUserId,
-              resourceType: 'team',
-              resourceId: team.id,
-              detail: {
-                source: 'admin',
-                name: team.name,
-                slug: team.slug,
-                captainUserId: dto.captainUserId,
-                reason: dto.reason,
-                override: true,
-              },
-            },
-            ctx,
-            tx,
-          );
-          await this.audit.write(
-            {
-              action: 'team_membership.join',
-              actorUserId,
-              resourceType: 'team_membership',
-              resourceId: captain.id,
-              detail: {
-                teamId: team.id,
-                userId: dto.captainUserId,
-                role: 'CAPTAIN',
-                source: 'admin_create',
-                override: true,
-              },
-            },
-            ctx,
-            tx,
-          );
-          return team.id;
-        }, TX_OPTIONS);
-      } catch (err) {
-        if (attempt < SLUG_RACE_RETRIES && isUniqueViolation(err, DB_CONSTRAINTS.teamSlugUnique)) {
-          continue;
-        }
-        rethrowMapped(err, {
-          ...TEAM_IDENTITY_CONSTRAINTS,
-          [DB_CONSTRAINTS.membershipOneActivePerUser]: () =>
-            conflict(API_ERROR_CODES.alreadyInTeam, 'Captain is already in a team'),
-        });
-      }
-    }
-    return this.teams.getDetailById(teamId);
-  }
-
   async invite(
     actorUserId: string,
     teamId: string,
@@ -245,6 +141,22 @@ export class TeamManagementService {
           select: { id: true },
         });
         if (pendingForInvitee) throw invitationAlreadyPending();
+        // Anti-harassment (gate L-5): no re-invite within 24 h of a revoke/decline.
+        const recentlyClosed = await tx.teamInvitation.findFirst({
+          where: {
+            teamId,
+            inviteeUserId: invitee.id,
+            status: { in: ['REVOKED', 'DECLINED'] },
+            respondedAt: { gt: new Date(now.getTime() - INVITATION_COOLDOWN_MS) },
+          },
+          select: { id: true },
+        });
+        if (recentlyClosed) {
+          throw conflict(
+            API_ERROR_CODES.invitationCooldown,
+            'This player was invited recently; wait 24 hours after a revoke or decline',
+          );
+        }
         const pendingCount = await tx.teamInvitation.count({
           where: { teamId, status: 'PENDING' },
         });
@@ -439,6 +351,16 @@ export class TeamManagementService {
         select: { id: true, role: true },
       });
       if (!target) throw notTeamMember();
+      // Gate L-6: the new captain must be an ACTIVE account. FOR SHARE conflicts with a
+      // concurrent suspension (UPDATE users), so the check holds at commit time.
+      const targetUser = await tx.$queryRaw<{ status: string }[]>`
+        SELECT status FROM users WHERE id = ${newCaptainUserId}::uuid FOR SHARE`;
+      if (targetUser[0]?.status !== 'ACTIVE') {
+        throw conflict(
+          API_ERROR_CODES.memberIneligible,
+          'The new captain must be an active account',
+        );
+      }
       const now = new Date();
       const toClose = [target.id, ...(captainRow ? [captainRow.id] : [])];
       const closed = await tx.teamMembership.updateMany({

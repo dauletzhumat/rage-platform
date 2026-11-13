@@ -16,7 +16,9 @@ export interface LockedTeam {
 /**
  * `SELECT … FROM teams WHERE id = $1 FOR UPDATE` — the serialization point for every roster
  * mutation of one team (accept, remove, leave, transfer, invite, revoke). Lock order is always
- * team → grants → invitation/membership rows, so these transactions cannot deadlock each other.
+ * team → SUPER_ADMIN grant → TEAM_MANAGER grant → invitation/membership/user rows. The grant part
+ * matches AdminService.revokeRole (SUPER_ADMIN grants → scoped grant), which takes no team lock,
+ * so these transactions cannot deadlock each other or a concurrent grant revocation.
  * 404 if missing; 409 SAMPLE_RESOURCE for sample teams (never part of an M2 mutation).
  */
 export async function lockTeam(tx: Tx, teamId: string): Promise<LockedTeam> {
@@ -77,12 +79,14 @@ export async function resolveTeamAccess(
     where: { teamId, userId: actorUserId, role: 'CAPTAIN', leftAt: null },
     select: { id: true },
   });
+  // Lock order matches AdminService.revokeRole (all SUPER_ADMIN grants FOR UPDATE, then the
+  // target grant): SUPER_ADMIN grant first, scoped TEAM_MANAGER grant second (gate L-1).
+  const isSuperAdmin = await hasSuperAdminLocked(tx, actorUserId);
   const manager = await tx.$queryRaw<{ id: string }[]>`
     SELECT id FROM user_role_grants
     WHERE user_id = ${actorUserId}::uuid AND role = 'TEAM_MANAGER'
       AND scope_type = 'TEAM' AND scope_id = ${teamId}::uuid AND revoked_at IS NULL
     FOR SHARE`;
-  const isSuperAdmin = await hasSuperAdminLocked(tx, actorUserId);
   const isCaptain = captain !== null;
   const isManager = manager.length > 0;
   return {

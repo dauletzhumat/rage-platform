@@ -40,7 +40,7 @@ export function idempotencyRequestHash(
  * separate statement, not inside it. This is acceptable because idempotency is only a
  * convenience layer: every M2 mutation is protected by row locks, in-transaction state checks
  * and DB constraints, so a re-execution (e.g. after a crash left an abandoned reservation that
- * is taken over after IDEMPOTENCY_STALE_SECONDS, or after a failed store) can never duplicate an
+ * is taken over after IDEMPOTENCY_STALE_SECONDS = 120 s, or after a failed store) can never duplicate an
  * effect — it fails with the contract's 409 (APPLICATION_NOT_PENDING, INVITATION_NOT_PENDING,
  * ALREADY_IN_TEAM, …). Keeping the key out of the business transaction also keeps services free
  * of HTTP concerns.

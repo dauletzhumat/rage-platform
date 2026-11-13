@@ -35,6 +35,10 @@ export const KNOWN_ERROR_CODES = [
   'CAPTAIN_MUST_TRANSFER',
   'IDEMPOTENCY_KEY_REUSED',
   'IDEMPOTENCY_IN_PROGRESS',
+  // M2 gate hardening (TEAMS.md §13)
+  'APPLICATION_LIMIT',
+  'INVITATION_COOLDOWN',
+  'MEMBER_INELIGIBLE',
 ] as const;
 
 export type KnownErrorCode = (typeof KNOWN_ERROR_CODES)[number];

@@ -32,12 +32,21 @@ export async function expireStaleInvitations(
   }
   if (scope.invitationId) filters.push(Prisma.sql`AND id = ${scope.invitationId}::uuid`);
   if (filters.length === 0) throw new Error('expireStaleInvitations requires a scope');
+  // CTE with ORDER BY id FOR UPDATE SKIP LOCKED (gate I-5): deterministic lock order and no
+  // waiting on rows another transaction is already handling (that transaction decides them;
+  // rows this transaction already holds are never skipped).
   const rows = await tx.$queryRaw<
     { id: string; team_id: string; invitee_user_id: string; role: string }[]
   >`
-    UPDATE team_invitations SET status = 'EXPIRED', responded_at = expires_at
-    WHERE status = 'PENDING' AND expires_at <= ${now} ${Prisma.join(filters, ' ')}
-    RETURNING id, team_id, invitee_user_id, role`;
+    WITH stale AS (
+      SELECT id FROM team_invitations
+      WHERE status = 'PENDING' AND expires_at <= ${now} ${Prisma.join(filters, ' ')}
+      ORDER BY id
+      FOR UPDATE SKIP LOCKED
+    )
+    UPDATE team_invitations t SET status = 'EXPIRED', responded_at = t.expires_at
+    FROM stale WHERE t.id = stale.id
+    RETURNING t.id, t.team_id, t.invitee_user_id, t.role`;
   for (const row of rows) {
     await audit.write(
       {

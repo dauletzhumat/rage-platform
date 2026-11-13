@@ -479,7 +479,10 @@
     "NOT_TEAM_MEMBER": "This player is not an active member of the team.",
     "CAPTAIN_MUST_TRANSFER": "The captain must transfer captaincy first.",
     "IDEMPOTENCY_KEY_REUSED": "This request was already used for a different action. Please try again.",
-    "IDEMPOTENCY_IN_PROGRESS": "Your previous request is still being processed. Please wait a moment."
+    "IDEMPOTENCY_IN_PROGRESS": "Your previous request is still being processed. Please wait a moment.",
+    "APPLICATION_LIMIT": "You have submitted too many applications in the last 24 hours. Try again later.",
+    "INVITATION_COOLDOWN": "This player recently declined or had an invitation revoked. You can invite them again after 24 hours.",
+    "MEMBER_INELIGIBLE": "This member's account is not active, so they cannot become captain."
   },
   "teamActions": {
     "cancel": "Cancel",
@@ -526,7 +529,8 @@
     "makeCaptain": "Make captain",
     "makeCaptainNamed": "Make {name} captain",
     "makeCaptainTitle": "Transfer captaincy to {name}?",
-    "makeCaptainDescription": "The current captain becomes a player. Only the new captain or an administrator can transfer it again."
+    "makeCaptainDescription": "The current captain becomes a player. Only the new captain or an administrator can transfer it again.",
+    "approveNoteHint": "Visible to the applicant and stored in the audit log. Up to 500 characters."
   },
   "teamApply": {
     "description": "Teams are created only after an administrator approves your application. You become the captain.",

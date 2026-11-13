@@ -104,7 +104,7 @@ Add new ADRs with date, context, considered alternatives, decision, tradeoffs an
 
 ## ADR-018: Resolution of ROADMAP open questions Q1–Q5, Q8
 - **Date:** 2026-11-12 · **Status:** Accepted (lead decision; revisit on product feedback)
-- **Q1 `POST /teams`:** exists only for SUPER_ADMIN with mandatory reason, audited (administrative creation, e.g. migrations of legacy teams). Captains create teams only through approved applications (ADR-002). Implemented in M2.
+- **Q1 `POST /teams`:** exists only for SUPER_ADMIN with mandatory reason, audited (administrative creation, e.g. migrations of legacy teams). Captains create teams only through approved applications (ADR-002). **Superseded in M2 (security gate M-1):** `POST /teams` was implemented and then removed before merge, because assigning a captain without that user's own signed-in consent violates the non-negotiable rules (teams only from an approved captain application; players accept explicitly). Legacy-team migration, if ever needed, will be designed with a consent step (e.g. a captain offer the user accepts).
 - **Q2 player route id:** `/players/[slug]` with `player_profiles.slug`; SteamID lookup only via `GET /players?steamId=` (M2+).
 - **Q3 slug vs UUID path segments:** accepted; slugs can never be UUID-shaped (slug pattern + generation rule).
 - **Q4 team manager:** a `user_role_grants` row `TEAM_MANAGER` scoped `TEAM:<teamId>`, granted by captain/admin and audited; `team_staff` is public display only.

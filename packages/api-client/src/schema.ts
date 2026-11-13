@@ -468,8 +468,7 @@ export interface paths {
     /** List public (approved, active) teams */
     get: operations['Teams_list'];
     put?: never;
-    /** Create a team directly with a captain (SUPER_ADMIN, audited) */
-    post: operations['TeamManagement_create'];
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -653,28 +652,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
-    AdminCreateTeamDto: {
-      /**
-       * Format: uuid
-       * @description Existing ACTIVE non-sample user without a team
-       */
-      captainUserId: string;
-      /**
-       * @description ISO 3166-1 alpha-2, uppercase
-       * @example KZ
-       */
-      countryCode?: string | null;
-      description?: string | null;
-      /**
-       * @description NFC, trimmed; letters, digits, space, ".", "_", "-"; starts with letter/digit
-       * @example Steppe Wolves
-       */
-      name: string;
-      /** @description Why the team is created directly (audited) */
-      reason: string;
-      /** @example SWLV */
-      tag: string;
-    };
     AdminTeamApplicationDto: {
       applicant: components['schemas']['TeamApplicantDto'];
       countryCode: string | null;
@@ -684,6 +661,8 @@ export interface components {
       description: string | null;
       /** Format: uuid */
       id: string;
+      /** @description Sample/demo data (the applicant is a sample account) */
+      isSample: boolean;
       name: string;
       /** Format: date-time */
       reviewedAt: string | null;
@@ -742,7 +721,7 @@ export interface components {
     };
     ApiErrorDto: {
       /**
-       * @description Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED, SAMPLE_RESOURCE, APPLICATION_ALREADY_PENDING, APPLICATION_NOT_PENDING, APPLICANT_IN_TEAM, APPLICANT_INELIGIBLE, TEAM_NAME_TAKEN, TEAM_TAG_TAKEN, TEAM_NOT_ACTIVE, PLAYER_NOT_FOUND, ALREADY_MEMBER, INVITATION_ALREADY_PENDING, INVITATION_LIMIT, INVITATION_NOT_PENDING, INVITATION_EXPIRED, ALREADY_IN_TEAM, ROSTER_FULL, NOT_TEAM_MEMBER, CAPTAIN_MUST_TRANSFER, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS. New codes may be added.
+       * @description Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED, SAMPLE_RESOURCE, APPLICATION_ALREADY_PENDING, APPLICATION_NOT_PENDING, APPLICANT_IN_TEAM, APPLICANT_INELIGIBLE, TEAM_NAME_TAKEN, TEAM_TAG_TAKEN, TEAM_NOT_ACTIVE, PLAYER_NOT_FOUND, ALREADY_MEMBER, INVITATION_ALREADY_PENDING, INVITATION_LIMIT, INVITATION_NOT_PENDING, INVITATION_EXPIRED, ALREADY_IN_TEAM, ROSTER_FULL, NOT_TEAM_MEMBER, CAPTAIN_MUST_TRANSFER, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS, MEMBER_INELIGIBLE, APPLICATION_LIMIT, INVITATION_COOLDOWN. New codes may be added.
        * @example CSRF_FAILED
        */
       code?: string;
@@ -2536,76 +2515,6 @@ export interface operations {
         };
       };
       400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-    };
-  };
-  TeamManagement_create: {
-    parameters: {
-      query?: never;
-      header?: {
-        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
-        'Idempotency-Key'?: string;
-      };
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['AdminCreateTeamDto'];
-      };
-    };
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['TeamDetailDto'];
-        };
-      };
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description No valid session */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description Missing role or CSRF validation failed */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description PLAYER_NOT_FOUND */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiErrorDto'];
-        };
-      };
-      /** @description TEAM_NAME_TAKEN | TEAM_TAG_TAKEN | ALREADY_IN_TEAM | APPLICANT_INELIGIBLE | SAMPLE_RESOURCE */
-      409: {
         headers: {
           [name: string]: unknown;
         };

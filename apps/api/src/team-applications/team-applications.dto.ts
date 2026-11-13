@@ -71,6 +71,8 @@ export class TeamApplicantDto {
 export class AdminTeamApplicationDto extends TeamApplicationDto {
   @ApiProperty({ type: TeamApplicantDto }) applicant!: TeamApplicantDto;
   @ApiProperty({ type: String, format: 'uuid', nullable: true }) reviewedById!: string | null;
+  @ApiProperty({ description: 'Sample/demo data (the applicant is a sample account)' })
+  isSample!: boolean;
 }
 
 export class AdminTeamApplicationPageDto extends PageMetaDto {

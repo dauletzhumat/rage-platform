@@ -10,7 +10,12 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { M2_MEMBERSHIP_ROLES, type M2MembershipRole } from '../team-domain/team-policy.js';
-import { NICKNAME_MAX, NICKNAME_MIN, NICKNAME_PATTERN } from '../auth/profile-rules.js';
+import {
+  NICKNAME_MAX,
+  NICKNAME_MIN,
+  NICKNAME_PATTERN,
+  VISIBLE_TEXT_PATTERN,
+} from '../auth/profile-rules.js';
 
 export class MeUserDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -88,6 +93,9 @@ export class UpdateMyProfileDto {
   @Length(NICKNAME_MIN, NICKNAME_MAX)
   @Matches(NICKNAME_PATTERN, {
     message: 'nickname may contain letters, digits, spaces, "_", "." and "-" only',
+  })
+  @Matches(VISIBLE_TEXT_PATTERN, {
+    message: 'nickname must contain a visible letter or digit and no invisible characters',
   })
   nickname?: string;
 

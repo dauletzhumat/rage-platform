@@ -140,7 +140,7 @@ export function ApproveApplicationButton({
       pendingLabel={t('working')}
       reason={{
         label: t('noteLabel'),
-        hint: t('noteHint'),
+        hint: t('approveNoteHint'),
         invalidMessage: t('noteInvalid'),
         validate: isValidOptionalNote,
       }}

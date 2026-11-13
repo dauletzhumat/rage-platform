@@ -7,10 +7,14 @@ import { uuidv7 } from './uuid7.js';
 export const IDEMPOTENCY_RETENTION_HOURS = 24;
 /**
  * An IN_PROGRESS reservation older than this is considered abandoned (process crash between
- * reserve and complete/release) and may be taken over. Business transactions time out far
- * earlier (<= 15 s), so a live request never holds a reservation this long.
+ * reserve and complete/release) and may be taken over. A live request is bounded by the
+ * business transaction (TX_OPTIONS: maxWait 10 s + timeout 15 s) plus a few short statements,
+ * so 120 s leaves a wide margin (gate I-1).
  */
-export const IDEMPOTENCY_STALE_SECONDS = 60;
+export const IDEMPOTENCY_STALE_SECONDS = 120;
+/** Expired rows older than this grace period are purged opportunistically (gate L-4). */
+export const IDEMPOTENCY_PURGE_GRACE_SECONDS = 3600;
+export const IDEMPOTENCY_PURGE_BATCH = 100;
 export const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{16,64}$/;
 
 export interface IdempotencyRequest {
@@ -40,7 +44,28 @@ export class IdempotencyStore {
 
   constructor(private readonly db: PrismaClient) {}
 
+  /**
+   * Best-effort retention (gate L-4): deletes at most IDEMPOTENCY_PURGE_BATCH rows expired for
+   * more than the grace period. SKIP LOCKED keeps concurrent purges from waiting on each other;
+   * the `expires_at` index makes this cheap. Failures are logged and ignored.
+   */
+  async purgeExpired(): Promise<number> {
+    try {
+      return await this.db.$executeRaw`
+        DELETE FROM idempotency_keys WHERE id IN (
+          SELECT id FROM idempotency_keys
+          WHERE expires_at < now() - make_interval(secs => ${IDEMPOTENCY_PURGE_GRACE_SECONDS}::int)
+          ORDER BY expires_at
+          LIMIT ${IDEMPOTENCY_PURGE_BATCH}::int
+          FOR UPDATE SKIP LOCKED)`;
+    } catch (err) {
+      this.logger.warn({ err: errorSummary(err) }, 'idempotency purge failed');
+      return 0;
+    }
+  }
+
   async reserve(req: IdempotencyRequest): Promise<ReserveOutcome> {
+    await this.purgeExpired();
     for (let attempt = 0; attempt < 3; attempt++) {
       const id = uuidv7();
       const rows = await this.db.$queryRaw<{ id: string }[]>`

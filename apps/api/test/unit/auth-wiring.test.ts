@@ -105,6 +105,15 @@ describe('security gate L-4: every unsafe handler in the app is session + CSRF g
     expect(handlers.filter((h) => h.unsafe && h.allowlistReason).map((h) => h.name)).toEqual([]);
   });
 
+  it('every @Idempotent handler runs SessionGuard (keys are scoped per user; gate I-8)', () => {
+    const idempotent = handlers.filter((h) => h.idempotent);
+    expect(idempotent.length).toBeGreaterThanOrEqual(11);
+    const withoutSession = idempotent
+      .filter((h) => !h.guards.includes(SessionGuard) || !h.guards.includes(CsrfGuard))
+      .map((h) => `${h.controller.name}.${h.name}`);
+    expect(withoutSession).toEqual([]);
+  });
+
   it('every M2 unsafe handler accepts Idempotency-Key (@Idempotent)', () => {
     const missing = handlers
       .filter((h) => h.unsafe && !h.idempotent)

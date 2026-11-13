@@ -6,6 +6,12 @@ import { canonicalJson } from '../../src/common/idempotency/canonical-json.js';
 import { idempotencyRequestHash } from '../../src/common/idempotency/idempotency.interceptor.js';
 import { IDEMPOTENCY_KEY_PATTERN } from '../../src/common/idempotency/idempotency.store.js';
 import { uuidv7 } from '../../src/common/idempotency/uuid7.js';
+import {
+  isValidNickname,
+  isVisibleText,
+  nicknameFromDisplayName,
+} from '../../src/auth/profile-rules.js';
+import { UpdateMyProfileDto } from '../../src/me/me.dto.js';
 import { CreateTeamApplicationDto } from '../../src/team-applications/team-applications.dto.js';
 import {
   pickFreeSlug,
@@ -73,7 +79,58 @@ describe('application DTO validation', () => {
   });
 });
 
+describe('visible-text rule for team names and nicknames (gate L-2)', () => {
+  const fillers = ['ㅤ', 'ᅟ', 'ᅠ', 'ﾠ'];
+  const invisibles = ['​', '‍', '⁠', '﻿', '᠎', '͏', '­'];
+
+  it('team names made of / containing Hangul fillers or invisible code points are rejected', async () => {
+    for (const ch of [...fillers, ...invisibles]) {
+      for (const name of [ch.repeat(5), `Team${ch}Name`, `${ch}Team`]) {
+        const dto = plainToInstance(CreateTeamApplicationDto, { name, tag: 'OK' });
+        const errors = await validate(dto);
+        // Either rejected, or (U+FEFF is JS whitespace) trimmed away entirely — never stored.
+        if (errors.length === 0) expect(dto.name.includes(ch), JSON.stringify(name)).toBe(false);
+        else
+          expect(
+            errors.map((e) => e.property),
+            JSON.stringify(name),
+          ).toEqual(['name']);
+      }
+      const inner = await validate(
+        plainToInstance(CreateTeamApplicationDto, { name: `Te${ch}am`, tag: 'OK' }),
+      );
+      expect(inner.map((e) => e.property)).toEqual(['name']);
+    }
+  });
+
+  it('nicknames follow the same rule (DTO and login-time display name)', async () => {
+    for (const ch of [...fillers, ...invisibles]) {
+      expect(isValidNickname(ch.repeat(3))).toBe(false);
+      expect(isValidNickname(`ab${ch}cd`)).toBe(false);
+      expect(nicknameFromDisplayName(`Pro${ch}Gamer`)).toBeNull();
+      const errors = await validate(
+        plainToInstance(UpdateMyProfileDto, { nickname: `nick${ch}name` }),
+      );
+      expect(errors.map((e) => e.property)).toEqual(['nickname']);
+    }
+    expect(isValidNickname('---')).toBe(false);
+    expect(isValidNickname('Игрок_1')).toBe(true);
+    expect(isVisibleText('Қасқыр 7')).toBe(true);
+    expect(await validate(plainToInstance(UpdateMyProfileDto, { nickname: 'player one' }))).toEqual(
+      [],
+    );
+  });
+});
+
 describe('idempotency helpers', () => {
+  it('canonical JSON keeps an own "__proto__" key so it is hashed (gate I-2)', () => {
+    const withProto = JSON.parse('{"a":1,"__proto__":{"role":"SUPER_ADMIN"}}') as unknown;
+    expect(canonicalJson(withProto)).toBe('{"__proto__":{"role":"SUPER_ADMIN"},"a":1}');
+    expect(idempotencyRequestHash('POST', '/r', {}, withProto)).not.toBe(
+      idempotencyRequestHash('POST', '/r', {}, { a: 1 }),
+    );
+  });
+
   it('canonical JSON ignores key order and undefined members', () => {
     expect(canonicalJson({ b: 1, a: { d: [2, { z: 1, y: 2 }], c: undefined } })).toBe(
       '{"a":{"d":[2,{"y":2,"z":1}]},"b":1}',

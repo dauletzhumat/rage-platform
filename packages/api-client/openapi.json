@@ -1,47 +1,6 @@
 {
   "components": {
     "schemas": {
-      "AdminCreateTeamDto": {
-        "properties": {
-          "captainUserId": {
-            "description": "Existing ACTIVE non-sample user without a team",
-            "format": "uuid",
-            "type": "string"
-          },
-          "countryCode": {
-            "description": "ISO 3166-1 alpha-2, uppercase",
-            "example": "KZ",
-            "nullable": true,
-            "type": "string"
-          },
-          "description": {
-            "maxLength": 500,
-            "nullable": true,
-            "type": "string"
-          },
-          "name": {
-            "description": "NFC, trimmed; letters, digits, space, \".\", \"_\", \"-\"; starts with letter/digit",
-            "example": "Steppe Wolves",
-            "maxLength": 32,
-            "minLength": 3,
-            "type": "string"
-          },
-          "reason": {
-            "description": "Why the team is created directly (audited)",
-            "maxLength": 500,
-            "minLength": 3,
-            "type": "string"
-          },
-          "tag": {
-            "example": "SWLV",
-            "maxLength": 6,
-            "minLength": 2,
-            "type": "string"
-          }
-        },
-        "required": ["name", "tag", "captainUserId", "reason"],
-        "type": "object"
-      },
       "AdminTeamApplicationDto": {
         "properties": {
           "applicant": {
@@ -71,6 +30,10 @@
           "id": {
             "format": "uuid",
             "type": "string"
+          },
+          "isSample": {
+            "description": "Sample/demo data (the applicant is a sample account)",
+            "type": "boolean"
           },
           "name": {
             "type": "string"
@@ -118,7 +81,8 @@
           "createdAt",
           "createdTeam",
           "applicant",
-          "reviewedById"
+          "reviewedById",
+          "isSample"
         ],
         "type": "object"
       },
@@ -247,7 +211,7 @@
       "ApiErrorDto": {
         "properties": {
           "code": {
-            "description": "Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED, SAMPLE_RESOURCE, APPLICATION_ALREADY_PENDING, APPLICATION_NOT_PENDING, APPLICANT_IN_TEAM, APPLICANT_INELIGIBLE, TEAM_NAME_TAKEN, TEAM_TAG_TAKEN, TEAM_NOT_ACTIVE, PLAYER_NOT_FOUND, ALREADY_MEMBER, INVITATION_ALREADY_PENDING, INVITATION_LIMIT, INVITATION_NOT_PENDING, INVITATION_EXPIRED, ALREADY_IN_TEAM, ROSTER_FULL, NOT_TEAM_MEMBER, CAPTAIN_MUST_TRANSFER, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS. New codes may be added.",
+            "description": "Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED, SAMPLE_RESOURCE, APPLICATION_ALREADY_PENDING, APPLICATION_NOT_PENDING, APPLICANT_IN_TEAM, APPLICANT_INELIGIBLE, TEAM_NAME_TAKEN, TEAM_TAG_TAKEN, TEAM_NOT_ACTIVE, PLAYER_NOT_FOUND, ALREADY_MEMBER, INVITATION_ALREADY_PENDING, INVITATION_LIMIT, INVITATION_NOT_PENDING, INVITATION_EXPIRED, ALREADY_IN_TEAM, ROSTER_FULL, NOT_TEAM_MEMBER, CAPTAIN_MUST_TRANSFER, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS, MEMBER_INELIGIBLE, APPLICATION_LIMIT, INVITATION_COOLDOWN. New codes may be added.",
             "example": "CSRF_FAILED",
             "type": "string"
           },
@@ -3763,103 +3727,6 @@
           }
         },
         "summary": "List public (approved, active) teams",
-        "tags": ["teams"]
-      },
-      "post": {
-        "operationId": "TeamManagement_create",
-        "parameters": [
-          {
-            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
-            "in": "header",
-            "name": "Idempotency-Key",
-            "required": false,
-            "schema": {
-              "maxLength": 64,
-              "minLength": 16,
-              "pattern": "^[A-Za-z0-9_-]{16,64}$",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AdminCreateTeamDto"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TeamDetailDto"
-                }
-              }
-            },
-            "description": ""
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            },
-            "description": ""
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            },
-            "description": "No valid session"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            },
-            "description": "Missing role or CSRF validation failed"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            },
-            "description": "PLAYER_NOT_FOUND"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            },
-            "description": "TEAM_NAME_TAKEN | TEAM_TAG_TAKEN | ALREADY_IN_TEAM | APPLICANT_INELIGIBLE | SAMPLE_RESOURCE"
-          }
-        },
-        "security": [
-          {
-            "csrf": [],
-            "session": []
-          }
-        ],
-        "summary": "Create a team directly with a captain (SUPER_ADMIN, audited)",
         "tags": ["teams"]
       }
     },

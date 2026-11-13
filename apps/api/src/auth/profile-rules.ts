@@ -5,12 +5,26 @@ export const NICKNAME_PATTERN = /^[\p{L}\p{N}_.\- ]+$/u;
 export const NICKNAME_MIN = 2;
 export const NICKNAME_MAX = 32;
 
+/**
+ * Visible-text rule (M2 security gate L-2) for nicknames and team names: no default-ignorable /
+ * invisible code points — explicitly incl. the Hangul fillers U+115F, U+1160, U+3164, U+FFA0,
+ * which are `\p{L}` and would otherwise pass a letter pattern — and at least one letter or
+ * digit. Mixed-script confusables are out of scope (tracked separately).
+ */
+export const VISIBLE_TEXT_PATTERN =
+  /^(?![\s\S]*[\p{Default_Ignorable_Code_Point}ᅟᅠㅤﾠ])(?=[\s\S]*[\p{L}\p{N}])[\s\S]*$/u;
+
+export function isVisibleText(value: string): boolean {
+  return VISIBLE_TEXT_PATTERN.test(value);
+}
+
 export function isValidNickname(value: string): boolean {
   return (
     value.length >= NICKNAME_MIN &&
     value.length <= NICKNAME_MAX &&
     value === value.trim() &&
-    NICKNAME_PATTERN.test(value)
+    NICKNAME_PATTERN.test(value) &&
+    isVisibleText(value)
   );
 }
 

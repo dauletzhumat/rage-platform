@@ -10,10 +10,19 @@ export function canonicalJson(value: unknown): string {
 function sortKeys(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sortKeys);
   if (value && typeof value === 'object' && !(value instanceof Date)) {
-    const out: Record<string, unknown> = {};
+    // Null-prototype target + defineProperty: an own "__proto__" key from JSON.parse is kept
+    // (and therefore hashed) instead of being swallowed by the prototype setter (gate I-2).
+    const out = Object.create(null) as Record<string, unknown>;
     for (const key of Object.keys(value).sort()) {
-      const v = (value as Record<string, unknown>)[key];
-      if (v !== undefined) out[key] = sortKeys(v);
+      const v = Object.getOwnPropertyDescriptor(value, key)?.value as unknown;
+      if (v !== undefined) {
+        Object.defineProperty(out, key, {
+          value: sortKeys(v),
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        });
+      }
     }
     return out;
   }

@@ -29,6 +29,10 @@ export const API_ERROR_CODES = {
   captainMustTransfer: 'CAPTAIN_MUST_TRANSFER',
   idempotencyKeyReused: 'IDEMPOTENCY_KEY_REUSED',
   idempotencyInProgress: 'IDEMPOTENCY_IN_PROGRESS',
+  // M2 security gate follow-ups
+  memberIneligible: 'MEMBER_INELIGIBLE',
+  applicationLimit: 'APPLICATION_LIMIT',
+  invitationCooldown: 'INVITATION_COOLDOWN',
 } as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];
 

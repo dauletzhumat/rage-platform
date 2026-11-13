@@ -11,7 +11,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { auditContextOf } from '../audit/audit.service.js';
-import { Authenticated, RequireRoles } from '../auth/auth.decorators.js';
+import { Authenticated } from '../auth/auth.decorators.js';
 import { CurrentUser } from '../auth/guards.js';
 import type { AuthContext } from '../auth/session.service.js';
 import { ApiErrorDto } from '../common/errors/api-error.js';
@@ -20,7 +20,6 @@ import type { RequestWithIds } from '../common/http/request-id.js';
 import { Idempotent } from '../common/idempotency/idempotent.decorator.js';
 import { TeamDetailDto } from '../teams/teams.dto.js';
 import {
-  AdminCreateTeamDto,
   CreateInvitationDto,
   RemoveMemberDto,
   RevokeInvitationDto,
@@ -49,27 +48,6 @@ export class TeamManagementController {
     @Req() req: RequestWithIds,
   ): Promise<TeamManageDto> {
     return this.management.manage(slug, auth.userId, auditContextOf(req));
-  }
-
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  @RequireRoles(['SUPER_ADMIN'], { unsafe: true })
-  @Idempotent()
-  @ApiOperation({ summary: 'Create a team directly with a captain (SUPER_ADMIN, audited)' })
-  @ApiCreatedResponse({ type: TeamDetailDto })
-  @ApiBadRequestResponse({ type: ApiErrorDto })
-  @ApiNotFoundResponse({ type: ApiErrorDto, description: 'PLAYER_NOT_FOUND' })
-  @ApiConflictResponse({
-    type: ApiErrorDto,
-    description:
-      'TEAM_NAME_TAKEN | TEAM_TAG_TAKEN | ALREADY_IN_TEAM | APPLICANT_INELIGIBLE | SAMPLE_RESOURCE',
-  })
-  create(
-    @CurrentUser() auth: AuthContext,
-    @Body() dto: AdminCreateTeamDto,
-    @Req() req: RequestWithIds,
-  ): Promise<TeamDetailDto> {
-    return this.management.createTeam(auth.userId, dto, auditContextOf(req));
   }
 
   @Post(':teamId/invitations')

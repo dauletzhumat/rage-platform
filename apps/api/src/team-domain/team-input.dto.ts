@@ -9,6 +9,7 @@ import {
   MaxLength,
   ValidateIf,
 } from 'class-validator';
+import { VISIBLE_TEXT_PATTERN } from '../auth/profile-rules.js';
 import { BIOGRAPHY_PATTERN } from '../me/me.dto.js';
 import {
   normalizeText,
@@ -75,6 +76,9 @@ export class TeamIdentityInputDto {
   @Matches(TEAM_NAME_PATTERN, {
     message:
       'name must start with a letter or digit and contain only letters, digits, spaces, ".", "_" and "-"',
+  })
+  @Matches(VISIBLE_TEXT_PATTERN, {
+    message: 'name must contain a visible letter or digit and no invisible characters',
   })
   name!: string;
 
