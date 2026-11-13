@@ -3,7 +3,7 @@
 | Milestone | Status | Evidence | Blocker |
 |---|---|---|---|
 | M0 Architecture / repository scaffold | **Verified** (local + GitHub CI green; QA gate conditions closed) | See "M0 evidence"; CI run https://github.com/dauletzhumat/rage-platform/actions/runs/43248240833 | — |
-| M1 Steam Login / player accounts | **Implemented — awaiting real Steam login** (branch `m1-steam-auth`) | See "M1 evidence"; security gate 0 Critical/High; QA gate PASS WITH CONDITIONS | A1/A2 need one real Steam login by a human (AUTH.md §13 / RUNBOOK §10.5) and green GitHub CI on the M1 commit |
+| M1 Steam Login / player accounts | **Verified locally** (real Steam login 2026-11-13); GitHub CI on the M1 commit pending | See "M1 evidence"; security gate 0 Critical/High; QA gate conditions met except CI | Green GitHub CI run on branch `m1-steam-auth` (open the PR) |
 | M2 Team applications / invitation roster | Not started | DB constraints already in place (23 constraint tests) | Depends on M1 |
 | M3 Tournament registration / brackets | Not started | | Depends on M2 |
 | M4 Server Agent / match control | Not started | | Needs a CS2 dedicated server + MatchZy/CounterStrikeSharp compatibility check |
@@ -57,12 +57,21 @@ Update this table after every milestone. `Verified` requires actual test evidenc
   `returnTo=/..//evil.com` signed as `/`; 429 carries `Retry-After: 60`; anonymous garbage
   callback → `state_mismatch` with 0 new audit rows.
 
+### Real Steam login (A1/A2) — 2026-11-13
+Performed by the owner against the real Steam OpenID endpoint (`http://localhost` realm, local
+api + web, Docker Postgres/Redis). SteamID redacted: `7656119833337****`.
+- Exactly **1** non-sample user created (status ACTIVE); the second sign-in reused it
+  (`auth.login` ×2, `last_login_at` updated, no second user).
+- Player profile auto-created (slug `player-<last6>`), then edited via `/me` (`profile.update`).
+- Bootstrap: exactly one `SUPER_ADMIN/GLOBAL` grant (`reason=bootstrap:env`, `issued_by` NULL)
+  and one `role_grant.bootstrap` audit row; `/admin/users` accessible.
+- Sessions: 2 rows, logout revoked the first (`auth.logout`), 1 active; 0 `auth.login_rejected`;
+  no API warnings/errors in the log.
+- Steam display name/avatar not synced — expected, `STEAM_WEB_API_KEY` is not set (optional).
+
 ### Blocked / not verified
-- **A1/A2 real Steam login** — requires a human with a Steam account: set
-  `BOOTSTRAP_SUPER_ADMIN_STEAM_ID64`, start api + web, sign in at `/login`, confirm exactly one
-  user and reuse on repeat login, then run `auth-session.spec.ts` with `E2E_SESSION_COOKIE`.
-  M1 must not be marked Verified before this.
-- GitHub CI on the M1 commit.
+- GitHub CI on the M1 commit (CI triggers on PRs / main; PR not opened yet).
+- `auth-session.spec.ts` (opt-in, needs a real session cookie in `E2E_SESSION_COOKIE`) not run.
 
 ---
 
