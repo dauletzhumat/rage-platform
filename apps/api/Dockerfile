@@ -14,7 +14,7 @@
 ARG PNPM_VERSION=11.1.3
 
 # ---------------------------------------------------------------------------------
-FROM node:24.22.2-trixie-slim AS base
+FROM node:26.13.0-trixie-slim AS base
 ARG PNPM_VERSION
 ENV PNPM_HOME=/pnpm \
     COREPACK_HOME=/opt/corepack \
@@ -75,7 +75,7 @@ RUN --mount=type=cache,id=rage-pnpm-store,target=/pnpm/store \
  && rm -rf /out/src /out/test /out/*.config.ts /out/tsconfig*.json /out/.swcrc
 
 # ---------------------------------------------------------------------------------
-FROM node:24.22.2-trixie-slim AS runtime
+FROM node:26.13.0-trixie-slim AS runtime
 ENV NODE_ENV=production \
     API_HOST=0.0.0.0 \
     API_PORT=4000
