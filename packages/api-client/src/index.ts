@@ -48,6 +48,32 @@ export type RoleScopeType = Schemas['RoleScopeType'];
 export type UserStatus = Schemas['UserStatus'];
 export type SteamAuthStatus = Schemas['SteamAuthFeatureDto']['status'];
 
+// ---- teams / applications / invitations (M2, docs/TEAMS.md) ----
+export type MeMembership = Schemas['MeMembershipDto'];
+export type TeamApplication = Schemas['TeamApplicationDto'];
+export type AdminTeamApplication = Schemas['AdminTeamApplicationDto'];
+export type AdminTeamApplicationPage = Schemas['AdminTeamApplicationPageDto'];
+export type TeamApplicant = Schemas['TeamApplicantDto'];
+export type CreateTeamApplicationRequest = Schemas['CreateTeamApplicationDto'];
+export type ApproveTeamApplicationRequest = Schemas['ApproveTeamApplicationDto'];
+export type RejectTeamApplicationRequest = Schemas['RejectTeamApplicationDto'];
+export type AdminCreateTeamRequest = Schemas['AdminCreateTeamDto'];
+export type TeamInvitation = Schemas['TeamInvitationDto'];
+export type MyInvitation = Schemas['MyInvitationDto'];
+export type CreateInvitationRequest = Schemas['CreateInvitationDto'];
+export type RevokeInvitationRequest = Schemas['RevokeInvitationDto'];
+export type TeamManage = Schemas['TeamManageDto'];
+export type TeamManagePermissions = Schemas['TeamManagePermissionsDto'];
+export type RosterHistoryEntry = Schemas['RosterHistoryEntryDto'];
+export type RosterHistoryPage = Schemas['RosterHistoryPageDto'];
+export type TeamApplicationStatus = Schemas['TeamApplicationStatus'];
+export type InvitationStatus = Schemas['InvitationStatus'];
+export type InvitationRole = Schemas['InvitationRole'];
+export type RosterLeftReason = Schemas['RosterLeftReason'];
+export type TeamMembershipRole = Schemas['TeamMembershipRole'];
+export type RemoveMemberRequest = Schemas['RemoveMemberDto'];
+export type TransferCaptainRequest = Schemas['TransferCaptainDto'];
+
 export type MatchStatus = MatchSummary['status'];
 export type MatchFormat = MatchSummary['format'];
 export type TournamentStatus = TournamentSummary['status'];

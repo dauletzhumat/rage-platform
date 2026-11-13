@@ -62,7 +62,9 @@ export function configureApp(app: NestExpressApplication, env: Env): void {
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['content-type', 'x-request-id', 'x-csrf-token', 'idempotency-key'],
-    exposedHeaders: ['x-request-id'],
+    // Retry-After (409 IDEMPOTENCY_IN_PROGRESS, 429) and Idempotency-Replayed must be readable
+    // by the cross-origin web client (TEAMS.md §7).
+    exposedHeaders: ['x-request-id', 'retry-after', 'idempotency-replayed'],
     maxAge: 600,
   });
 

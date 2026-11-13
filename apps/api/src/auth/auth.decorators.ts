@@ -1,4 +1,4 @@
-import { applyDecorators, UseGuards } from '@nestjs/common';
+import { applyDecorators, SetMetadata, UseGuards } from '@nestjs/common';
 import {
   ApiCookieAuth,
   ApiForbiddenResponse,
@@ -29,6 +29,18 @@ export function Authenticated(options: { unsafe?: boolean } = {}) {
       ? [ApiForbiddenResponse({ type: ApiErrorDto, description: 'CSRF validation failed' })]
       : []),
   );
+}
+
+export const UNGUARDED_UNSAFE_ROUTE = 'rage:unguarded-unsafe-route';
+
+/**
+ * Explicit, documented exemption from the "every unsafe handler has SessionGuard → CsrfGuard"
+ * rule enforced by `test/unit/auth-wiring.test.ts`. Only for routes that cannot carry a session
+ * by design (none exist today: Steam sign-in uses GET). The reason is mandatory and reviewed.
+ */
+export function AllowUnguardedUnsafeRoute(reason: string) {
+  if (reason.trim().length < 10) throw new Error('AllowUnguardedUnsafeRoute needs a real reason');
+  return SetMetadata(UNGUARDED_UNSAFE_ROUTE, reason);
 }
 
 /** Session → CSRF → role check (roles from active GLOBAL grants only). */

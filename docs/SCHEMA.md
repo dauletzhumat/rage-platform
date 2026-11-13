@@ -13,7 +13,7 @@ Use UUID keys, timestamptz, foreign keys, partial unique indexes where supported
 - team_applications(id, applicant_user_id, requested_name, requested_tag, requested_slug, country_code, description, logo_key, status, reviewed_by, reviewed_at, review_reason, created_at)
 - teams(id, slug UNIQUE, name UNIQUE, tag, country_code, region, logo_key, description, status, created_at)
 - team_memberships(id, team_id, user_id, role, joined_at, left_at, invited_by, unique active membership rules)
-- team_invitations(id, team_id, invitee_user_id, invited_by, status, expires_at, created_at, responded_at)
+- team_invitations(id, team_id, invitee_user_id, invited_by, role, status, expires_at, created_at, responded_at)
 - team_staff(id, team_id, user_id, role, valid_from, valid_to)
 - team_achievements(id, team_id, tournament_id, placement, prize_amount, currency_code)
 - team_ranking_snapshots(id, team_id, rank, region, algorithm_version, points, calculated_at)
@@ -45,6 +45,46 @@ Use UUID keys, timestamptz, foreign keys, partial unique indexes where supported
 - demos(id, match_map_id, object_key, sha256, bytes, status, parser_version, uploaded_at, processed_at)
 - audit_logs(id, actor_user_id, action, resource_type, resource_id, detail_json, created_at)
 - outbox_events(id, topic, resource_id, payload_json, published_at, attempts, created_at)
+- idempotency_keys(id, user_id, key, method, route, request_hash, status IN_PROGRESS|COMPLETED, response_status, response_body, created_at, expires_at, UNIQUE(user_id,key)) — M2, see below
 
 ## Indexing
 Indexes on FK fields and timeline filters, latest matches per team/player, active/expiry invitation, application status, tournament + status, source server event ordering, active server allocation. Store recalculable aggregates separately; avoid prematurely materializing all leaderboards.
+
+## M2 additions (migration `20261113000000_m2_teams`, ADR-019, `docs/TEAMS.md`)
+Forward-only, non-destructive; constraint names are exported as `DB_CONSTRAINTS` from `@rage/db`.
+
+| Object | Rule | Name |
+|---|---|---|
+| `idempotency_keys` (new) | one key per user | unique index `idempotency_keys_user_key_uniq` (`user_id`, `key`) |
+| | key `^[A-Za-z0-9_-]{16,64}$` | `idempotency_keys_key_format_chk` |
+| | `request_hash` lowercase hex SHA-256 | `idempotency_keys_request_hash_chk` |
+| | method in POST/PUT/PATCH/DELETE; route not blank | `idempotency_keys_method_chk`, `idempotency_keys_route_not_blank_chk` |
+| | COMPLETED ⇒ `response_status` set; IN_PROGRESS ⇒ no status/body; status 200–299 only | `idempotency_keys_completed_response_chk`, `idempotency_keys_in_progress_empty_chk`, `idempotency_keys_response_status_2xx_chk` |
+| | `expires_at > created_at`; retention scan | `idempotency_keys_expiry_chk`, index `idempotency_keys_expires_at_idx` |
+| | FK `user_id → users` ON DELETE RESTRICT | `idempotency_keys_user_id_fkey` |
+| `team_applications` | PENDING tags unique case-insensitively | partial unique `team_applications_pending_tag_ci_uniq` (`lower(requested_tag)` WHERE PENDING) |
+| `team_applications`, `teams` | tag `^[A-Za-z0-9]{2,10}$` (DB backstop; API enforces 2–6) | `team_applications_tag_format_chk`, `teams_tag_format_chk` |
+| `team_memberships` | role ∈ CAPTAIN/PLAYER/SUBSTITUTE (enum keeps MANAGER/COACH, unused) | `team_memberships_role_m2_chk` |
+| `team_invitations` | role ∈ PLAYER/SUBSTITUTE | `team_invitations_role_m2_chk` |
+| `team_memberships` | roster history `WHERE team_id ORDER BY joined_at DESC, id DESC` | index `team_memberships_team_id_joined_at_id_idx` |
+
+Notes
+- `idempotency_keys` is **not** append-only: `rage_app` has SELECT/INSERT/UPDATE/DELETE (expired rows
+  are overwritten in place, keyed by `(user_id, key)`). It is a convenience layer; correctness stays
+  with the constraints and row locks above.
+- Roster count uses the existing `team_memberships_team_id_left_at_idx` (`team_id`, `left_at`).
+  Roster history must order by `joined_at DESC, id DESC`: a captain transfer opens two rows with the
+  same `joined_at`, so `id` is the deterministic tie-breaker.
+- Tag clashes between a PENDING application and an existing team are cross-table and checked by the
+  API; at approval `teams_tag_ci_uniq` is the final arbiter.
+
+### Deploy / rollback
+- Deploy (as owner): `pnpm --filter @rage/db migrate:deploy`, then **always**
+  `pnpm --filter @rage/db db:grants`. The file runs as one implicit transaction: if existing rows
+  violate a new CHECK or the pending-tag unique index, nothing is applied. Pre-flight queries are in the
+  migration header (all must return 0 rows/0 count).
+- Rollback is a new forward migration (never edit an applied one): `DROP TABLE idempotency_keys;
+  DROP TYPE "IdempotencyStatus"; DROP INDEX team_applications_pending_tag_ci_uniq,
+  team_memberships_team_id_joined_at_id_idx;` and `ALTER TABLE … DROP CONSTRAINT` for the five CHECKs,
+  with the matching `schema.prisma` revert. Dropping `idempotency_keys` loses only ≤ 24 h of replay
+  data, no business data.

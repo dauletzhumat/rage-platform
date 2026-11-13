@@ -6,6 +6,8 @@ import { isWellFormedToken, SESSION_COOKIE } from '@/lib/auth/cookies';
 import { apiGet, DEFAULT_API_BASE_URL, type QueryValue } from './http';
 import { buildServerHeaders, parseTrustedHops } from './ssr-headers';
 import type {
+  AdminTeamApplicationDto,
+  AdminTeamApplicationListParams,
   AdminUserDto,
   AdminUserListParams,
   ApiResult,
@@ -13,15 +15,21 @@ import type {
   AuditLogDto,
   ListParams,
   MatchDetail,
-  MeDto,
+  InvitationStatus,
+  MeDtoM2,
   MatchSummary,
+  MyInvitationDto,
   MetaResponse,
   Paginated,
   PaginatedResponse,
   PlayerDetail,
   PlayerSummary,
   ReadinessResponse,
+  RosterHistoryEntryDto,
+  TeamApplicationDto,
+  TeamApplicationStatus,
   TeamDetail,
+  TeamManageDto,
   TeamSummary,
   TournamentDetail,
   TournamentListParams,
@@ -178,10 +186,10 @@ function unauthenticatedWithoutFetch<T>(): ApiResult<T> {
  * Current user from `GET /me`, forwarding only the visitor's `rage_session` cookie.
  * No (well-formed) session cookie → `unauthenticated` without any API request; 401 → `unauthenticated`.
  */
-export const getMe = cache(async (): Promise<ApiResult<MeDto>> => {
+export const getMe = cache(async (): Promise<ApiResult<MeDtoM2>> => {
   const { sessionToken } = await incomingRequest();
   if (!isWellFormedToken(sessionToken)) return unauthenticatedWithoutFetch();
-  return get<MeDto>('/me', undefined, { withSession: true });
+  return get<MeDtoM2>('/me', undefined, { withSession: true });
 });
 
 export const getAdminUsers = cache(
@@ -206,4 +214,75 @@ export const getAuditLogs = cache(
       { withSession: true },
     );
   },
+);
+
+// ---------- teams, applications, invitations (M2, docs/TEAMS.md §4) ----------
+
+const TEAM_APPLICATION_STATUS_SET: ReadonlySet<string> = new Set([
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'WITHDRAWN',
+]);
+const INVITATION_STATUS_SET: ReadonlySet<string> = new Set([
+  'PENDING',
+  'ACCEPTED',
+  'DECLINED',
+  'REVOKED',
+  'EXPIRED',
+]);
+
+/**
+ * Read that REQUIRES a session: forwards only `rage_session`, and answers `unauthenticated`
+ * without any API request when the visitor has no well-formed session cookie.
+ */
+async function sessionGet<T>(path: string, query?: Record<string, QueryValue>) {
+  const { sessionToken } = await incomingRequest();
+  if (!isWellFormedToken(sessionToken)) return unauthenticatedWithoutFetch<T>();
+  return get<T>(path, query, { withSession: true });
+}
+
+/** Own applications, newest first (max 20). */
+export const getMyTeamApplications = cache((): Promise<ApiResult<TeamApplicationDto[]>> =>
+  sessionGet('/me/team-applications'),
+);
+
+/** Own invitations filtered by status (API default PENDING; max 50). */
+export const getMyInvitations = cache(
+  (status?: InvitationStatus): Promise<ApiResult<MyInvitationDto[]>> =>
+    sessionGet('/me/invitations', {
+      status: status && INVITATION_STATUS_SET.has(status) ? status : undefined,
+    }),
+);
+
+/** SUPER_ADMIN queue (API default status PENDING, oldest first). */
+export const getAdminTeamApplications = cache(
+  (
+    params: AdminTeamApplicationListParams = {},
+  ): Promise<ApiResult<PaginatedResponse<AdminTeamApplicationDto>>> =>
+    sessionGet('/admin/team-applications', {
+      status:
+        params.status && TEAM_APPLICATION_STATUS_SET.has(params.status)
+          ? (params.status satisfies TeamApplicationStatus)
+          : undefined,
+      page: params.page,
+      pageSize: params.pageSize,
+    }),
+);
+
+/** Team operator view; 403 for everyone else (the team itself stays public). */
+export const getTeamManage = cache((slug: string): Promise<ApiResult<TeamManageDto>> =>
+  SLUG_PATTERN.test(slug) ? sessionGet(`/teams/${seg(slug)}/manage`) : notFoundWithoutFetch(),
+);
+
+/** Public roster history (newest first). Never forwards the session cookie. */
+export const getTeamRosterHistory = cache(
+  (
+    slug: string,
+    page?: number,
+    pageSize?: number,
+  ): Promise<ApiResult<PaginatedResponse<RosterHistoryEntryDto>>> =>
+    SLUG_PATTERN.test(slug)
+      ? get(`/teams/${seg(slug)}/roster-history`, { page, pageSize })
+      : notFoundWithoutFetch(),
 );

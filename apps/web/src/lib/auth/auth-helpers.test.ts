@@ -126,6 +126,7 @@ function me(roles: Array<[MeDto['roles'][number]['role'], MeDto['roles'][number]
     },
     profile: { slug: 'neo', nickname: 'Neo', countryCode: null, biography: null },
     steamProfile: null,
+    membership: null,
     roles: roles.map(([role, scopeType], i) => ({
       id: `r${i}`,
       role,

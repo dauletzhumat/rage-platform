@@ -98,6 +98,16 @@ function readDetails(body: Partial<ApiErrorBody>): ApiFieldError[] | undefined {
   return details.length > 0 ? details : undefined;
 }
 
+/** Error codes are SCREAMING_SNAKE identifiers (docs/AUTH.md §9a, TEAMS.md §8). */
+const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]{1,63}$/;
+
+/** `ApiErrorDto.code` when well-formed; anything else is ignored (never rendered raw). */
+export function readErrorCode(body: unknown): string | undefined {
+  if (typeof body !== 'object' || body === null) return undefined;
+  const code = (body as { code?: unknown }).code;
+  return typeof code === 'string' && ERROR_CODE_PATTERN.test(code) ? code : undefined;
+}
+
 function readServerMessage(body: Partial<ApiErrorBody>): string | undefined {
   const message = (body as { message?: unknown }).message;
   if (typeof message === 'string' && message.trim()) return message.slice(0, MAX_TEXT);
@@ -184,9 +194,13 @@ export async function apiSend<T>(path: string, options: ApiSendOptions): Promise
   const errorBody = isErrorBody(json) ? json : {};
   const effectiveRequestId =
     typeof errorBody.requestId === 'string' ? errorBody.requestId : requestId;
+  // 5xx never carry a code (AUTH.md §9a); only 4xx codes are trusted for branching.
+  const code =
+    response.status >= 400 && response.status < 500 ? readErrorCode(errorBody) : undefined;
   const extra = {
     status: response.status,
     ...(effectiveRequestId ? { requestId: effectiveRequestId } : {}),
+    ...(code ? { code } : {}),
   };
 
   switch (response.status) {
@@ -207,9 +221,12 @@ export async function apiSend<T>(path: string, options: ApiSendOptions): Promise
       return failure('not_found', 'The requested resource was not found.', extra);
     case 409: {
       const serverMessage = readServerMessage(errorBody);
+      // e.g. IDEMPOTENCY_IN_PROGRESS + `Retry-After: 1` (TEAMS.md §7).
+      const retryAfterSeconds = parseRetryAfter(response.headers.get('retry-after'));
       return failure('conflict', 'The request conflicts with the current state.', {
         ...extra,
         ...(serverMessage ? { serverMessage } : {}),
+        ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
       });
     }
     case 429: {

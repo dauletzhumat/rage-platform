@@ -3,6 +3,7 @@ import { type Prisma } from '@rage/db';
 import { type AuditRequestContext, AuditService } from '../audit/audit.service.js';
 import { iso } from '../common/http/dto.js';
 import { PrismaService } from '../infra/prisma/prisma.service.js';
+import type { M2MembershipRole } from '../team-domain/team-policy.js';
 import type { MeDto, UpdateMyProfileDto } from './me.dto.js';
 
 const meSelect = {
@@ -17,6 +18,11 @@ const meSelect = {
     where: { revokedAt: null },
     select: { id: true, role: true, scopeType: true, scopeId: true, issuedAt: true },
     orderBy: [{ issuedAt: 'asc' }, { id: 'asc' }],
+  },
+  memberships: {
+    where: { leftAt: null },
+    select: { role: true, joinedAt: true, team: { select: { id: true, slug: true, name: true } } },
+    take: 1,
   },
 } satisfies Prisma.UserSelect;
 
@@ -34,6 +40,7 @@ export class MeService {
     });
     // A session always belongs to a user with a profile (created at first login).
     if (!user?.playerProfile) throw new UnauthorizedException('Authentication required');
+    const membership = user.memberships[0];
     return {
       user: {
         id: user.id,
@@ -57,6 +64,15 @@ export class MeService {
         scopeId: g.scopeId,
         issuedAt: g.issuedAt.toISOString(),
       })),
+      membership: membership
+        ? {
+            teamId: membership.team.id,
+            teamSlug: membership.team.slug,
+            teamName: membership.team.name,
+            role: membership.role as M2MembershipRole,
+            joinedAt: membership.joinedAt.toISOString(),
+          }
+        : null,
     };
   }
 

@@ -190,6 +190,35 @@ test.describe('protected routes (no session)', () => {
   }
 });
 
+test.describe('M2 team routes (no session, no API required)', () => {
+  test('/teams/apply and /teams/:slug/manage render no mutation forms anonymously', async ({
+    page,
+  }) => {
+    for (const route of ['/teams/apply', '/teams/some-team/manage']) {
+      await page.goto(route);
+      await expect(page.getByTestId('auth-required')).toBeVisible();
+      await expect(page.getByTestId('team-application-form')).toHaveCount(0);
+      await expect(page.getByTestId('invite-form')).toHaveCount(0);
+    }
+  });
+
+  test('/teams/:slug/manage with an invalid slug renders not-found (no upstream request)', async ({
+    page,
+  }) => {
+    // Streaming (loading.tsx) commits the 200 status before notFound(); assert the UI instead.
+    await page.goto('/teams/NOT..VALID/manage');
+    await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
+    await expect(page.getByTestId('auth-required')).toHaveCount(0);
+  });
+
+  test('/me/invitations keeps the status filter in returnTo', async ({ page }) => {
+    await page.goto('/me/invitations?status=DECLINED');
+    await expect(page).toHaveURL(
+      `/login?returnTo=${encodeURIComponent('/me/invitations?status=DECLINED')}`,
+    );
+  });
+});
+
 test.describe('admin routes (no session)', () => {
   for (const route of adminRoutes) {
     test(`${route} redirects to login without rendering admin UI`, async ({ page, request }) => {

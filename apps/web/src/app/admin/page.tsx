@@ -21,15 +21,15 @@ export default async function AdminDashboardPage() {
   const sections: Array<{ href: string; label: string; note: string }> = [
     ...(superAdmin
       ? [
+          {
+            href: '/admin/team-applications',
+            label: t('teamApplications'),
+            note: t('teamApplicationsDescription'),
+          },
           { href: '/admin/users', label: t('users'), note: t('usersDescription') },
           { href: '/admin/audit', label: t('auditLog'), note: t('auditDescription') },
         ]
       : []),
-    {
-      href: '/admin/team-applications',
-      label: t('teamApplications'),
-      note: t('teamApplicationsComing'),
-    },
     { href: '/admin/tournaments', label: t('tournaments'), note: t('tournamentsComing') },
     { href: '/admin/matches', label: t('matches'), note: t('matchesComing') },
     { href: '/admin/servers', label: t('servers'), note: t('serversComing') },

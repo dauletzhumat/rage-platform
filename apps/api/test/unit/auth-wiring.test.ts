@@ -1,10 +1,8 @@
-import { GUARDS_METADATA, METHOD_METADATA } from '@nestjs/common/constants.js';
-import { RequestMethod } from '@nestjs/common';
+import { Controller, Delete, Get, Module, Patch, Post, Put, UseGuards } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { describe, expect, it, vi } from 'vitest';
-import { AdminAuditController, AdminUsersController } from '../../src/admin/admin.controller.js';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { AppModule } from '../../src/app.module.js';
-import { AuthController } from '../../src/auth/auth.controller.js';
+import { AllowUnguardedUnsafeRoute } from '../../src/auth/auth.decorators.js';
 import { CsrfGuard, SessionGuard } from '../../src/auth/guards.js';
 import { FetchOpenIdTransport, OPENID_TRANSPORT } from '../../src/auth/openid-transport.js';
 import { STEAM_OPENID, SteamOpenIdService } from '../../src/auth/steam-openid.service.js';
@@ -18,7 +16,12 @@ import {
   SteamProfileSyncService,
 } from '../../src/auth/steam-profile-sync.js';
 import { parseEnv } from '../../src/config/env.js';
-import { MeController } from '../../src/me/me.controller.js';
+import {
+  type DiscoveredHandler,
+  discoverControllers,
+  discoverHandlers,
+  unsafeHandlerViolations,
+} from '../support/route-wiring.js';
 
 // Placeholders only: Prisma/Redis connect lazily, so compiling the module contacts nothing.
 const baseEnv = {
@@ -62,32 +65,125 @@ describe('provider wiring', () => {
   });
 });
 
-describe('every unsafe authenticated handler is CSRF-guarded', () => {
-  const controllers = [AuthController, MeController, AdminUsersController, AdminAuditController];
-  const unsafe = new Set([
-    RequestMethod.POST,
-    RequestMethod.PUT,
-    RequestMethod.PATCH,
-    RequestMethod.DELETE,
+describe('security gate L-4: every unsafe handler in the app is session + CSRF guarded', () => {
+  // M1 unsafe handlers predate the idempotency layer (TEAMS.md §7 applies to M2 endpoints).
+  const NOT_IDEMPOTENT_BY_DESIGN = new Set([
+    'AuthController.logout',
+    'MeController.update',
+    'AdminUsersController.grant',
+    'AdminUsersController.revoke',
   ]);
-  for (const ctrl of controllers) {
-    const proto = ctrl.prototype as unknown as Record<string, unknown>;
-    for (const name of Object.getOwnPropertyNames(proto)) {
-      const handler = proto[name];
-      if (name === 'constructor' || typeof handler !== 'function') continue;
-      const method = Reflect.getMetadata(METHOD_METADATA, handler) as RequestMethod | undefined;
-      if (method === undefined || !unsafe.has(method)) continue;
-      it(`${ctrl.name}.${name}`, () => {
-        const guards = [
-          ...((Reflect.getMetadata(GUARDS_METADATA, ctrl) as unknown[]) ?? []),
-          ...((Reflect.getMetadata(GUARDS_METADATA, handler) as unknown[]) ?? []),
-        ];
-        expect(guards).toContain(SessionGuard);
-        expect(guards).toContain(CsrfGuard);
-        expect(guards.indexOf(SessionGuard)).toBeLessThan(guards.indexOf(CsrfGuard));
-      });
+  let handlers: DiscoveredHandler[] = [];
+  let controllerNames: string[] = [];
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule.forRoot(parseEnv(steamEnv))],
+    }).compile();
+    try {
+      const controllers = discoverControllers(moduleRef);
+      controllerNames = controllers.map((c) => c.name);
+      handlers = controllers.flatMap(discoverHandlers);
+    } finally {
+      await moduleRef.close();
     }
+  });
+
+  it('discovers controllers from the compiled module graph (not a hard-coded list)', () => {
+    // Sanity only: discovery must see M1 and M2 controllers, i.e. it is really walking modules.
+    expect(controllerNames).toEqual(
+      expect.arrayContaining(['AuthController', 'MeController', 'TeamManagementController']),
+    );
+    expect(handlers.filter((h) => h.unsafe).length).toBeGreaterThanOrEqual(15);
+  });
+
+  it('no unsafe handler lacks SessionGuard → CsrfGuard (in that order)', () => {
+    expect(unsafeHandlerViolations(handlers)).toEqual([]);
+  });
+
+  it('allowlisted unsafe handlers are rare and documented (none today)', () => {
+    expect(handlers.filter((h) => h.unsafe && h.allowlistReason).map((h) => h.name)).toEqual([]);
+  });
+
+  it('every M2 unsafe handler accepts Idempotency-Key (@Idempotent)', () => {
+    const missing = handlers
+      .filter((h) => h.unsafe && !h.idempotent)
+      .map((h) => `${h.controller.name}.${h.name}`)
+      .filter((id) => !NOT_IDEMPOTENT_BY_DESIGN.has(id));
+    expect(missing).toEqual([]);
+  });
+});
+
+describe('L-4 meta-test: the wiring check catches broken controllers', () => {
+  @Controller('fixture-unguarded')
+  class UnguardedFixtureController {
+    @Post()
+    create(): void {}
+    @Get()
+    read(): void {}
   }
+
+  @Controller('fixture-wrong-order')
+  class WrongOrderFixtureController {
+    @Patch()
+    @UseGuards(CsrfGuard, SessionGuard)
+    update(): void {}
+    @Delete()
+    @UseGuards(SessionGuard)
+    remove(): void {}
+    @Put()
+    @UseGuards(CsrfGuard)
+    replace(): void {}
+  }
+
+  @Controller('fixture-ok')
+  @UseGuards(SessionGuard)
+  class OkFixtureController {
+    @Post()
+    @UseGuards(CsrfGuard)
+    classThenHandler(): void {}
+    @Post('hook')
+    @AllowUnguardedUnsafeRoute('fixture: signed webhook without cookies')
+    allowlisted(): void {}
+  }
+
+  class InheritedFixtureController extends UnguardedFixtureController {}
+  Controller('fixture-inherited')(InheritedFixtureController);
+
+  @Module({
+    controllers: [
+      UnguardedFixtureController,
+      WrongOrderFixtureController,
+      OkFixtureController,
+      InheritedFixtureController,
+    ],
+  })
+  class FixtureModule {}
+
+  it('flags unguarded, half-guarded and mis-ordered unsafe handlers found via discovery', async () => {
+    // Fixtures are compiled into the real app graph (the guards' dependencies come from it).
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule.forRoot(parseEnv(steamEnv)), FixtureModule],
+    }).compile();
+    try {
+      const handlers = discoverControllers(moduleRef).flatMap(discoverHandlers);
+      expect(unsafeHandlerViolations(handlers).sort()).toEqual(
+        [
+          'InheritedFixtureController.create: no guards at all',
+          'UnguardedFixtureController.create: no guards at all',
+          'WrongOrderFixtureController.remove: missing CsrfGuard',
+          'WrongOrderFixtureController.replace: missing SessionGuard',
+          'WrongOrderFixtureController.update: CsrfGuard runs before SessionGuard',
+        ].sort(),
+      );
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it('the allowlist decorator demands a reason', () => {
+    expect(() => AllowUnguardedUnsafeRoute('')).toThrow();
+  });
 });
 
 describe('Steam profile sync validation', () => {

@@ -6,6 +6,7 @@ import { ExternalLink, ShieldCheck } from 'lucide-react';
 import { UserAvatar } from '@/components/layout/user-avatar';
 import { FormattedDate } from '@/components/domain/formatting';
 import { RoleChip } from '@/components/domain/role-chip';
+import { MembershipCard } from '@/components/me/membership-card';
 import { ProfileForm } from '@/components/me/profile-form';
 import { ApiErrorState } from '@/components/states/api-error-state';
 import { Badge } from '@/components/ui/badge';
@@ -41,7 +42,7 @@ export default async function MePage() {
     );
   }
 
-  const { user, profile, steamProfile, roles } = me.data;
+  const { user, profile, steamProfile, roles, membership } = me.data;
   const steamUrl = safeSteamProfileUrl(steamProfile?.profileUrl);
   const steamName = steamProfile?.displayName ?? null;
 
@@ -52,7 +53,7 @@ export default async function MePage() {
         description={t('description')}
         actions={
           <Link
-            href={`/players/${profile.slug}`}
+            href={`/players/${encodeURIComponent(profile.slug)}`}
             className={buttonVariants({ variant: 'secondary', size: 'sm' })}
           >
             {t('publicProfile')}
@@ -107,6 +108,8 @@ export default async function MePage() {
               </dl>
             </CardContent>
           </Card>
+
+          <MembershipCard membership={membership} />
 
           <Card>
             <CardHeader>

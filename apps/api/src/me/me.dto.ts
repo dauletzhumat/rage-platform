@@ -9,6 +9,7 @@ import {
   MaxLength,
   ValidateIf,
 } from 'class-validator';
+import { M2_MEMBERSHIP_ROLES, type M2MembershipRole } from '../team-domain/team-policy.js';
 import { NICKNAME_MAX, NICKNAME_MIN, NICKNAME_PATTERN } from '../auth/profile-rules.js';
 
 export class MeUserDto {
@@ -45,11 +46,26 @@ export class MeRoleDto {
   @ApiProperty({ format: 'date-time' }) issuedAt!: string;
 }
 
+export class MeMembershipDto {
+  @ApiProperty({ format: 'uuid' }) teamId!: string;
+  @ApiProperty() teamSlug!: string;
+  @ApiProperty() teamName!: string;
+  @ApiProperty({ enum: M2_MEMBERSHIP_ROLES, enumName: 'TeamMembershipRole' })
+  role!: M2MembershipRole;
+  @ApiProperty({ format: 'date-time' }) joinedAt!: string;
+}
+
 export class MeDto {
   @ApiProperty({ type: MeUserDto }) user!: MeUserDto;
   @ApiProperty({ type: MeProfileDto }) profile!: MeProfileDto;
   @ApiProperty({ type: MeSteamProfileDto, nullable: true }) steamProfile!: MeSteamProfileDto | null;
   @ApiProperty({ type: [MeRoleDto], description: 'Active role grants' }) roles!: MeRoleDto[];
+  @ApiProperty({
+    type: MeMembershipDto,
+    nullable: true,
+    description: 'Active team membership (one per user, ADR-019) or null',
+  })
+  membership!: MeMembershipDto | null;
 }
 
 /** NFC so visually identical nicknames compare equal (security gate M1, L-5). */

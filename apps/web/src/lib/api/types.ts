@@ -191,6 +191,82 @@ export interface ApiFailure {
   serverMessage?: string;
   /** Parsed `Retry-After` for 429, in whole seconds. */
   retryAfterSeconds?: number;
+  /** Stable machine-readable `ApiErrorDto.code` (4xx only; never set for 5xx). */
+  code?: string;
 }
 
 export type ApiResult<T> = { ok: true; data: T } | ApiFailure;
+
+// ---- M2 types (generated, docs/TEAMS.md) ----
+import type {
+  AdminTeamApplication,
+  ApproveTeamApplicationRequest as GeneratedApproveRequest,
+  CreateInvitationRequest as GeneratedCreateInvitationRequest,
+  CreateTeamApplicationRequest as GeneratedCreateApplicationRequest,
+  InvitationRole as GeneratedInvitationRole,
+  InvitationStatus as GeneratedInvitationStatus,
+  MeMembership,
+  MyInvitation,
+  RejectTeamApplicationRequest as GeneratedRejectRequest,
+  RemoveMemberRequest as GeneratedRemoveMemberRequest,
+  RevokeInvitationRequest as GeneratedRevokeInvitationRequest,
+  RosterHistoryEntry,
+  RosterLeftReason as GeneratedRosterLeftReason,
+  TeamApplication,
+  TeamApplicationStatus as GeneratedTeamApplicationStatus,
+  TeamDetail as GeneratedTeamDetail,
+  TeamInvitation,
+  TeamManage,
+  TeamMembershipRole as GeneratedTeamMembershipRole,
+  TeamRosterEntry as GeneratedTeamRosterEntry,
+  TransferCaptainRequest as GeneratedTransferCaptainRequest,
+} from '@rage/api-client';
+
+export type TeamApplicationStatus = GeneratedTeamApplicationStatus;
+export type InvitationStatus = GeneratedInvitationStatus;
+export type InvitationRole = GeneratedInvitationRole;
+export type TeamMembershipRole = GeneratedTeamMembershipRole;
+export type RosterLeftReason = GeneratedRosterLeftReason;
+
+const teamApplicationStatuses = ['PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN'] as const;
+export const TEAM_APPLICATION_STATUSES: Exhaustive<
+  TeamApplicationStatus,
+  typeof teamApplicationStatuses
+> = teamApplicationStatuses;
+
+const invitationStatuses = ['PENDING', 'ACCEPTED', 'DECLINED', 'REVOKED', 'EXPIRED'] as const;
+export const INVITATION_STATUSES: Exhaustive<InvitationStatus, typeof invitationStatuses> =
+  invitationStatuses;
+
+const invitationRoles = ['PLAYER', 'SUBSTITUTE'] as const;
+export const INVITATION_ROLES: Exhaustive<InvitationRole, typeof invitationRoles> = invitationRoles;
+
+const rosterLeftReasons = ['left', 'removed', 'role_change', 'captain_transfer', 'admin'] as const;
+export const ROSTER_LEFT_REASONS: Exhaustive<RosterLeftReason, typeof rosterLeftReasons> =
+  rosterLeftReasons;
+
+export type TeamApplicationDto = TeamApplication;
+export type AdminTeamApplicationDto = AdminTeamApplication;
+export type TeamInvitationDto = TeamInvitation;
+export type MyInvitationDto = MyInvitation;
+export type RosterHistoryEntryDto = RosterHistoryEntry;
+export type TeamRosterEntryM2 = GeneratedTeamRosterEntry;
+export type TeamDetailM2 = GeneratedTeamDetail;
+export type TeamManageDto = TeamManage;
+export type MeMembershipDto = MeMembership;
+export type MeDtoM2 = MeDto;
+
+export type CreateTeamApplicationRequest = GeneratedCreateApplicationRequest;
+export type ApproveTeamApplicationRequest = GeneratedApproveRequest;
+export type RejectTeamApplicationRequest = GeneratedRejectRequest;
+export type CreateInvitationRequest = GeneratedCreateInvitationRequest;
+export type RevokeInvitationRequest = GeneratedRevokeInvitationRequest;
+export type RemoveMemberRequest = GeneratedRemoveMemberRequest;
+export type TransferCaptainRequest = GeneratedTransferCaptainRequest;
+
+export interface AdminTeamApplicationListParams {
+  status?: TeamApplicationStatus;
+  page?: number;
+  pageSize?: number;
+}
+// ---- end M2 types ----

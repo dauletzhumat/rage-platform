@@ -1,6 +1,151 @@
 {
   "components": {
     "schemas": {
+      "AdminCreateTeamDto": {
+        "properties": {
+          "captainUserId": {
+            "description": "Existing ACTIVE non-sample user without a team",
+            "format": "uuid",
+            "type": "string"
+          },
+          "countryCode": {
+            "description": "ISO 3166-1 alpha-2, uppercase",
+            "example": "KZ",
+            "nullable": true,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 500,
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "NFC, trimmed; letters, digits, space, \".\", \"_\", \"-\"; starts with letter/digit",
+            "example": "Steppe Wolves",
+            "maxLength": 32,
+            "minLength": 3,
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why the team is created directly (audited)",
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          },
+          "tag": {
+            "example": "SWLV",
+            "maxLength": 6,
+            "minLength": 2,
+            "type": "string"
+          }
+        },
+        "required": ["name", "tag", "captainUserId", "reason"],
+        "type": "object"
+      },
+      "AdminTeamApplicationDto": {
+        "properties": {
+          "applicant": {
+            "$ref": "#/components/schemas/TeamApplicantDto"
+          },
+          "countryCode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdTeam": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeamApplicationCreatedTeamDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reviewReason": {
+            "description": "Reject reason (or optional approval note); visible to the applicant",
+            "nullable": true,
+            "type": "string"
+          },
+          "reviewedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "reviewedById": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "slug": {
+            "description": "Requested slug (derived server-side; the team may get a suffixed slug)",
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeamApplicationStatus"
+              }
+            ]
+          },
+          "tag": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "tag",
+          "slug",
+          "countryCode",
+          "description",
+          "status",
+          "reviewReason",
+          "reviewedAt",
+          "createdAt",
+          "createdTeam",
+          "applicant",
+          "reviewedById"
+        ],
+        "type": "object"
+      },
+      "AdminTeamApplicationPageDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminTeamApplicationDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "example": 1,
+            "type": "number"
+          },
+          "pageSize": {
+            "example": 20,
+            "type": "number"
+          },
+          "total": {
+            "example": 0,
+            "type": "number"
+          }
+        },
+        "required": ["page", "pageSize", "total", "items"],
+        "type": "object"
+      },
       "AdminUserDto": {
         "properties": {
           "createdAt": {
@@ -102,7 +247,7 @@
       "ApiErrorDto": {
         "properties": {
           "code": {
-            "description": "Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED. New codes may be added.",
+            "description": "Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED, SAMPLE_RESOURCE, APPLICATION_ALREADY_PENDING, APPLICATION_NOT_PENDING, APPLICANT_IN_TEAM, APPLICANT_INELIGIBLE, TEAM_NAME_TAKEN, TEAM_TAG_TAKEN, TEAM_NOT_ACTIVE, PLAYER_NOT_FOUND, ALREADY_MEMBER, INVITATION_ALREADY_PENDING, INVITATION_LIMIT, INVITATION_NOT_PENDING, INVITATION_EXPIRED, ALREADY_IN_TEAM, ROSTER_FULL, NOT_TEAM_MEMBER, CAPTAIN_MUST_TRANSFER, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS. New codes may be added.",
             "example": "CSRF_FAILED",
             "type": "string"
           },
@@ -131,6 +276,18 @@
           }
         },
         "required": ["statusCode", "error", "message", "requestId"],
+        "type": "object"
+      },
+      "ApproveTeamApplicationDto": {
+        "properties": {
+          "note": {
+            "description": "Optional note to the applicant (stored as reviewReason, audited)",
+            "maxLength": 500,
+            "minLength": 3,
+            "nullable": true,
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "AuditLogDto": {
@@ -206,6 +363,54 @@
         "required": ["page", "pageSize", "total", "items"],
         "type": "object"
       },
+      "CreateInvitationDto": {
+        "properties": {
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InvitationRole"
+              }
+            ]
+          },
+          "steamId64": {
+            "description": "SteamID64 of a registered player (must have signed in once)",
+            "example": "76561198000000000",
+            "type": "string"
+          }
+        },
+        "required": ["steamId64", "role"],
+        "type": "object"
+      },
+      "CreateTeamApplicationDto": {
+        "properties": {
+          "countryCode": {
+            "description": "ISO 3166-1 alpha-2, uppercase",
+            "example": "KZ",
+            "nullable": true,
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 500,
+            "nullable": true,
+            "type": "string"
+          },
+          "name": {
+            "description": "NFC, trimmed; letters, digits, space, \".\", \"_\", \"-\"; starts with letter/digit",
+            "example": "Steppe Wolves",
+            "maxLength": 32,
+            "minLength": 3,
+            "type": "string"
+          },
+          "tag": {
+            "example": "SWLV",
+            "maxLength": 6,
+            "minLength": 2,
+            "type": "string"
+          }
+        },
+        "required": ["name", "tag"],
+        "type": "object"
+      },
       "Cs2IntegrationFeatureDto": {
         "properties": {
           "status": {
@@ -278,6 +483,47 @@
         },
         "required": ["role", "scopeType", "reason"],
         "type": "object"
+      },
+      "InvitationInviteeDto": {
+        "properties": {
+          "nickname": {
+            "type": "string"
+          },
+          "playerSlug": {
+            "type": "string"
+          },
+          "steamId64": {
+            "example": "76561198000000000",
+            "type": "string"
+          },
+          "userId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": ["userId", "steamId64", "nickname", "playerSlug"],
+        "type": "object"
+      },
+      "InvitationInviterDto": {
+        "properties": {
+          "nickname": {
+            "type": "string"
+          },
+          "userId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": ["userId", "nickname"],
+        "type": "object"
+      },
+      "InvitationRole": {
+        "enum": ["PLAYER", "SUBSTITUTE"],
+        "type": "string"
+      },
+      "InvitationStatus": {
+        "enum": ["PENDING", "ACCEPTED", "DECLINED", "REVOKED", "EXPIRED"],
+        "type": "string"
       },
       "LivenessDto": {
         "properties": {
@@ -527,6 +773,16 @@
       },
       "MeDto": {
         "properties": {
+          "membership": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MeMembershipDto"
+              }
+            ],
+            "description": "Active team membership (one per user, ADR-019) or null",
+            "nullable": true,
+            "type": "object"
+          },
           "profile": {
             "$ref": "#/components/schemas/MeProfileDto"
           },
@@ -550,7 +806,34 @@
             "$ref": "#/components/schemas/MeUserDto"
           }
         },
-        "required": ["user", "profile", "steamProfile", "roles"],
+        "required": ["user", "profile", "steamProfile", "roles", "membership"],
+        "type": "object"
+      },
+      "MeMembershipDto": {
+        "properties": {
+          "joinedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeamMembershipRole"
+              }
+            ]
+          },
+          "teamId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "teamSlug": {
+            "type": "string"
+          }
+        },
+        "required": ["teamId", "teamSlug", "teamName", "role", "joinedAt"],
         "type": "object"
       },
       "MeProfileDto": {
@@ -684,6 +967,86 @@
           }
         },
         "required": ["name", "version", "apiVersion", "environment", "features"],
+        "type": "object"
+      },
+      "MyInvitationDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "invitedBy": {
+            "$ref": "#/components/schemas/MyInvitationInviterDto"
+          },
+          "respondedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InvitationRole"
+              }
+            ]
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InvitationStatus"
+              }
+            ]
+          },
+          "team": {
+            "$ref": "#/components/schemas/MyInvitationTeamDto"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "role",
+          "expiresAt",
+          "createdAt",
+          "respondedAt",
+          "team",
+          "invitedBy"
+        ],
+        "type": "object"
+      },
+      "MyInvitationInviterDto": {
+        "properties": {
+          "nickname": {
+            "type": "string"
+          }
+        },
+        "required": ["nickname"],
+        "type": "object"
+      },
+      "MyInvitationTeamDto": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "slug", "name", "tag"],
         "type": "object"
       },
       "PlayerDetailDto": {
@@ -831,6 +1194,42 @@
         "required": ["status", "checks"],
         "type": "object"
       },
+      "RejectTeamApplicationDto": {
+        "properties": {
+          "reason": {
+            "description": "Shown to the applicant; audited",
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": ["reason"],
+        "type": "object"
+      },
+      "RemoveMemberDto": {
+        "properties": {
+          "reason": {
+            "description": "Audit only, never shown publicly",
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": ["reason"],
+        "type": "object"
+      },
+      "RevokeInvitationDto": {
+        "properties": {
+          "reason": {
+            "description": "Optional reason (audit only, never public)",
+            "maxLength": 500,
+            "minLength": 3,
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "RevokeRoleDto": {
         "properties": {
           "reason": {
@@ -907,6 +1306,72 @@
         "enum": ["SUPER_ADMIN", "TOURNAMENT_ADMIN", "MATCH_ADMIN", "OBSERVER", "TEAM_MANAGER"],
         "type": "string"
       },
+      "RosterHistoryEntryDto": {
+        "properties": {
+          "joinedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "leftAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "leftReason": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RosterLeftReason"
+              }
+            ],
+            "description": "Enumerated reason only; free-text reasons are never public",
+            "nullable": true
+          },
+          "nickname": {
+            "type": "string"
+          },
+          "playerSlug": {
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeamMembershipRole"
+              }
+            ]
+          }
+        },
+        "required": ["playerSlug", "nickname", "role", "joinedAt", "leftAt", "leftReason"],
+        "type": "object"
+      },
+      "RosterHistoryPageDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RosterHistoryEntryDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "example": 1,
+            "type": "number"
+          },
+          "pageSize": {
+            "example": 20,
+            "type": "number"
+          },
+          "total": {
+            "example": 0,
+            "type": "number"
+          }
+        },
+        "required": ["page", "pageSize", "total", "items"],
+        "type": "object"
+      },
+      "RosterLeftReason": {
+        "description": "Enumerated reason only; free-text reasons are never public",
+        "enum": ["left", "removed", "role_change", "captain_transfer", "admin"],
+        "type": "string"
+      },
       "SteamAuthFeatureDto": {
         "properties": {
           "status": {
@@ -917,6 +1382,116 @@
         },
         "required": ["status"],
         "type": "object"
+      },
+      "TeamApplicantDto": {
+        "properties": {
+          "nickname": {
+            "type": "string"
+          },
+          "playerSlug": {
+            "type": "string"
+          },
+          "steamId64": {
+            "example": "76561198000000000",
+            "type": "string"
+          },
+          "userId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": ["userId", "steamId64", "nickname", "playerSlug"],
+        "type": "object"
+      },
+      "TeamApplicationCreatedTeamDto": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "slug", "name"],
+        "type": "object"
+      },
+      "TeamApplicationDto": {
+        "properties": {
+          "countryCode": {
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdTeam": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeamApplicationCreatedTeamDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reviewReason": {
+            "description": "Reject reason (or optional approval note); visible to the applicant",
+            "nullable": true,
+            "type": "string"
+          },
+          "reviewedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "slug": {
+            "description": "Requested slug (derived server-side; the team may get a suffixed slug)",
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeamApplicationStatus"
+              }
+            ]
+          },
+          "tag": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "tag",
+          "slug",
+          "countryCode",
+          "description",
+          "status",
+          "reviewReason",
+          "reviewedAt",
+          "createdAt",
+          "createdTeam"
+        ],
+        "type": "object"
+      },
+      "TeamApplicationStatus": {
+        "enum": ["PENDING", "APPROVED", "REJECTED", "WITHDRAWN"],
+        "type": "string"
       },
       "TeamDetailDto": {
         "properties": {
@@ -985,6 +1560,111 @@
         ],
         "type": "object"
       },
+      "TeamInvitationDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "invitedBy": {
+            "$ref": "#/components/schemas/InvitationInviterDto"
+          },
+          "invitee": {
+            "$ref": "#/components/schemas/InvitationInviteeDto"
+          },
+          "respondedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InvitationRole"
+              }
+            ]
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/InvitationStatus"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "role",
+          "expiresAt",
+          "createdAt",
+          "respondedAt",
+          "invitee",
+          "invitedBy"
+        ],
+        "type": "object"
+      },
+      "TeamManageDto": {
+        "properties": {
+          "pendingInvitationCap": {
+            "example": 10,
+            "type": "number"
+          },
+          "pendingInvitations": {
+            "items": {
+              "$ref": "#/components/schemas/TeamInvitationDto"
+            },
+            "type": "array"
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/TeamManagePermissionsDto"
+          },
+          "rosterCap": {
+            "example": 7,
+            "type": "number"
+          },
+          "team": {
+            "$ref": "#/components/schemas/TeamDetailDto"
+          }
+        },
+        "required": [
+          "team",
+          "pendingInvitations",
+          "permissions",
+          "rosterCap",
+          "pendingInvitationCap"
+        ],
+        "type": "object"
+      },
+      "TeamManagePermissionsDto": {
+        "properties": {
+          "canInvite": {
+            "type": "boolean"
+          },
+          "canRemove": {
+            "description": "Remove non-captain members",
+            "type": "boolean"
+          },
+          "canTransfer": {
+            "description": "Captain or SUPER_ADMIN only",
+            "type": "boolean"
+          }
+        },
+        "required": ["canInvite", "canRemove", "canTransfer"],
+        "type": "object"
+      },
+      "TeamMembershipRole": {
+        "enum": ["CAPTAIN", "PLAYER", "SUBSTITUTE"],
+        "type": "string"
+      },
       "TeamPageDto": {
         "properties": {
           "items": {
@@ -1046,9 +1726,14 @@
                 "$ref": "#/components/schemas/MembershipRole"
               }
             ]
+          },
+          "userId": {
+            "description": "User id (needed for remove / transfer; not secret)",
+            "format": "uuid",
+            "type": "string"
           }
         },
-        "required": ["playerSlug", "nickname", "countryCode", "role", "joinedAt"],
+        "required": ["userId", "playerSlug", "nickname", "countryCode", "role", "joinedAt"],
         "type": "object"
       },
       "TeamSummaryDto": {
@@ -1268,6 +1953,17 @@
         ],
         "type": "object"
       },
+      "TransferCaptainDto": {
+        "properties": {
+          "newCaptainUserId": {
+            "description": "Active member of the same team",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": ["newCaptainUserId"],
+        "type": "object"
+      },
       "UpdateMyProfileDto": {
         "properties": {
           "biography": {
@@ -1409,6 +2105,310 @@
           }
         ],
         "summary": "Audit log, newest first",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/team-applications": {
+      "get": {
+        "operationId": "AdminTeamApplications_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/TeamApplicationStatus"
+                }
+              ],
+              "default": "PENDING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTeamApplicationPageDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Missing role"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Team application queue (default PENDING, oldest first)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/team-applications/{id}/approve": {
+      "post": {
+        "operationId": "AdminTeamApplications_approve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveTeamApplicationDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamApplicationDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Missing role or CSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "APPLICATION_NOT_PENDING | APPLICANT_INELIGIBLE | APPLICANT_IN_TEAM | TEAM_NAME_TAKEN | TEAM_TAG_TAKEN | IDEMPOTENCY_KEY_REUSED | IDEMPOTENCY_IN_PROGRESS"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Approve: creates the team and the captain membership atomically (audited)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/team-applications/{id}/reject": {
+      "post": {
+        "operationId": "AdminTeamApplications_reject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectTeamApplicationDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamApplicationDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Missing role or CSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "APPLICATION_NOT_PENDING"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Reject with a reason visible to the applicant (audited)",
         "tags": ["admin"]
       }
     },
@@ -1900,6 +2900,200 @@
         "tags": ["health"]
       }
     },
+    "/api/v1/invitations/{id}/accept": {
+      "post": {
+        "operationId": "Invitations_accept",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyInvitationDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "CSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "INVITATION_NOT_PENDING | INVITATION_EXPIRED | TEAM_NOT_ACTIVE | ALREADY_IN_TEAM | ROSTER_FULL | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Accept an invitation (invitee only; others get 404). No request body.",
+        "tags": ["invitations"]
+      }
+    },
+    "/api/v1/invitations/{id}/decline": {
+      "post": {
+        "operationId": "Invitations_decline",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyInvitationDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "CSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "INVITATION_NOT_PENDING | INVITATION_EXPIRED | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Decline an invitation (invitee only; others get 404). No body.",
+        "tags": ["invitations"]
+      }
+    },
     "/api/v1/matches": {
       "get": {
         "operationId": "Matches_list",
@@ -2036,6 +3230,68 @@
         "tags": ["me"]
       }
     },
+    "/api/v1/me/invitations": {
+      "get": {
+        "operationId": "MyInvitations_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/InvitationStatus"
+                }
+              ],
+              "default": "PENDING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/MyInvitationDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Own team invitations by status (default PENDING), newest first, max 50",
+        "tags": ["me"]
+      }
+    },
     "/api/v1/me/profile": {
       "patch": {
         "operationId": "Me_update",
@@ -2099,6 +3355,44 @@
           }
         ],
         "summary": "Update own nickname / country / biography (audited)",
+        "tags": ["me"]
+      }
+    },
+    "/api/v1/me/team-applications": {
+      "get": {
+        "operationId": "MyTeamApplications_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TeamApplicationDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Own team applications, newest first (max 20)",
         "tags": ["me"]
       }
     },
@@ -2223,6 +3517,193 @@
         "tags": ["players"]
       }
     },
+    "/api/v1/team-applications": {
+      "post": {
+        "description": "Requires a signed-in, non-sample user without an active membership or PENDING application. The slug is derived server-side from the name.",
+        "operationId": "TeamApplications_submit",
+        "parameters": [
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTeamApplicationDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamApplicationDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "CSRF validation failed"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "APPLICATION_ALREADY_PENDING | APPLICANT_IN_TEAM | TEAM_NAME_TAKEN | TEAM_TAG_TAKEN | SAMPLE_RESOURCE | IDEMPOTENCY_KEY_REUSED | IDEMPOTENCY_IN_PROGRESS"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Submit a team creation application (captain-to-be; audited)",
+        "tags": ["team-applications"]
+      }
+    },
+    "/api/v1/team-applications/{id}/withdraw": {
+      "post": {
+        "operationId": "TeamApplications_withdraw",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamApplicationDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "CSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Missing or not your application"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "APPLICATION_NOT_PENDING"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Withdraw own PENDING application (audited)",
+        "tags": ["team-applications"]
+      }
+    },
     "/api/v1/teams": {
       "get": {
         "operationId": "Teams_list",
@@ -2283,6 +3764,103 @@
         },
         "summary": "List public (approved, active) teams",
         "tags": ["teams"]
+      },
+      "post": {
+        "operationId": "TeamManagement_create",
+        "parameters": [
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminCreateTeamDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamDetailDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Missing role or CSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "PLAYER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "TEAM_NAME_TAKEN | TEAM_TAG_TAKEN | ALREADY_IN_TEAM | APPLICANT_INELIGIBLE | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Create a team directly with a captain (SUPER_ADMIN, audited)",
+        "tags": ["teams"]
       }
     },
     "/api/v1/teams/{slug}": {
@@ -2321,6 +3899,668 @@
           }
         },
         "summary": "Public team profile with current roster",
+        "tags": ["teams"]
+      }
+    },
+    "/api/v1/teams/{slug}/manage": {
+      "get": {
+        "operationId": "TeamManagement_manage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamManageDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE (not an operator)"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Team management view (captain, TEAM_MANAGER of the team, SUPER_ADMIN)",
+        "tags": ["teams"]
+      }
+    },
+    "/api/v1/teams/{slug}/roster-history": {
+      "get": {
+        "description": "Ordered by joinedAt DESC, id DESC. `leftReason` is one of left / removed / role_change / captain_transfer / admin — never free text.",
+        "operationId": "Teams_rosterHistory",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RosterHistoryPageDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Public roster history (all membership rows, newest first)",
+        "tags": ["teams"]
+      }
+    },
+    "/api/v1/teams/{teamId}/invitations": {
+      "post": {
+        "operationId": "TeamManagement_invite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "teamId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvitationDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamInvitationDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "CSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Team not found | PLAYER_NOT_FOUND"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "ALREADY_MEMBER | INVITATION_ALREADY_PENDING | INVITATION_LIMIT | TEAM_NOT_ACTIVE | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Invite a registered player by SteamID64 (team operator, audited)",
+        "tags": ["teams"]
+      }
+    },
+    "/api/v1/teams/{teamId}/invitations/{invitationId}/revoke": {
+      "post": {
+        "operationId": "TeamManagement_revoke",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "teamId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "invitationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeInvitationDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamInvitationDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "CSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "INVITATION_NOT_PENDING | INVITATION_EXPIRED | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Revoke a pending invitation (team operator, audited)",
+        "tags": ["teams"]
+      }
+    },
+    "/api/v1/teams/{teamId}/leave": {
+      "post": {
+        "operationId": "TeamManagement_leave",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "teamId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Left"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "CSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Team not found | NOT_TEAM_MEMBER"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "CAPTAIN_MUST_TRANSFER | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Leave the team (not allowed for the captain; audited)",
+        "tags": ["teams"]
+      }
+    },
+    "/api/v1/teams/{teamId}/members/{userId}/remove": {
+      "post": {
+        "operationId": "TeamManagement_remove",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "teamId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RemoveMemberDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Removed"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "CSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Team not found | NOT_TEAM_MEMBER"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "CAPTAIN_MUST_TRANSFER | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Remove a non-captain member (team operator, audited)",
+        "tags": ["teams"]
+      }
+    },
+    "/api/v1/teams/{teamId}/transfer-captain": {
+      "post": {
+        "operationId": "TeamManagement_transfer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "teamId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferCaptainDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamDetailDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE | CSRF_FAILED\n\nCSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Team not found | NOT_TEAM_MEMBER"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Transfer captaincy (current captain or SUPER_ADMIN; audited)",
         "tags": ["teams"]
       }
     },

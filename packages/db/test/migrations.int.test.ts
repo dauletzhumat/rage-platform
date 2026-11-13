@@ -40,6 +40,7 @@ const EXPECTED_TABLES = [
   'demos',
   'audit_logs',
   'outbox_events',
+  'idempotency_keys',
 ];
 
 // Runs last alphabetically-independent: it resets the schema itself, so it is safe in any order.

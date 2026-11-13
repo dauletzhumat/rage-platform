@@ -8,6 +8,27 @@ export const API_ERROR_CODES = {
   lastSuperAdmin: 'LAST_SUPER_ADMIN',
   validationFailed: 'VALIDATION_FAILED',
   rateLimited: 'RATE_LIMITED',
+  // M2 (docs/TEAMS.md §8)
+  sampleResource: 'SAMPLE_RESOURCE',
+  applicationAlreadyPending: 'APPLICATION_ALREADY_PENDING',
+  applicationNotPending: 'APPLICATION_NOT_PENDING',
+  applicantInTeam: 'APPLICANT_IN_TEAM',
+  applicantIneligible: 'APPLICANT_INELIGIBLE',
+  teamNameTaken: 'TEAM_NAME_TAKEN',
+  teamTagTaken: 'TEAM_TAG_TAKEN',
+  teamNotActive: 'TEAM_NOT_ACTIVE',
+  playerNotFound: 'PLAYER_NOT_FOUND',
+  alreadyMember: 'ALREADY_MEMBER',
+  invitationAlreadyPending: 'INVITATION_ALREADY_PENDING',
+  invitationLimit: 'INVITATION_LIMIT',
+  invitationNotPending: 'INVITATION_NOT_PENDING',
+  invitationExpired: 'INVITATION_EXPIRED',
+  alreadyInTeam: 'ALREADY_IN_TEAM',
+  rosterFull: 'ROSTER_FULL',
+  notTeamMember: 'NOT_TEAM_MEMBER',
+  captainMustTransfer: 'CAPTAIN_MUST_TRANSFER',
+  idempotencyKeyReused: 'IDEMPOTENCY_KEY_REUSED',
+  idempotencyInProgress: 'IDEMPOTENCY_IN_PROGRESS',
 } as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];
 

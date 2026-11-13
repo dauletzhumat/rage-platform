@@ -5,6 +5,7 @@ import {
   createTestPrisma,
   expectDbError,
   uniqueSteamId64,
+  uniqueTag,
   uniqueSuffix,
   withPgClient,
 } from './helpers/test-db.js';
@@ -22,7 +23,7 @@ const newUser = () => prisma.user.create({ data: { steamId64: uniqueSteamId64() 
 
 async function newTeam(name = `Team ${uniqueSuffix()}`) {
   const s = uniqueSuffix();
-  return prisma.team.create({ data: { name, tag: `T${s}`.slice(0, 10), slug: `team-${s}` } });
+  return prisma.team.create({ data: { name, tag: uniqueTag(), slug: `team-${s}` } });
 }
 
 async function newServer() {
@@ -125,7 +126,7 @@ describe('team application constraints', () => {
       data: {
         applicantUserId: u.id,
         requestedName: `A ${s1}`,
-        requestedTag: 'A',
+        requestedTag: uniqueTag('A'),
         requestedSlug: `a-${s1}`,
       },
     });
@@ -135,7 +136,7 @@ describe('team application constraints', () => {
         data: {
           applicantUserId: u.id,
           requestedName: `B ${s2}`,
-          requestedTag: 'B',
+          requestedTag: uniqueTag('B'),
           requestedSlug: `b-${s2}`,
         },
       }),
@@ -157,7 +158,7 @@ describe('team application constraints', () => {
       data: {
         applicantUserId: u.id,
         requestedName: `B ${s2}`,
-        requestedTag: 'B',
+        requestedTag: uniqueTag('B'),
         requestedSlug: `b-${s2}`,
       },
     });
@@ -171,7 +172,7 @@ describe('team application constraints', () => {
       data: {
         applicantUserId: u.id,
         requestedName: `C ${s}`,
-        requestedTag: 'C',
+        requestedTag: uniqueTag('C'),
         requestedSlug: `c-${s}`,
       },
     });
@@ -206,7 +207,7 @@ describe('team application constraints', () => {
         data: {
           applicantUserId: u.id,
           requestedName: `D ${s}`,
-          requestedTag: 'D',
+          requestedTag: uniqueTag('D'),
           requestedSlug: `d-${s}`,
         },
       });

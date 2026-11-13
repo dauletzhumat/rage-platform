@@ -21,6 +21,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/team-applications': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Team application queue (default PENDING, oldest first) */
+    get: operations['AdminTeamApplications_list'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/team-applications/{id}/approve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Approve: creates the team and the captain membership atomically (audited) */
+    post: operations['AdminTeamApplications_approve'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/team-applications/{id}/reject': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reject with a reason visible to the applicant (audited) */
+    post: operations['AdminTeamApplications_reject'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/admin/users': {
     parameters: {
       query?: never;
@@ -183,6 +234,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/invitations/{id}/accept': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Accept an invitation (invitee only; others get 404). No request body. */
+    post: operations['Invitations_accept'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/invitations/{id}/decline': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Decline an invitation (invitee only; others get 404). No body. */
+    post: operations['Invitations_decline'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/matches': {
     parameters: {
       query?: never;
@@ -234,6 +319,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/me/invitations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Own team invitations by status (default PENDING), newest first, max 50 */
+    get: operations['MyInvitations_list'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/me/profile': {
     parameters: {
       query?: never;
@@ -249,6 +351,23 @@ export interface paths {
     head?: never;
     /** Update own nickname / country / biography (audited) */
     patch: operations['Me_update'];
+    trace?: never;
+  };
+  '/api/v1/me/team-applications': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Own team applications, newest first (max 20) */
+    get: operations['MyTeamApplications_list'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   '/api/v1/meta': {
@@ -302,6 +421,43 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/team-applications': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Submit a team creation application (captain-to-be; audited)
+     * @description Requires a signed-in, non-sample user without an active membership or PENDING application. The slug is derived server-side from the name.
+     */
+    post: operations['TeamApplications_submit'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/team-applications/{id}/withdraw': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Withdraw own PENDING application (audited) */
+    post: operations['TeamApplications_withdraw'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/teams': {
     parameters: {
       query?: never;
@@ -312,7 +468,8 @@ export interface paths {
     /** List public (approved, active) teams */
     get: operations['Teams_list'];
     put?: never;
-    post?: never;
+    /** Create a team directly with a captain (SUPER_ADMIN, audited) */
+    post: operations['TeamManagement_create'];
     delete?: never;
     options?: never;
     head?: never;
@@ -330,6 +487,128 @@ export interface paths {
     get: operations['Teams_get'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/teams/{slug}/manage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Team management view (captain, TEAM_MANAGER of the team, SUPER_ADMIN) */
+    get: operations['TeamManagement_manage'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/teams/{slug}/roster-history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Public roster history (all membership rows, newest first)
+     * @description Ordered by joinedAt DESC, id DESC. `leftReason` is one of left / removed / role_change / captain_transfer / admin — never free text.
+     */
+    get: operations['Teams_rosterHistory'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/teams/{teamId}/invitations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Invite a registered player by SteamID64 (team operator, audited) */
+    post: operations['TeamManagement_invite'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/teams/{teamId}/invitations/{invitationId}/revoke': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Revoke a pending invitation (team operator, audited) */
+    post: operations['TeamManagement_revoke'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/teams/{teamId}/leave': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Leave the team (not allowed for the captain; audited) */
+    post: operations['TeamManagement_leave'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/teams/{teamId}/members/{userId}/remove': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Remove a non-captain member (team operator, audited) */
+    post: operations['TeamManagement_remove'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/teams/{teamId}/transfer-captain': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Transfer captaincy (current captain or SUPER_ADMIN; audited) */
+    post: operations['TeamManagement_transfer'];
     delete?: never;
     options?: never;
     head?: never;
@@ -374,6 +653,58 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    AdminCreateTeamDto: {
+      /**
+       * Format: uuid
+       * @description Existing ACTIVE non-sample user without a team
+       */
+      captainUserId: string;
+      /**
+       * @description ISO 3166-1 alpha-2, uppercase
+       * @example KZ
+       */
+      countryCode?: string | null;
+      description?: string | null;
+      /**
+       * @description NFC, trimmed; letters, digits, space, ".", "_", "-"; starts with letter/digit
+       * @example Steppe Wolves
+       */
+      name: string;
+      /** @description Why the team is created directly (audited) */
+      reason: string;
+      /** @example SWLV */
+      tag: string;
+    };
+    AdminTeamApplicationDto: {
+      applicant: components['schemas']['TeamApplicantDto'];
+      countryCode: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      createdTeam: components['schemas']['TeamApplicationCreatedTeamDto'] | null;
+      description: string | null;
+      /** Format: uuid */
+      id: string;
+      name: string;
+      /** Format: date-time */
+      reviewedAt: string | null;
+      /** Format: uuid */
+      reviewedById: string | null;
+      /** @description Reject reason (or optional approval note); visible to the applicant */
+      reviewReason: string | null;
+      /** @description Requested slug (derived server-side; the team may get a suffixed slug) */
+      slug: string;
+      status: components['schemas']['TeamApplicationStatus'];
+      tag: string;
+    };
+    AdminTeamApplicationPageDto: {
+      items: components['schemas']['AdminTeamApplicationDto'][];
+      /** @example 1 */
+      page: number;
+      /** @example 20 */
+      pageSize: number;
+      /** @example 0 */
+      total: number;
+    };
     AdminUserDto: {
       /** Format: date-time */
       createdAt: string;
@@ -411,7 +742,7 @@ export interface components {
     };
     ApiErrorDto: {
       /**
-       * @description Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED. New codes may be added.
+       * @description Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED, SAMPLE_RESOURCE, APPLICATION_ALREADY_PENDING, APPLICATION_NOT_PENDING, APPLICANT_IN_TEAM, APPLICANT_INELIGIBLE, TEAM_NAME_TAKEN, TEAM_TAG_TAKEN, TEAM_NOT_ACTIVE, PLAYER_NOT_FOUND, ALREADY_MEMBER, INVITATION_ALREADY_PENDING, INVITATION_LIMIT, INVITATION_NOT_PENDING, INVITATION_EXPIRED, ALREADY_IN_TEAM, ROSTER_FULL, NOT_TEAM_MEMBER, CAPTAIN_MUST_TRANSFER, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS. New codes may be added.
        * @example CSRF_FAILED
        */
       code?: string;
@@ -427,6 +758,10 @@ export interface components {
       requestId: string;
       /** @example 404 */
       statusCode: number;
+    };
+    ApproveTeamApplicationDto: {
+      /** @description Optional note to the applicant (stored as reviewReason, audited) */
+      note?: string | null;
     };
     AuditLogDto: {
       /** @example role_grant.create */
@@ -455,6 +790,29 @@ export interface components {
       /** @example 0 */
       total: number;
     };
+    CreateInvitationDto: {
+      role: components['schemas']['InvitationRole'];
+      /**
+       * @description SteamID64 of a registered player (must have signed in once)
+       * @example 76561198000000000
+       */
+      steamId64: string;
+    };
+    CreateTeamApplicationDto: {
+      /**
+       * @description ISO 3166-1 alpha-2, uppercase
+       * @example KZ
+       */
+      countryCode?: string | null;
+      description?: string | null;
+      /**
+       * @description NFC, trimmed; letters, digits, space, ".", "_", "-"; starts with letter/digit
+       * @example Steppe Wolves
+       */
+      name: string;
+      /** @example SWLV */
+      tag: string;
+    };
     Cs2IntegrationFeatureDto: {
       /** @enum {string} */
       status: 'not_implemented';
@@ -481,6 +839,23 @@ export interface components {
       scopeId?: string | null;
       scopeType: components['schemas']['RoleScopeType'];
     };
+    InvitationInviteeDto: {
+      nickname: string;
+      playerSlug: string;
+      /** @example 76561198000000000 */
+      steamId64: string;
+      /** Format: uuid */
+      userId: string;
+    };
+    InvitationInviterDto: {
+      nickname: string;
+      /** Format: uuid */
+      userId: string;
+    };
+    /** @enum {string} */
+    InvitationRole: 'PLAYER' | 'SUBSTITUTE';
+    /** @enum {string} */
+    InvitationStatus: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'REVOKED' | 'EXPIRED';
     LivenessDto: {
       /** @enum {string} */
       status: 'ok';
@@ -553,6 +928,8 @@ export interface components {
       winnerTeamSlug: string | null;
     };
     MeDto: {
+      /** @description Active team membership (one per user, ADR-019) or null */
+      membership: components['schemas']['MeMembershipDto'] | null;
       profile: components['schemas']['MeProfileDto'];
       /** @description Active role grants */
       roles: components['schemas']['MeRoleDto'][];
@@ -561,6 +938,15 @@ export interface components {
     };
     /** @enum {string} */
     MembershipRole: 'CAPTAIN' | 'PLAYER' | 'SUBSTITUTE' | 'MANAGER' | 'COACH';
+    MeMembershipDto: {
+      /** Format: date-time */
+      joinedAt: string;
+      role: components['schemas']['TeamMembershipRole'];
+      /** Format: uuid */
+      teamId: string;
+      teamName: string;
+      teamSlug: string;
+    };
     MeProfileDto: {
       biography: string | null;
       /** @example KZ */
@@ -608,6 +994,30 @@ export interface components {
        * @example 76561198000000000
        */
       steamId64: string;
+    };
+    MyInvitationDto: {
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      expiresAt: string;
+      /** Format: uuid */
+      id: string;
+      invitedBy: components['schemas']['MyInvitationInviterDto'];
+      /** Format: date-time */
+      respondedAt: string | null;
+      role: components['schemas']['InvitationRole'];
+      status: components['schemas']['InvitationStatus'];
+      team: components['schemas']['MyInvitationTeamDto'];
+    };
+    MyInvitationInviterDto: {
+      nickname: string;
+    };
+    MyInvitationTeamDto: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      slug: string;
+      tag: string;
     };
     PlayerDetailDto: {
       avatarUrl: string | null;
@@ -663,6 +1073,18 @@ export interface components {
       /** @enum {string} */
       status: 'ok' | 'error';
     };
+    RejectTeamApplicationDto: {
+      /** @description Shown to the applicant; audited */
+      reason: string;
+    };
+    RemoveMemberDto: {
+      /** @description Audit only, never shown publicly */
+      reason: string;
+    };
+    RevokeInvitationDto: {
+      /** @description Optional reason (audit only, never public) */
+      reason?: string | null;
+    };
     RevokeRoleDto: {
       reason: string;
     };
@@ -688,6 +1110,31 @@ export interface components {
     RoleScopeType: 'GLOBAL' | 'TEAM' | 'TOURNAMENT' | 'MATCH';
     /** @enum {string} */
     RoleType: 'SUPER_ADMIN' | 'TOURNAMENT_ADMIN' | 'MATCH_ADMIN' | 'OBSERVER' | 'TEAM_MANAGER';
+    RosterHistoryEntryDto: {
+      /** Format: date-time */
+      joinedAt: string;
+      /** Format: date-time */
+      leftAt: string | null;
+      /** @description Enumerated reason only; free-text reasons are never public */
+      leftReason: components['schemas']['RosterLeftReason'] | null;
+      nickname: string;
+      playerSlug: string;
+      role: components['schemas']['TeamMembershipRole'];
+    };
+    RosterHistoryPageDto: {
+      items: components['schemas']['RosterHistoryEntryDto'][];
+      /** @example 1 */
+      page: number;
+      /** @example 20 */
+      pageSize: number;
+      /** @example 0 */
+      total: number;
+    };
+    /**
+     * @description Enumerated reason only; free-text reasons are never public
+     * @enum {string}
+     */
+    RosterLeftReason: 'left' | 'removed' | 'role_change' | 'captain_transfer' | 'admin';
     SteamAuthFeatureDto: {
       /**
        * @description "configured" when realm, return URL, web URL and SESSION_SECRET are valid (Steam sign-in routes work); "unconfigured" otherwise (auth routes answer 503). Says nothing about whether a real Steam login has been verified manually.
@@ -695,6 +1142,40 @@ export interface components {
        */
       status: 'unconfigured' | 'configured';
     };
+    TeamApplicantDto: {
+      nickname: string;
+      playerSlug: string;
+      /** @example 76561198000000000 */
+      steamId64: string;
+      /** Format: uuid */
+      userId: string;
+    };
+    TeamApplicationCreatedTeamDto: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      slug: string;
+    };
+    TeamApplicationDto: {
+      countryCode: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      createdTeam: components['schemas']['TeamApplicationCreatedTeamDto'] | null;
+      description: string | null;
+      /** Format: uuid */
+      id: string;
+      name: string;
+      /** Format: date-time */
+      reviewedAt: string | null;
+      /** @description Reject reason (or optional approval note); visible to the applicant */
+      reviewReason: string | null;
+      /** @description Requested slug (derived server-side; the team may get a suffixed slug) */
+      slug: string;
+      status: components['schemas']['TeamApplicationStatus'];
+      tag: string;
+    };
+    /** @enum {string} */
+    TeamApplicationStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
     TeamDetailDto: {
       activeMemberCount: number;
       countryCode: string | null;
@@ -713,6 +1194,38 @@ export interface components {
       slug: string;
       tag: string;
     };
+    TeamInvitationDto: {
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      expiresAt: string;
+      /** Format: uuid */
+      id: string;
+      invitedBy: components['schemas']['InvitationInviterDto'];
+      invitee: components['schemas']['InvitationInviteeDto'];
+      /** Format: date-time */
+      respondedAt: string | null;
+      role: components['schemas']['InvitationRole'];
+      status: components['schemas']['InvitationStatus'];
+    };
+    TeamManageDto: {
+      /** @example 10 */
+      pendingInvitationCap: number;
+      pendingInvitations: components['schemas']['TeamInvitationDto'][];
+      permissions: components['schemas']['TeamManagePermissionsDto'];
+      /** @example 7 */
+      rosterCap: number;
+      team: components['schemas']['TeamDetailDto'];
+    };
+    TeamManagePermissionsDto: {
+      canInvite: boolean;
+      /** @description Remove non-captain members */
+      canRemove: boolean;
+      /** @description Captain or SUPER_ADMIN only */
+      canTransfer: boolean;
+    };
+    /** @enum {string} */
+    TeamMembershipRole: 'CAPTAIN' | 'PLAYER' | 'SUBSTITUTE';
     TeamPageDto: {
       items: components['schemas']['TeamSummaryDto'][];
       /** @example 1 */
@@ -734,6 +1247,11 @@ export interface components {
       nickname: string;
       playerSlug: string;
       role: components['schemas']['MembershipRole'];
+      /**
+       * Format: uuid
+       * @description User id (needed for remove / transfer; not secret)
+       */
+      userId: string;
     };
     TeamSummaryDto: {
       activeMemberCount: number;
@@ -804,6 +1322,13 @@ export interface components {
       startsAt: string | null;
       status: components['schemas']['TournamentStatus'];
     };
+    TransferCaptainDto: {
+      /**
+       * Format: uuid
+       * @description Active member of the same team
+       */
+      newCaptainUserId: string;
+    };
     UpdateMyProfileDto: {
       biography?: string | null;
       /**
@@ -866,6 +1391,197 @@ export interface operations {
       };
       /** @description Missing role */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminTeamApplications_list: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+        status?: components['schemas']['TeamApplicationStatus'];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminTeamApplicationPageDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Missing role */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminTeamApplications_approve: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ApproveTeamApplicationDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TeamApplicationDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Missing role or CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description APPLICATION_NOT_PENDING | APPLICANT_INELIGIBLE | APPLICANT_IN_TEAM | TEAM_NAME_TAKEN | TEAM_TAG_TAKEN | IDEMPOTENCY_KEY_REUSED | IDEMPOTENCY_IN_PROGRESS */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminTeamApplications_reject: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RejectTeamApplicationDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TeamApplicationDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Missing role or CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description APPLICATION_NOT_PENDING */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -1244,6 +1960,140 @@ export interface operations {
       };
     };
   };
+  Invitations_accept: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MyInvitationDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description INVITATION_NOT_PENDING | INVITATION_EXPIRED | TEAM_NOT_ACTIVE | ALREADY_IN_TEAM | ROSTER_FULL | SAMPLE_RESOURCE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  Invitations_decline: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MyInvitationDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description INVITATION_NOT_PENDING | INVITATION_EXPIRED | SAMPLE_RESOURCE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   Matches_list: {
     parameters: {
       query?: {
@@ -1339,6 +2189,44 @@ export interface operations {
       };
     };
   };
+  MyInvitations_list: {
+    parameters: {
+      query?: {
+        status?: components['schemas']['InvitationStatus'];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MyInvitationDto'][];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   Me_update: {
     parameters: {
       query?: never;
@@ -1379,6 +2267,34 @@ export interface operations {
       };
       /** @description CSRF validation failed */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  MyTeamApplications_list: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TeamApplicationDto'][];
+        };
+      };
+      /** @description No valid session */
+      401: {
         headers: {
           [name: string]: unknown;
         };
@@ -1468,6 +2384,135 @@ export interface operations {
       };
     };
   };
+  TeamApplications_submit: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateTeamApplicationDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TeamApplicationDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description APPLICATION_ALREADY_PENDING | APPLICANT_IN_TEAM | TEAM_NAME_TAKEN | TEAM_TAG_TAKEN | SAMPLE_RESOURCE | IDEMPOTENCY_KEY_REUSED | IDEMPOTENCY_IN_PROGRESS */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  TeamApplications_withdraw: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TeamApplicationDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Missing or not your application */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description APPLICATION_NOT_PENDING */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   Teams_list: {
     parameters: {
       query?: {
@@ -1500,6 +2545,76 @@ export interface operations {
       };
     };
   };
+  TeamManagement_create: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AdminCreateTeamDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TeamDetailDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Missing role or CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description PLAYER_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description TEAM_NAME_TAKEN | TEAM_TAG_TAKEN | ALREADY_IN_TEAM | APPLICANT_INELIGIBLE | SAMPLE_RESOURCE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   Teams_get: {
     parameters: {
       query?: never;
@@ -1520,6 +2635,452 @@ export interface operations {
         };
       };
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  TeamManagement_manage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TeamManageDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description FORBIDDEN_ROLE (not an operator) */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  Teams_rosterHistory: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RosterHistoryPageDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  TeamManagement_invite: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        teamId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateInvitationDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TeamInvitationDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Team not found | PLAYER_NOT_FOUND */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description ALREADY_MEMBER | INVITATION_ALREADY_PENDING | INVITATION_LIMIT | TEAM_NOT_ACTIVE | SAMPLE_RESOURCE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  TeamManagement_revoke: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        invitationId: string;
+        teamId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RevokeInvitationDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TeamInvitationDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description INVITATION_NOT_PENDING | INVITATION_EXPIRED | SAMPLE_RESOURCE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  TeamManagement_leave: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        teamId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Left */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Team not found | NOT_TEAM_MEMBER */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CAPTAIN_MUST_TRANSFER | SAMPLE_RESOURCE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  TeamManagement_remove: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        teamId: string;
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RemoveMemberDto'];
+      };
+    };
+    responses: {
+      /** @description Removed */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Team not found | NOT_TEAM_MEMBER */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description CAPTAIN_MUST_TRANSFER | SAMPLE_RESOURCE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  TeamManagement_transfer: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        teamId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TransferCaptainDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TeamDetailDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /**
+       * @description FORBIDDEN_ROLE | CSRF_FAILED
+       *
+       *     CSRF validation failed
+       */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Team not found | NOT_TEAM_MEMBER */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description SAMPLE_RESOURCE */
+      409: {
         headers: {
           [name: string]: unknown;
         };
