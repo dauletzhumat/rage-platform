@@ -13,7 +13,7 @@
 ARG PNPM_VERSION=11.1.3
 
 # ---------------------------------------------------------------------------------
-FROM node:24.22.2-trixie-slim AS base
+FROM node:26.13.0-trixie-slim AS base
 ARG PNPM_VERSION
 ENV PNPM_HOME=/pnpm \
     COREPACK_HOME=/opt/corepack \
@@ -55,7 +55,7 @@ RUN pnpm --filter "@rage/web..." run build \
  && mkdir -p apps/web/public
 
 # ---------------------------------------------------------------------------------
-FROM node:24.22.2-trixie-slim AS runtime
+FROM node:26.13.0-trixie-slim AS runtime
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
