@@ -3,7 +3,7 @@
 | Milestone | Status | Evidence | Blocker |
 |---|---|---|---|
 | M0 Architecture / repository scaffold | **Verified** (local + GitHub CI green; QA gate conditions closed) | See "M0 evidence"; CI run https://github.com/dauletzhumat/rage-platform/actions/runs/43248240833 | — |
-| M1 Steam Login / player accounts | **Verified locally** (real Steam login 2026-11-13); GitHub CI on the M1 commit pending | See "M1 evidence"; security gate 0 Critical/High; QA gate conditions met except CI | Green GitHub CI run on branch `m1-steam-auth` (open the PR) |
+| M1 Steam Login / player accounts | **Verified** (real Steam login 2026-11-13 + GitHub CI green) | See "M1 evidence"; PR https://github.com/dauletzhumat/rage-platform/pull/14; CI runs https://github.com/dauletzhumat/rage-platform/actions/runs/43476165887 and https://github.com/dauletzhumat/rage-platform/actions/runs/43477663040 | — |
 | M2 Team applications / invitation roster | Not started | DB constraints already in place (23 constraint tests) | Depends on M1 |
 | M3 Tournament registration / brackets | Not started | | Depends on M2 |
 | M4 Server Agent / match control | Not started | | Needs a CS2 dedicated server + MatchZy/CounterStrikeSharp compatibility check |
@@ -69,8 +69,10 @@ api + web, Docker Postgres/Redis). SteamID redacted: `7656119833337****`.
   no API warnings/errors in the log.
 - Steam display name/avatar not synced — expected, `STEAM_WEB_API_KEY` is not set (optional).
 
-### Blocked / not verified
-- GitHub CI on the M1 commit (CI triggers on PRs / main; PR not opened yet).
+### CI
+- GitHub CI: **green** on PR #14 (commits `8600b9a`, `ee68a5f`; both jobs incl. blocking e2e).
+
+### Not run (optional)
 - `auth-session.spec.ts` (opt-in, needs a real session cookie in `E2E_SESSION_COOKIE`) not run.
 
 ---
