@@ -108,6 +108,11 @@ export default async function TeamPage({ params, searchParams }: Props) {
                 {team.tag}
               </Badge>
               {team.isSample ? <SampleDataBadge /> : null}
+              {team.status !== 'ACTIVE' ? (
+                <Badge tone="neutral" data-testid="team-status-badge">
+                  {t(team.status === 'DISBANDED' ? 'statusDisbanded' : 'statusInactive')}
+                </Badge>
+              ) : null}
             </div>
             <Facts
               items={[
@@ -118,7 +123,7 @@ export default async function TeamPage({ params, searchParams }: Props) {
               ]}
             />
           </div>
-          {canSeeManageLink(me, team.id, team.slug) ? (
+          {team.status === 'ACTIVE' && canSeeManageLink(me, team.id, team.slug) ? (
             <Link
               href={`/teams/${encodeURIComponent(team.slug)}/manage`}
               className={buttonVariants({ variant: 'secondary', size: 'sm' })}

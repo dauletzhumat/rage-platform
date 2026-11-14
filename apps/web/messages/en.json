@@ -193,7 +193,9 @@
       "role_change": "Role changed",
       "captain_transfer": "Captaincy transferred",
       "admin": "Administrator action"
-    }
+    },
+    "statusDisbanded": "Disbanded",
+    "statusInactive": "Inactive"
   },
   "roles": {
     "CAPTAIN": "Captain",

@@ -193,7 +193,9 @@
       "role_change": "Смена роли",
       "captain_transfer": "Передача капитанства",
       "admin": "Действие администратора"
-    }
+    },
+    "statusDisbanded": "Распущена",
+    "statusInactive": "Неактивна"
   },
   "roles": {
     "CAPTAIN": "Капитан",

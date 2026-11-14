@@ -18,8 +18,15 @@ import type {
   TeamSummaryDto,
 } from './teams.dto.js';
 
-/** Only approved, active teams are public; applications never appear here (ADR-002). */
+/** Only approved, active teams are listed; applications never appear here (ADR-002). */
 const publicWhere = { status: 'ACTIVE' } satisfies Prisma.TeamWhereInput;
+/**
+ * Team pages and roster history stay reachable by slug for INACTIVE/DISBANDED teams (archived,
+ * history is public — TEAMS.md §6.2a). SUSPENDED teams are hidden (moderation).
+ */
+const pageWhere = {
+  status: { in: ['ACTIVE', 'INACTIVE', 'DISBANDED'] },
+} satisfies Prisma.TeamWhereInput;
 /**
  * Current members whose accounts are publicly visible. Suspended/banned users are
  * hidden from public rosters and counts, consistent with /players (security LOW-2).
@@ -42,6 +49,7 @@ const summarySelect = {
 
 const detailSelect = {
   ...summarySelect,
+  status: true,
   description: true,
   createdAt: true,
   memberships: {
@@ -102,7 +110,7 @@ export class TeamsService {
 
   async getBySlug(slug: string): Promise<TeamDetailDto> {
     const row = await this.prisma.client.team.findFirst({
-      where: { ...publicWhere, slug },
+      where: { ...pageWhere, slug },
       select: detailSelect,
     });
     if (!row) throw new NotFoundException('Team not found');
@@ -126,7 +134,7 @@ export class TeamsService {
     query: PaginationQueryDto,
   ): Promise<Page<RosterHistoryEntryDto>> {
     const team = await this.prisma.client.team.findFirst({
-      where: { ...publicWhere, slug },
+      where: { ...pageWhere, slug },
       select: { id: true },
     });
     if (!team) throw new NotFoundException('Team not found');
@@ -185,6 +193,7 @@ function toDetail(row: DetailRow): TeamDetailDto {
 
   return {
     ...toSummary(row),
+    status: row.status,
     description: row.description,
     createdAt: row.createdAt.toISOString(),
     roster,

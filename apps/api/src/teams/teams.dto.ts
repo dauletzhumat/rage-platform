@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { TeamStatus } from '@rage/db';
 import { PageMetaDto } from '../common/pagination/pagination.js';
 import {
   LEFT_REASONS,
@@ -41,6 +42,12 @@ export class TeamRosterEntryDto {
 }
 
 export class TeamDetailDto extends TeamSummaryDto {
+  @ApiProperty({
+    enum: TeamStatus,
+    enumName: 'TeamStatus',
+    description: 'ACTIVE, or INACTIVE/DISBANDED (archived page; not listed in /teams)',
+  })
+  status!: TeamStatus;
   @ApiProperty({ type: String, nullable: true }) description!: string | null;
   @ApiProperty({ format: 'date-time' }) createdAt!: string;
   @ApiProperty({ type: [TeamRosterEntryDto], description: 'Current (active) memberships' })

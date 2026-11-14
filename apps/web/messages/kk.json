@@ -193,7 +193,9 @@
       "role_change": "Рөлі өзгерді",
       "captain_transfer": "Капитандық берілді",
       "admin": "Әкімші әрекеті"
-    }
+    },
+    "statusDisbanded": "Таратылған",
+    "statusInactive": "Белсенді емес"
   },
   "roles": {
     "CAPTAIN": "Капитан",

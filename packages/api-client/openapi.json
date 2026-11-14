@@ -1504,6 +1504,14 @@
           "slug": {
             "type": "string"
           },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TeamStatus"
+              }
+            ],
+            "description": "ACTIVE, or INACTIVE/DISBANDED (archived page; not listed in /teams)"
+          },
           "tag": {
             "type": "string"
           }
@@ -1518,6 +1526,7 @@
           "logoUrl",
           "isSample",
           "activeMemberCount",
+          "status",
           "description",
           "createdAt",
           "roster"
@@ -1699,6 +1708,11 @@
         },
         "required": ["userId", "playerSlug", "nickname", "countryCode", "role", "joinedAt"],
         "type": "object"
+      },
+      "TeamStatus": {
+        "description": "ACTIVE, or INACTIVE/DISBANDED (archived page; not listed in /teams)",
+        "enum": ["ACTIVE", "INACTIVE", "SUSPENDED", "DISBANDED"],
+        "type": "string"
       },
       "TeamSummaryDto": {
         "properties": {

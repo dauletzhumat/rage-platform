@@ -1171,6 +1171,8 @@ export interface components {
       /** @description Current (active) memberships */
       roster: components['schemas']['TeamRosterEntryDto'][];
       slug: string;
+      /** @description ACTIVE, or INACTIVE/DISBANDED (archived page; not listed in /teams) */
+      status: components['schemas']['TeamStatus'];
       tag: string;
     };
     TeamInvitationDto: {
@@ -1232,6 +1234,11 @@ export interface components {
        */
       userId: string;
     };
+    /**
+     * @description ACTIVE, or INACTIVE/DISBANDED (archived page; not listed in /teams)
+     * @enum {string}
+     */
+    TeamStatus: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'DISBANDED';
     TeamSummaryDto: {
       activeMemberCount: number;
       countryCode: string | null;

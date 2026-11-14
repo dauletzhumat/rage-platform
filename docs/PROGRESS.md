@@ -4,7 +4,7 @@
 |---|---|---|---|
 | M0 Architecture / repository scaffold | **Verified** (local + GitHub CI green; QA gate conditions closed) | See "M0 evidence"; CI run https://github.com/dauletzhumat/rage-platform/actions/runs/43248240833 | — |
 | M1 Steam Login / player accounts | **Verified** (real Steam login 2026-11-13 + GitHub CI green) | See "M1 evidence"; PR https://github.com/dauletzhumat/rage-platform/pull/14; CI runs https://github.com/dauletzhumat/rage-platform/actions/runs/43476165887 and https://github.com/dauletzhumat/rage-platform/actions/runs/43477663040 | — |
-| M2 Team applications / invitation roster | **Implemented — awaiting real-account UI run** (branch `m2-teams`) | See "M2 evidence"; contract `docs/TEAMS.md`, ADR-019; security + QA gates PASS WITH CONDITIONS, findings fixed | Signed-in UI flows need real Steam accounts (invitations need two); GitHub CI on the PR |
+| M2 Team applications / invitation roster | **Verified** (real two-account run 2026-11-14 + GitHub CI green) | See "M2 evidence"; contract `docs/TEAMS.md`, ADR-019; security + QA gates passed, findings fixed | — |
 | M3 Tournament registration / brackets | Not started | | Depends on M2 |
 | M4 Server Agent / match control | Not started | | Needs a CS2 dedicated server + MatchZy/CounterStrikeSharp compatibility check |
 | M5 Live stats / match history | Not started | | Depends on M4 (real server events) |
@@ -51,11 +51,25 @@ Update this table after every milestone. `Verified` requires actual test evidenc
   real contention (13 waits, 0 deadlocks), OpenAPI drift none, e2e live API 41 passed / 5 skipped,
   API down 37 / 9, i18n complete.
 
-### Blocked / not verified
-- Signed-in UI flows with real Steam accounts: apply → approve (and reject with visible reason) →
-  invite a second real account by SteamID64 → accept in that account's own session → decline /
-  revoke / leave / remove / captain transfer → public roster history.
-- GitHub CI on the M2 PR.
+### Real two-account run (A3/A4 UI) — 2026-11-14
+Performed by the owner with two real Steam accounts (A = bootstrap SUPER_ADMIN, B = second
+account) on local api + web; checked afterwards in the DB, audit log and public API.
+- Both accounts applied; both applications APPROVED → teams FURIAZ (captain B) and CASPIANZ
+  (captain A). `team_application.submit` ×2, `approve` ×2, `team.create` ×2.
+- A invited B; B was blocked by the one-active-membership rule (`ALREADY_IN_TEAM`) while sole
+  captain of FURIAZ. **Found a gap:** a sole captain could neither leave nor transfer. Fixed
+  (TEAMS.md §6.2a: sole captain leaving disbands the team, revokes its invitations, audits
+  `team.disband`; archived team pages and history stay public, unlisted).
+- After the fix B left FURIAZ (DISBANDED, `team.disband`), accepted the CASPIANZ invitation
+  (ACCEPTED, `team_invitation.accept`, `team_membership.join`), A transferred captaincy to B
+  (rows closed/opened with `captain_transfer`), and A was then removed (`removed`).
+- Public roster history of CASPIANZ shows all 4 rows in order with enumerated reasons only.
+- 9 idempotency keys COMPLETED, no IN_PROGRESS leftovers.
+- Not exercised in the UI: reject with visible reason, decline, revoke, expiry (covered by
+  integration tests).
+
+### CI
+- GitHub CI green on the M2 PR (commits `4788ecb`, `02b8701`; final commit re-checked before merge).
 
 ---
 

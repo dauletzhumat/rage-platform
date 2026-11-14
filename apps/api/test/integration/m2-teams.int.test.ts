@@ -931,6 +931,14 @@ describe('M2 teams API (real PostgreSQL + Redis)', () => {
         await db().auditLog.count({ where: { action: 'team.disband', resourceId: lonely.id } }),
       ).toBe(1);
 
+      // Archived page + history stay public; the team is no longer listed.
+      const page = await get(`/teams/${lonely.slug}`).expect(200);
+      expect(page.body).toMatchObject({ status: 'DISBANDED', roster: [] });
+      const hist = await get(`/teams/${lonely.slug}/roster-history`).expect(200);
+      expect(hist.body.items[0]).toMatchObject({ role: 'CAPTAIN', leftReason: 'left' });
+      const listed = await get(`/teams?q=${encodeURIComponent(lonely.name)}`).expect(200);
+      expect(listed.body.items.map((t: { id: string }) => t.id)).not.toContain(lonely.id);
+
       await post(`/invitations/${incoming.body.id}/accept`, lonely.captain).expect(200);
       expect((await get('/me', lonely.captain).expect(200)).body.membership).toMatchObject({
         teamId: other.id,
