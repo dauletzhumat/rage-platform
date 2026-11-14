@@ -42,6 +42,9 @@ describe('public read API', () => {
       data: { slug: 'disbanded-team', name: 'Disbanded Team', tag: 'DIS', status: 'DISBANDED' },
     });
     ids.hiddenTeam = hidden.id;
+    await db.team.create({
+      data: { slug: 'suspended-team', name: 'Suspended Team', tag: 'SUSP', status: 'SUSPENDED' },
+    });
 
     await db.teamMembership.createMany({
       data: [
@@ -141,8 +144,15 @@ describe('public read API', () => {
       expect(res.body.roster[0].role).toBe('CAPTAIN');
     });
 
-    it('inactive teams and malformed slugs are 404', async () => {
-      await get('/teams/disbanded-team').expect(404);
+    it('disbanded teams keep an archived page (not listed); suspended and malformed are 404', async () => {
+      // TEAMS.md §6.2a: history of a disbanded team stays public by slug.
+      const archived = await get('/teams/disbanded-team').expect(200);
+      expect(archived.body).toMatchObject({ status: 'DISBANDED', roster: [] });
+      await get('/teams/disbanded-team/roster-history').expect(200);
+      const listed = await get('/teams?q=Disbanded').expect(200);
+      expect(listed.body.total).toBe(0);
+      await get('/teams/suspended-team').expect(404);
+      await get('/teams/suspended-team/roster-history').expect(404);
       const res = await get('/teams/NOT_A_SLUG').expect(404);
       expect(res.body.message).toBe('Team not found');
     });

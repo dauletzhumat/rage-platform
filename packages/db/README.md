@@ -51,7 +51,7 @@ const prisma = createPrismaClient(); // reads process.env.DATABASE_URL; wires @p
 - **Matches:** `Match` (series: `format`, the `status` state machine, map wins, `version` for optimistic locking), `MatchRoster`, `MatchMap`, `MatchMapPlayer`, `MapVetoAction`, `MatchRound`.
 - **Servers:** `GameServer` (`secretRef` only, **no** password columns), `ServerAgent`, `ServerAllocation` (leases), `ServerCommandRequest` (`commandType` is an enum allowlist, and `payload` must be a JSON object of typed params; there is no free-form command text).
 - **Events and stats:** `MatchEvent` (raw, append-only), `PlayerMapStat`, `PlayerRoundStat`, `TeamMapStat`, `Demo` (object key only, never the bytes).
-- **Infra:** `AuditLog` (append-only), `OutboxEvent`.
+- **Infra:** `AuditLog` (append-only), `OutboxEvent`, `IdempotencyKey` (M2; stored 2xx responses for `Idempotency-Key` replays, 24 h retention, not append-only).
 
 ## Constraints
 
@@ -74,6 +74,10 @@ const prisma = createPrismaClient(); // reads process.env.DATABASE_URL; wires @p
 | Event dedup                                                                                        | `UNIQUE(source_server_id, external_event_id)`                                              |
 | Non-negative stats, headshots ≤ kills, KAST ≤ rounds, CT + T = rounds won                          | CHECKs                                                                                     |
 | `audit_logs` and `match_events` append-only                                                        | `BEFORE UPDATE/DELETE/TRUNCATE` triggers                                                   |
+| M2: no two PENDING applications with the same tag (case-insensitive)                               | partial unique `team_applications_pending_tag_ci_uniq`                                     |
+| M2: team/application tags `^[A-Za-z0-9]{2,10}$` (API enforces 2–6)                                 | CHECKs `teams_tag_format_chk`, `team_applications_tag_format_chk`                          |
+| M2: membership roles CAPTAIN/PLAYER/SUBSTITUTE; invitation roles PLAYER/SUBSTITUTE                 | CHECKs `team_memberships_role_m2_chk`, `team_invitations_role_m2_chk`                      |
+| M2: one `Idempotency-Key` per user; key/hash/method format; response consistent with status        | unique `idempotency_keys_user_key_uniq` + `idempotency_keys_*_chk`                         |
 
 The API should match on the constraint names exported as `DB_CONSTRAINTS`. An integration test checks that every exported name exists.
 
@@ -85,7 +89,8 @@ The API should match on the constraint names exported as `DB_CONSTRAINTS`. An in
 - Roster cap (5 starters + 2 substitutes, configurable), eligibility, and the minimum of 5 verified starters.
 - Roster entries are immutable after lock. Substitutions create a new roster version (`SUPERSEDED` → `LOCKED`) with an audit row.
 - A map winner and a map player's team must be match participants. The series winner must match the map results.
-- Invitation expiry (`expires_at`), with a periodic job or a check at accept time.
+- Invitation expiry (`expires_at`): lazy expiry in M2 (docs/TEAMS.md §6.4), a job may come later.
+- Roster cap (7 active memberships, ADR-019) and the tag 2–6 length policy; a PENDING tag/name clashing with an existing team (cross-table).
 - Strict SteamID validation before it reaches the database. Note that Postgres `varchar(17)` silently truncates _trailing spaces_ that overflow the length, so `"7656119…0 "` with 18 characters would be stored. Always validate with `isSteamId64Format` and only accept IDs from verified Steam OpenID.
 - Concurrency: run approvals, invitation acceptance, allocation and result commits in transactions. The partial unique indexes are the final arbiter, so map `P2002` on them to `409 Conflict`.
 

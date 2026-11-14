@@ -3,7 +3,7 @@ import { type Prisma } from '@rage/db';
 import type { RequestWithIds } from '../common/http/request-id.js';
 import { PrismaService } from '../infra/prisma/prisma.service.js';
 
-/** M1 audit action codes (docs/AUTH.md §10). */
+/** Audit action codes: M1 (docs/AUTH.md §10) and M2 (docs/TEAMS.md §9). */
 export type AuditAction =
   | 'auth.login'
   | 'auth.logout'
@@ -11,7 +11,22 @@ export type AuditAction =
   | 'profile.update'
   | 'role_grant.create'
   | 'role_grant.revoke'
-  | 'role_grant.bootstrap';
+  | 'role_grant.bootstrap'
+  | 'team_application.submit'
+  | 'team_application.withdraw'
+  | 'team_application.approve'
+  | 'team_application.reject'
+  | 'team.create'
+  | 'team.captain_transfer'
+  | 'team.disband'
+  | 'team_invitation.create'
+  | 'team_invitation.revoke'
+  | 'team_invitation.accept'
+  | 'team_invitation.decline'
+  | 'team_invitation.expire'
+  | 'team_membership.join'
+  | 'team_membership.leave'
+  | 'team_membership.remove';
 
 export interface AuditEntry {
   action: AuditAction;

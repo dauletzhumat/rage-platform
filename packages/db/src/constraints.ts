@@ -1,6 +1,6 @@
 /**
  * Names of database constraints/indexes the API is expected to translate into domain errors
- * (e.g. HTTP 409). Defined in prisma/migrations/*_init/migration.sql — keep in sync.
+ * (e.g. HTTP 409). Defined in the raw SQL of prisma/migrations (init and later) — keep in sync.
  */
 export const DB_CONSTRAINTS = {
   userSteamIdUnique: 'users_steam_id64_key',
@@ -12,14 +12,23 @@ export const DB_CONSTRAINTS = {
   applicationPendingNameUnique: 'team_applications_pending_name_ci_uniq',
   applicationPendingSlugUnique: 'team_applications_pending_slug_uniq',
   applicationCreatedTeamUnique: 'team_applications_created_team_id_key',
+  /** M2: no two PENDING applications with the same tag (case-insensitive). */
+  applicationPendingTagUnique: 'team_applications_pending_tag_ci_uniq',
+  /** M2: tag format backstop `^[A-Za-z0-9]{2,10}$` (API enforces 2-6). */
+  applicationTagFormat: 'team_applications_tag_format_chk',
   teamSlugUnique: 'teams_slug_key',
   teamNameUnique: 'teams_name_key',
   teamNameCaseInsensitiveUnique: 'teams_name_ci_uniq',
   teamTagCaseInsensitiveUnique: 'teams_tag_ci_uniq',
+  teamTagFormat: 'teams_tag_format_chk',
   membershipOneActivePerUser: 'team_memberships_one_active_per_user_uniq',
   membershipOneActiveCaptainPerTeam: 'team_memberships_one_active_captain_per_team_uniq',
   membershipInvitationUnique: 'team_memberships_invitation_id_key',
+  /** M2: memberships use only CAPTAIN / PLAYER / SUBSTITUTE (ADR-019). */
+  membershipRoleM2: 'team_memberships_role_m2_chk',
   invitationOnePendingPerTeamInvitee: 'team_invitations_one_pending_per_team_invitee_uniq',
+  /** M2: invitations offer only PLAYER / SUBSTITUTE. */
+  invitationRoleM2: 'team_invitations_role_m2_chk',
   registrationTournamentTeamUnique: 'tournament_registrations_tournament_id_team_id_key',
   rosterOneLockedPerRegistration: 'tournament_rosters_one_locked_per_registration_uniq',
   rosterEntryUserUnique: 'tournament_roster_entries_roster_id_user_id_key',
@@ -29,6 +38,15 @@ export const DB_CONSTRAINTS = {
   allocationOneActivePerMatch: 'server_allocations_one_active_per_match_uniq',
   commandIdempotencyKeyUnique: 'server_command_requests_idempotency_key_key',
   matchEventSourceUnique: 'match_events_source_server_id_external_event_id_key',
+  /** M2: one Idempotency-Key per user (docs/TEAMS.md §7). */
+  idempotencyUserKeyUnique: 'idempotency_keys_user_key_uniq',
+  idempotencyKeyFormat: 'idempotency_keys_key_format_chk',
+  idempotencyRequestHashFormat: 'idempotency_keys_request_hash_chk',
+  idempotencyMethod: 'idempotency_keys_method_chk',
+  idempotencyCompletedResponse: 'idempotency_keys_completed_response_chk',
+  idempotencyInProgressEmpty: 'idempotency_keys_in_progress_empty_chk',
+  idempotencyResponseStatus2xx: 'idempotency_keys_response_status_2xx_chk',
+  idempotencyExpiry: 'idempotency_keys_expiry_chk',
 } as const;
 
 export type DbConstraintName = (typeof DB_CONSTRAINTS)[keyof typeof DB_CONSTRAINTS];

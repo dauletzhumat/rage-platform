@@ -239,6 +239,12 @@ enum ServerCommandState {
   TIMED_OUT
 }
 
+/// API idempotency (docs/TEAMS.md §7, API_CONVENTIONS §8).
+enum IdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
 enum DemoStatus {
   PENDING_UPLOAD
   UPLOADED
@@ -288,6 +294,7 @@ model User {
   playerMapStats         PlayerMapStat[]
   playerRoundStats       PlayerRoundStat[]
   auditLogs              AuditLog[]
+  idempotencyKeys        IdempotencyKey[]
 
   @@index([status])
   @@map("users")
@@ -462,6 +469,8 @@ model TeamMembership {
   invitation TeamInvitation? @relation(fields: [invitationId], references: [id], onDelete: Restrict)
 
   @@index([teamId, leftAt])
+  /// Public roster history: WHERE team_id = $1 ORDER BY joined_at DESC, id DESC.
+  @@index([teamId, joinedAt(sort: Desc), id(sort: Desc)])
   @@index([userId, joinedAt])
   @@index([invitedById])
   @@map("team_memberships")
@@ -1115,6 +1124,34 @@ model AuditLog {
   @@index([action, createdAt])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+/// Stored responses for `Idempotency-Key` replays (docs/TEAMS.md §7). Convenience layer only:
+/// correctness comes from constraints + row locks. Retention 24 h; expired rows are ignored and
+/// overwritten by the API. NOT append-only (the app role updates/deletes rows).
+/// SQL CHECKs: key format, sha-256 hex hash, method allowlist, COMPLETED ⇒ 2xx response_status,
+/// IN_PROGRESS ⇒ no stored response, expires_at > created_at.
+model IdempotencyKey {
+  id             String            @id @default(uuid(7)) @db.Uuid
+  userId         String            @map("user_id") @db.Uuid
+  /// Client-supplied header value, `^[A-Za-z0-9_-]{16,64}$`.
+  key            String            @db.VarChar(64)
+  method         String            @db.VarChar(10)
+  /// Route template (e.g. `/api/v1/invitations/:id/accept`), not the concrete URL.
+  route          String            @db.VarChar(200)
+  /// Lowercase hex SHA-256 of method + route template + params + canonical JSON body.
+  requestHash    String            @map("request_hash") @db.Char(64)
+  status         IdempotencyStatus @default(IN_PROGRESS)
+  responseStatus Int?              @map("response_status")
+  responseBody   Json?             @map("response_body")
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt      DateTime          @map("expires_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, key], map: "idempotency_keys_user_key_uniq")
+  @@index([expiresAt])
+  @@map("idempotency_keys")
 }
 
 /// Transactional outbox for reliable event publication (written in the same tx as the change).

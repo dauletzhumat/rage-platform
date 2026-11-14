@@ -161,6 +161,39 @@ describe('db:grants application role (ADR-016)', () => {
     });
   });
 
+  it('has full DML (not append-only) on idempotency_keys (M2)', async () => {
+    const privs = await privilegeSnapshot();
+    expect(privs.filter((p) => p.startsWith('idempotency_keys:'))).toEqual([
+      'idempotency_keys:DELETE',
+      'idempotency_keys:INSERT',
+      'idempotency_keys:SELECT',
+      'idempotency_keys:UPDATE',
+    ]);
+    await withAppClient(async (app) => {
+      await inRolledBackTx(app, async () => {
+        const userId = randomUUID();
+        await app.query(`INSERT INTO users (id, steam_id64, updated_at) VALUES ($1, $2, now())`, [
+          userId,
+          uniqueSteamId64(),
+        ]);
+        const id = randomUUID();
+        await app.query(
+          `INSERT INTO idempotency_keys (id, user_id, key, method, route, request_hash, expires_at)
+           VALUES ($1, $2, $3, 'POST', '/api/v1/teams/:teamId/leave', $4, now() + interval '24 hours')`,
+          [id, userId, randomUUID(), 'a'.repeat(64)],
+        );
+        const upd = await app.query(
+          `UPDATE idempotency_keys SET status = 'COMPLETED', response_status = 204 WHERE id = $1`,
+          [id],
+        );
+        expect(upd.rowCount).toBe(1);
+        expect((await app.query(`DELETE FROM idempotency_keys WHERE id = $1`, [id])).rowCount).toBe(
+          1,
+        );
+      });
+    });
+  });
+
   it('can INSERT and SELECT audit_logs, and INSERT is granted on match_events', async () => {
     await withAppClient(async (app) => {
       await inRolledBackTx(app, async () => {

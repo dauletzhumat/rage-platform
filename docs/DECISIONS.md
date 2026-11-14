@@ -104,9 +104,16 @@ Add new ADRs with date, context, considered alternatives, decision, tradeoffs an
 
 ## ADR-018: Resolution of ROADMAP open questions Q1–Q5, Q8
 - **Date:** 2026-11-12 · **Status:** Accepted (lead decision; revisit on product feedback)
-- **Q1 `POST /teams`:** exists only for SUPER_ADMIN with mandatory reason, audited (administrative creation, e.g. migrations of legacy teams). Captains create teams only through approved applications (ADR-002). Implemented in M2.
+- **Q1 `POST /teams`:** exists only for SUPER_ADMIN with mandatory reason, audited (administrative creation, e.g. migrations of legacy teams). Captains create teams only through approved applications (ADR-002). **Superseded in M2 (security gate M-1):** `POST /teams` was implemented and then removed before merge, because assigning a captain without that user's own signed-in consent violates the non-negotiable rules (teams only from an approved captain application; players accept explicitly). Legacy-team migration, if ever needed, will be designed with a consent step (e.g. a captain offer the user accepts).
 - **Q2 player route id:** `/players/[slug]` with `player_profiles.slug`; SteamID lookup only via `GET /players?steamId=` (M2+).
 - **Q3 slug vs UUID path segments:** accepted; slugs can never be UUID-shaped (slug pattern + generation rule).
 - **Q4 team manager:** a `user_role_grants` row `TEAM_MANAGER` scoped `TEAM:<teamId>`, granted by captain/admin and audited; `team_staff` is public display only.
 - **Q5 series vs map states:** `matches.status` keeps series-level states; map-level progress (`KNIFE`, `MAP_FINISHED`) lives in `match_maps.status`. The current `MatchStatus` enum still contains `KNIFE`/`MAP_FINISHED`; they will not be used for series and will be removed by an M3 migration together with the state machine.
 - **Q8 MFA for privileged accounts:** Steam OpenID provides no MFA signal; WebAuthn step-up for SUPER_ADMIN actions is planned for M7. Until then, admin actions are audited and admin sessions follow the same TTLs.
+
+## ADR-019: Team, invitation and roster policy (resolves Q7)
+- **Date:** 2026-11-13 · **Status:** Accepted (M2; lead decision)
+- **Context:** M2 needs fixed rules for roster size, multi-team membership, invitation lifetime and who may act on a roster (ROADMAP Q7, ADR-018 Q4).
+- **Decision:** one active membership per user across all teams, substitutes included (already enforced by a partial unique index); roster cap 7 (CAPTAIN + PLAYER + SUBSTITUTE); memberships use only CAPTAIN/PLAYER/SUBSTITUTE — managers are `TEAM_MANAGER` scoped grants, coaches `team_staff`; invitations expire after 7 days with lazy expiry (no job in M2), max 10 pending per team; an invited player in another team must leave before accepting; the captain cannot leave or be removed without transferring captaincy; SUPER_ADMIN may act on any team as an audited override; role changes close and reopen membership rows so history is never rewritten; team slug derived server-side from the name; idempotency keys implemented per API_CONVENTIONS §8 as a convenience layer over DB constraints and row locks. Full contract: `docs/TEAMS.md`.
+- **Alternatives:** allowing substitutes on two teams (complicates tournament eligibility and snapshots); a background expiry job now (needs BullMQ worker; not required for correctness).
+- **Tradeoffs:** a player switching teams must leave first (one extra step); expired invitations stay PENDING in the DB until touched.

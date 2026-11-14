@@ -13,12 +13,15 @@ import { serializeRequest, serializeResponse } from './common/http/log-serialize
 import { AUTH_THROTTLER, isStrictAuthRoute, RageThrottlerGuard } from './common/http/throttler.js';
 import { AppConfigModule } from './config/config.module.js';
 import { type Env } from './config/env.js';
+import { InvitationsModule } from './invitations/invitations.module.js';
 import { HealthModule } from './health/health.module.js';
 import { InfraModule } from './infra/infra.module.js';
 import { MeModule } from './me/me.module.js';
 import { MatchesModule } from './matches/matches.module.js';
 import { MetaModule } from './meta/meta.module.js';
 import { PlayersModule } from './players/players.module.js';
+import { TeamApplicationsModule } from './team-applications/team-applications.module.js';
+import { TeamManagementModule } from './team-management/team-management.module.js';
 import { TeamsModule } from './teams/teams.module.js';
 import { TournamentsModule } from './tournaments/tournaments.module.js';
 
@@ -75,6 +78,9 @@ export class AppModule {
         MetaModule,
         PlayersModule,
         TeamsModule,
+        TeamApplicationsModule,
+        TeamManagementModule,
+        InvitationsModule,
         TournamentsModule,
         MatchesModule,
       ],

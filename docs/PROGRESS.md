@@ -4,7 +4,7 @@
 |---|---|---|---|
 | M0 Architecture / repository scaffold | **Verified** (local + GitHub CI green; QA gate conditions closed) | See "M0 evidence"; CI run https://github.com/dauletzhumat/rage-platform/actions/runs/43248240833 | — |
 | M1 Steam Login / player accounts | **Verified** (real Steam login 2026-11-13 + GitHub CI green) | See "M1 evidence"; PR https://github.com/dauletzhumat/rage-platform/pull/14; CI runs https://github.com/dauletzhumat/rage-platform/actions/runs/43476165887 and https://github.com/dauletzhumat/rage-platform/actions/runs/43477663040 | — |
-| M2 Team applications / invitation roster | Not started | DB constraints already in place (23 constraint tests) | Depends on M1 |
+| M2 Team applications / invitation roster | **Verified** (real two-account run 2026-11-14 + GitHub CI green) | See "M2 evidence"; contract `docs/TEAMS.md`, ADR-019; security + QA gates passed, findings fixed | — |
 | M3 Tournament registration / brackets | Not started | | Depends on M2 |
 | M4 Server Agent / match control | Not started | | Needs a CS2 dedicated server + MatchZy/CounterStrikeSharp compatibility check |
 | M5 Live stats / match history | Not started | | Depends on M4 (real server events) |
@@ -12,6 +12,64 @@
 | M7 CS2 E2E / hardening / deploy | Not started | | Production host, domain/TLS |
 
 Update this table after every milestone. `Verified` requires actual test evidence.
+
+---
+
+## M2 evidence (2026-11-13 → 2026-11-14)
+
+### Done
+- Contract `docs/TEAMS.md` (+ §12 as-built notes, §13 hardening) and ADR-019 (roster cap 7, one
+  active membership incl. substitutes, 7-day invitations with lazy expiry, captain transfer rules,
+  SUPER_ADMIN override audited).
+- DB migration `20261113000000_m2_teams`: `idempotency_keys`, pending-tag uniqueness, M2 role and
+  tag CHECKs, roster-history index.
+- API: applications (submit/withdraw/list) and admin approve/reject with row locks; invitations
+  (invite/revoke/accept/decline, lazy expiry, cap 10, 24 h re-invite cooldown); remove/leave/
+  captain transfer; public roster history; `/me` membership; generic `Idempotency-Key` layer;
+  audit for every mutation. Security follow-up L-4 closed: the CSRF wiring test enumerates every
+  controller in the app graph (meta-test proves it catches unguarded handlers).
+- Web: `/teams/apply`, `/me/invitations`, `/teams/[slug]/manage`, `/admin/team-applications`,
+  roster history on `/teams/[slug]`, membership card on `/me`; all error codes in en/ru/kk;
+  generated client types.
+- **Security gate** (0 Critical/High). Fixed: M-1 `POST /teams` removed (assigned a captain without
+  consent; ADR-018 Q1 amended); L-1 lock order; L-2 invisible/filler characters in team names and
+  nicknames; L-3 5 applications per 24 h; L-4 idempotency row purge; L-5 re-invite cooldown; L-6
+  transfer only to ACTIVE users; I-1/I-2/I-5/I-8. Open: mixed-script look-alike names (tracked),
+  I-3/I-4/I-6/I-7 accepted or tracked.
+- **QA gate** PASS WITH CONDITIONS (no P0/P1). Fixed: P2-1 same-user double-accept race test; P3-1
+  sample applications cannot be rejected and are flagged in the admin queue; P3-2/P3-3 doc drift;
+  P3-5 extra races (invite cap, leave vs remove). Open: P3-4 e2e for roster history.
+- Integration test runner switched to worker threads (`apps/api/vitest.integration.config.ts`):
+  forked workers crashed intermittently on Windows with 0xC0000409 (runner process, not the API).
+
+### Verified (commands actually run, 2026-11-14, after gate fixes)
+- format ✓; lint 8/8; typecheck 8/8; unit db 32 + api 216 + web 224 + client 4; integration db 56 +
+  api 118 (includes concurrent double approve ×5, last-slot accept, one user two teams, same-user
+  double accept, accept vs revoke, transfer vs remove, leave vs remove, invite cap, same
+  idempotency key ×5, manager-grant revoke vs invite); build 6/6.
+- QA gate (pre-fix snapshot 44ae19b): integration ×2 without flakes, Postgres lock-wait log proved
+  real contention (13 waits, 0 deadlocks), OpenAPI drift none, e2e live API 41 passed / 5 skipped,
+  API down 37 / 9, i18n complete.
+
+### Real two-account run (A3/A4 UI) — 2026-11-14
+Performed by the owner with two real Steam accounts (A = bootstrap SUPER_ADMIN, B = second
+account) on local api + web; checked afterwards in the DB, audit log and public API.
+- Both accounts applied; both applications APPROVED → teams FURIAZ (captain B) and CASPIANZ
+  (captain A). `team_application.submit` ×2, `approve` ×2, `team.create` ×2.
+- A invited B; B was blocked by the one-active-membership rule (`ALREADY_IN_TEAM`) while sole
+  captain of FURIAZ. **Found a gap:** a sole captain could neither leave nor transfer. Fixed
+  (TEAMS.md §6.2a: sole captain leaving disbands the team, revokes its invitations, audits
+  `team.disband`; archived team pages and history stay public, unlisted).
+- After the fix B left FURIAZ (DISBANDED, `team.disband`), accepted the CASPIANZ invitation
+  (ACCEPTED, `team_invitation.accept`, `team_membership.join`), A transferred captaincy to B
+  (rows closed/opened with `captain_transfer`), and A was then removed (`removed`).
+- Public roster history of CASPIANZ shows all 4 rows in order with enumerated reasons only.
+- 9 idempotency keys COMPLETED, no IN_PROGRESS leftovers.
+- Not exercised in the UI: reject with visible reason, decline, revoke, expiry (covered by
+  integration tests).
+
+### CI
+- GitHub CI green on the M2 PR (commits `4788ecb`, `02b8701`; final commit re-checked before merge).
 
 ---
 

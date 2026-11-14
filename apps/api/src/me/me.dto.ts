@@ -9,7 +9,13 @@ import {
   MaxLength,
   ValidateIf,
 } from 'class-validator';
-import { NICKNAME_MAX, NICKNAME_MIN, NICKNAME_PATTERN } from '../auth/profile-rules.js';
+import { M2_MEMBERSHIP_ROLES, type M2MembershipRole } from '../team-domain/team-policy.js';
+import {
+  NICKNAME_MAX,
+  NICKNAME_MIN,
+  NICKNAME_PATTERN,
+  VISIBLE_TEXT_PATTERN,
+} from '../auth/profile-rules.js';
 
 export class MeUserDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -45,11 +51,26 @@ export class MeRoleDto {
   @ApiProperty({ format: 'date-time' }) issuedAt!: string;
 }
 
+export class MeMembershipDto {
+  @ApiProperty({ format: 'uuid' }) teamId!: string;
+  @ApiProperty() teamSlug!: string;
+  @ApiProperty() teamName!: string;
+  @ApiProperty({ enum: M2_MEMBERSHIP_ROLES, enumName: 'TeamMembershipRole' })
+  role!: M2MembershipRole;
+  @ApiProperty({ format: 'date-time' }) joinedAt!: string;
+}
+
 export class MeDto {
   @ApiProperty({ type: MeUserDto }) user!: MeUserDto;
   @ApiProperty({ type: MeProfileDto }) profile!: MeProfileDto;
   @ApiProperty({ type: MeSteamProfileDto, nullable: true }) steamProfile!: MeSteamProfileDto | null;
   @ApiProperty({ type: [MeRoleDto], description: 'Active role grants' }) roles!: MeRoleDto[];
+  @ApiProperty({
+    type: MeMembershipDto,
+    nullable: true,
+    description: 'Active team membership (one per user, ADR-019) or null',
+  })
+  membership!: MeMembershipDto | null;
 }
 
 /** NFC so visually identical nicknames compare equal (security gate M1, L-5). */
@@ -72,6 +93,9 @@ export class UpdateMyProfileDto {
   @Length(NICKNAME_MIN, NICKNAME_MAX)
   @Matches(NICKNAME_PATTERN, {
     message: 'nickname may contain letters, digits, spaces, "_", "." and "-" only',
+  })
+  @Matches(VISIBLE_TEXT_PATTERN, {
+    message: 'nickname must contain a visible letter or digit and no invisible characters',
   })
   nickname?: string;
 

@@ -90,6 +90,19 @@ export function uniqueSuffix(): string {
   return `${Date.now().toString(36)}${seq.toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
 }
 
+let tagSeq = 0;
+const TAG_RUN = Math.floor(Math.random() * 36 ** 4)
+  .toString(36)
+  .padStart(4, '0');
+/**
+ * Unique team/application tag matching the DB backstop `^[A-Za-z0-9]{2,10}$` (uppercase, 6-10
+ * chars). Unique within a test file; a random per-file prefix avoids clashes between files.
+ */
+export function uniqueTag(prefix = 'T'): string {
+  tagSeq += 1;
+  return `${prefix}${TAG_RUN}${tagSeq.toString(36)}`.toUpperCase().slice(0, 10);
+}
+
 /** Collects every message/code/meta in an error chain so assertions can find constraint names. */
 export function describeError(error: unknown): string {
   const parts: string[] = [];
