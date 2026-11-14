@@ -18,6 +18,7 @@ export type AuditAction =
   | 'team_application.reject'
   | 'team.create'
   | 'team.captain_transfer'
+  | 'team.disband'
   | 'team_invitation.create'
   | 'team_invitation.revoke'
   | 'team_invitation.accept'

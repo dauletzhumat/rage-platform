@@ -168,7 +168,7 @@ Plus M1 `UNAUTHENTICATED`, `CSRF_FAILED`, `FORBIDDEN_ROLE`, `VALIDATION_FAILED`,
 
 ## 9. Audit actions (M2)
 `team_application.submit`, `team_application.withdraw`, `team_application.approve`,
-`team_application.reject`, `team.create`, `team.captain_transfer`, `team_invitation.create`,
+`team_application.reject`, `team.create`, `team.captain_transfer`, `team.disband`, `team_invitation.create`,
 `team_invitation.revoke`, `team_invitation.accept`, `team_invitation.decline`,
 `team_invitation.expire`, `team_membership.join`, `team_membership.leave`,
 `team_membership.remove`. `detail` carries ids, roles, reasons and `override: true` for
@@ -231,3 +231,10 @@ Clarifications made during implementation; they are part of the contract.
   sample entries in the admin queue.
 - Expired idempotency rows are purged opportunistically on reserve.
 - Lock order everywhere: team row → SUPER_ADMIN grants → scoped grants → invitation/membership rows.
+
+### 6.2a Sole captain leaves (added after the M2 manual run)
+A captain who is the **only** active member may `POST /teams/:teamId/leave`: their membership is
+closed (`left`), the team becomes `DISBANDED`, its PENDING invitations are REVOKED, and
+`team.disband` is audited. With other active members the API still answers 409
+`CAPTAIN_MUST_TRANSFER`. Without this, a sole captain could never leave or join another team
+(one-active-membership policy). A disbanded team rejects new invitations (`TEAM_NOT_ACTIVE`).

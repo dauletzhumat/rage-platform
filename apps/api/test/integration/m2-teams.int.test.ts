@@ -899,6 +899,51 @@ describe('M2 teams API (real PostgreSQL + Redis)', () => {
       expect(await auditCount('team_membership.leave')).toBeGreaterThanOrEqual(1);
     });
 
+    it('a sole captain can leave: team disbanded, pending invitations revoked, can join elsewhere', async () => {
+      const lonely = await makeTeam();
+      const other = await makeTeam();
+      // Pending invitation FROM the lonely team (must be revoked on disband) …
+      const outsider = await user();
+      const outgoing = await post(`/teams/${lonely.id}/invitations`, lonely.captain, {
+        steamId64: outsider.steamId64,
+        role: 'PLAYER',
+      }).expect(201);
+      // … and one TO the lonely captain from another team.
+      const incoming = await post(`/teams/${other.id}/invitations`, other.captain, {
+        steamId64: lonely.captain.steamId64,
+        role: 'PLAYER',
+      }).expect(201);
+      const blocked = await post(`/invitations/${incoming.body.id}/accept`, lonely.captain).expect(
+        409,
+      );
+      expect(blocked.body.code).toBe('ALREADY_IN_TEAM');
+
+      await post(`/teams/${lonely.id}/leave`, lonely.captain).expect(204);
+      const team = await db().team.findUniqueOrThrow({ where: { id: lonely.id } });
+      expect(team.status).toBe('DISBANDED');
+      expect(
+        await db().teamInvitation.findUniqueOrThrow({ where: { id: outgoing.body.id } }),
+      ).toMatchObject({ status: 'REVOKED' });
+      expect(await db().teamMembership.count({ where: { teamId: lonely.id, leftAt: null } })).toBe(
+        0,
+      );
+      expect(
+        await db().auditLog.count({ where: { action: 'team.disband', resourceId: lonely.id } }),
+      ).toBe(1);
+
+      await post(`/invitations/${incoming.body.id}/accept`, lonely.captain).expect(200);
+      expect((await get('/me', lonely.captain).expect(200)).body.membership).toMatchObject({
+        teamId: other.id,
+        role: 'PLAYER',
+      });
+      // The disbanded team accepts no new invitations.
+      const dead = await post(`/teams/${lonely.id}/invitations`, admin, {
+        steamId64: outsider.steamId64,
+        role: 'PLAYER',
+      }).expect(409);
+      expect(['TEAM_NOT_ACTIVE', 'INVITATION_COOLDOWN']).toContain(dead.body.code);
+    });
+
     it('transfer closes and opens rows; history intact and stably ordered', async () => {
       const team = await makeTeam();
       const p = await addMember(team.id, team.captain, undefined, 'SUBSTITUTE');

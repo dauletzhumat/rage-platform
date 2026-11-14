@@ -10,8 +10,9 @@ import type { MeMembershipDto } from '@/lib/api/types';
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
 
 /**
- * Current team membership on /me (TEAMS.md §4.4, §10). Leave is offered to non-captains; the
- * captain is told to transfer captaincy first (the API enforces CAPTAIN_MUST_TRANSFER).
+ * Current team membership on /me (TEAMS.md §4.4, §10). Members can leave. A captain must transfer
+ * captaincy first, unless they are the only member: then leaving disbands the team (§6.2a; the
+ * API answers CAPTAIN_MUST_TRANSFER otherwise).
  * `membership === undefined` means the API does not report memberships yet → nothing claimed.
  */
 export function MembershipCard({ membership }: { membership: MeMembershipDto | null | undefined }) {
@@ -61,14 +62,21 @@ export function MembershipCard({ membership }: { membership: MeMembershipDto | n
             {membership.role === 'CAPTAIN' ? (
               <div className="space-y-2">
                 <p className="text-xs text-muted">{t('captainMustTransfer')}</p>
-                {teamHref ? (
-                  <Link
-                    href={`${teamHref}/manage`}
-                    className={buttonVariants({ variant: 'secondary', size: 'sm' })}
-                  >
-                    {t('manageTeam')}
-                  </Link>
-                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  {teamHref ? (
+                    <Link
+                      href={`${teamHref}/manage`}
+                      className={buttonVariants({ variant: 'secondary', size: 'sm' })}
+                    >
+                      {t('manageTeam')}
+                    </Link>
+                  ) : null}
+                  <LeaveTeamButton
+                    teamId={membership.teamId}
+                    teamName={membership.teamName}
+                    asCaptain
+                  />
+                </div>
               </div>
             ) : (
               <LeaveTeamButton teamId={membership.teamId} teamName={membership.teamName} />

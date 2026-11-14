@@ -298,17 +298,51 @@ export class TeamManagementService {
 
   async leave(actorUserId: string, teamId: string, ctx: AuditRequestContext): Promise<void> {
     await this.prisma.client.$transaction(async (tx) => {
-      await lockTeam(tx, teamId);
+      const team = await lockTeam(tx, teamId);
       const membership = await tx.teamMembership.findFirst({
         where: { teamId, userId: actorUserId, leftAt: null },
         select: { id: true, role: true },
       });
       if (!membership) throw notTeamMember();
-      if (membership.role === 'CAPTAIN') throw captainMustTransfer();
+      const now = new Date();
+      let disbanded = false;
+      if (membership.role === 'CAPTAIN') {
+        // A captain with teammates must transfer first. A captain who is the ONLY active member
+        // may leave: the team is disbanded (TEAMS.md §6.2a) — otherwise a sole captain could
+        // never leave or join another team (one-active-membership policy).
+        const others = await tx.teamMembership.count({
+          where: { teamId, leftAt: null, NOT: { id: membership.id } },
+        });
+        if (others > 0) throw captainMustTransfer();
+        disbanded = true;
+      }
       await tx.teamMembership.update({
         where: { id: membership.id },
-        data: { leftAt: new Date(), leftReason: 'left' },
+        data: { leftAt: now, leftReason: 'left' },
       });
+      if (disbanded) {
+        await tx.team.update({ where: { id: teamId }, data: { status: 'DISBANDED' } });
+        const revoked = await tx.teamInvitation.updateMany({
+          where: { teamId, status: 'PENDING' },
+          data: { status: 'REVOKED', respondedAt: now },
+        });
+        await this.audit.write(
+          {
+            action: 'team.disband',
+            actorUserId,
+            resourceType: 'team',
+            resourceId: teamId,
+            detail: {
+              teamId,
+              previousStatus: team.status,
+              reason: 'sole_captain_left',
+              revokedInvitations: revoked.count,
+            },
+          },
+          ctx,
+          tx,
+        );
+      }
       await this.audit.write(
         {
           action: 'team_membership.leave',

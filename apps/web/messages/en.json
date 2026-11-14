@@ -404,7 +404,7 @@
     "team": "Team",
     "teamRole": "Role",
     "joinedAt": "Joined",
-    "captainMustTransfer": "You are the captain. Transfer captaincy to another member before you can leave the team.",
+    "captainMustTransfer": "You are the captain. With teammates on the roster, transfer captaincy first. If you are the only member, you can leave — the team will be disbanded.",
     "manageTeam": "Manage team",
     "noTeam": "You're not on a team. Accept a captain's invitation or apply to create your own team.",
     "applyForTeam": "Apply to create a team"
@@ -530,7 +530,8 @@
     "makeCaptainNamed": "Make {name} captain",
     "makeCaptainTitle": "Transfer captaincy to {name}?",
     "makeCaptainDescription": "The current captain becomes a player. Only the new captain or an administrator can transfer it again.",
-    "approveNoteHint": "Visible to the applicant and stored in the audit log. Up to 500 characters."
+    "approveNoteHint": "Visible to the applicant and stored in the audit log. Up to 500 characters.",
+    "leaveCaptainDescription": "You are the only member, so leaving disbands the team: it becomes inactive and its pending invitations are revoked. Its history stays public. If other members are still on the roster, transfer captaincy first."
   },
   "teamApply": {
     "description": "Teams are created only after an administrator approves your application. You become the captain.",

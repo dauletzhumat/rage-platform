@@ -89,7 +89,16 @@ export function DeclineInvitationButton({
   );
 }
 
-export function LeaveTeamButton({ teamId, teamName }: { teamId: string; teamName: string }) {
+export function LeaveTeamButton({
+  teamId,
+  teamName,
+  asCaptain = false,
+}: {
+  teamId: string;
+  teamName: string;
+  /** Captain variant: only works when they are the sole member; the team is then disbanded. */
+  asCaptain?: boolean;
+}) {
   const t = useTranslations('teamActions');
   return (
     <ActionDialog
@@ -97,7 +106,7 @@ export function LeaveTeamButton({ teamId, teamName }: { teamId: string; teamName
       triggerAriaLabel={t('leaveNamed', { name: teamName })}
       triggerVariant="destructive"
       title={t('leaveTitle', { name: teamName })}
-      description={t('leaveDescription')}
+      description={asCaptain ? t('leaveCaptainDescription') : t('leaveDescription')}
       confirmLabel={t('leave')}
       pendingLabel={t('working')}
       destructive

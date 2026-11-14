@@ -236,10 +236,11 @@ describe('MembershipCard (/me)', () => {
     expect(screen.getByRole('button', { name: 'Leave Nova' })).toBeInTheDocument();
   });
 
-  it('captain: transfer-first notice instead of Leave', () => {
+  it('captain: transfer-first notice plus Leave (disbands when sole member)', () => {
     renderWithIntl(<MembershipCard membership={{ ...base, role: 'CAPTAIN' }} />);
-    expect(screen.queryByRole('button', { name: /Leave/ })).toBeNull();
-    expect(screen.getByText(/Transfer captaincy to another member/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Leave Nova' })).toBeInTheDocument();
+    expect(screen.getByText(/transfer captaincy first/)).toBeInTheDocument();
+    expect(screen.getByText(/the team will be disbanded/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Manage team' })).toHaveAttribute(
       'href',
       '/teams/nova/manage',
