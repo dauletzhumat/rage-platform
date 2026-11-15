@@ -96,7 +96,11 @@ describe('connection helpers', () => {
   });
 
   it('restricts the append-only and migration tables', () => {
-    expect([...APPEND_ONLY_TABLES].sort()).toEqual(['audit_logs', 'match_events']);
+    expect([...APPEND_ONLY_TABLES].sort()).toEqual([
+      'audit_logs',
+      'match_events',
+      'match_state_transitions',
+    ]);
     expect(NO_ACCESS_TABLES).toEqual(['_prisma_migrations']);
   });
 });

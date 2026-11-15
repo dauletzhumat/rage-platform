@@ -31,7 +31,8 @@ import type {
 export const ROLE_SCOPES: Record<RoleType, readonly RoleScopeType[]> = {
   SUPER_ADMIN: ['GLOBAL'],
   TOURNAMENT_ADMIN: ['GLOBAL', 'TOURNAMENT'],
-  MATCH_ADMIN: ['GLOBAL', 'TOURNAMENT'],
+  // M3: MATCH_ADMIN may also be scoped to one match (TOURNAMENTS.md §2).
+  MATCH_ADMIN: ['GLOBAL', 'TOURNAMENT', 'MATCH'],
   OBSERVER: ['GLOBAL', 'TOURNAMENT', 'MATCH'],
   TEAM_MANAGER: ['TEAM'],
 };

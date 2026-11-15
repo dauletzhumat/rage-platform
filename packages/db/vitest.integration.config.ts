@@ -8,6 +8,9 @@ export default defineConfig({
     environment: 'node',
     globalSetup: ['test/helpers/global-setup.ts'],
     fileParallelism: false,
+    // Forked workers intermittently crash on Windows with 0xC0000409 at startup (runner-level,
+    // seen in M2/M3); worker threads do not (same choice as apps/api).
+    pool: 'threads',
     testTimeout: 60_000,
     hookTimeout: 120_000,
   },

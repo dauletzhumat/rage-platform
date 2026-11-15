@@ -40,6 +40,22 @@ export function setStandardRetryAfter(res: Partial<Response>): void {
   if (seconds !== undefined) res.setHeader('Retry-After', String(seconds));
 }
 
+/** Keeps only well-formed `{ field, message }` string pairs (max 50) from a coded error body. */
+export function sanitizeDetails(value: unknown): ApiErrorDto['details'] {
+  if (!Array.isArray(value)) return undefined;
+  const out = value
+    .filter(
+      (d): d is { field: string; message: string } =>
+        !!d &&
+        typeof d === 'object' &&
+        typeof (d as { field?: unknown }).field === 'string' &&
+        typeof (d as { message?: unknown }).message === 'string',
+    )
+    .slice(0, 50)
+    .map((d) => ({ field: d.field, message: d.message }));
+  return out.length > 0 ? out : undefined;
+}
+
 /**
  * Converts every thrown error into the normalized `ApiErrorDto` envelope.
  * Unknown errors become a generic 500 — internals (stack, SQL, Prisma codes) never leak.
@@ -66,6 +82,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
         const c = (body as { code: unknown }).code;
         if (typeof c === 'string' && /^[A-Z][A-Z0-9_]{1,63}$/.test(c)) code = c;
       }
+      if (body && typeof body === 'object' && 'details' in body) {
+        details = sanitizeDetails((body as { details: unknown }).details);
+      }
       if (exception instanceof RequestValidationException) {
         message = exception.message;
         details = exception.details;
@@ -89,6 +108,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         // Never echo internal exception text for server errors.
         message = STATUS_CODES[status] ?? 'Internal server error';
         code = undefined;
+        details = undefined;
         this.logger.error({ err: exception, requestId }, 'HTTP 5xx exception');
       }
     } else if (prismaKnownCode(exception) === 'P2002') {

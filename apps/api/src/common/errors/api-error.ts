@@ -33,6 +33,27 @@ export const API_ERROR_CODES = {
   memberIneligible: 'MEMBER_INELIGIBLE',
   applicationLimit: 'APPLICATION_LIMIT',
   invitationCooldown: 'INVITATION_COOLDOWN',
+  // M3 (docs/TOURNAMENTS.md §11)
+  invalidStateTransition: 'INVALID_STATE_TRANSITION',
+  formatNotSupported: 'FORMAT_NOT_SUPPORTED',
+  tournamentNameTaken: 'TOURNAMENT_NAME_TAKEN',
+  registrationClosed: 'REGISTRATION_CLOSED',
+  alreadyRegistered: 'ALREADY_REGISTERED',
+  rosterInvalid: 'ROSTER_INVALID',
+  playerIneligible: 'PLAYER_INELIGIBLE',
+  tournamentFull: 'TOURNAMENT_FULL',
+  registrationNotPending: 'REGISTRATION_NOT_PENDING',
+  seedsInvalid: 'SEEDS_INVALID',
+  notEnoughTeams: 'NOT_ENOUGH_TEAMS',
+  bracketExists: 'BRACKET_EXISTS',
+  matchNotReady: 'MATCH_NOT_READY',
+  matchAlreadyCompleted: 'MATCH_ALREADY_COMPLETED',
+  scoreInvalid: 'SCORE_INVALID',
+  vetoNotYourTurn: 'VETO_NOT_YOUR_TURN',
+  vetoInvalidMap: 'VETO_INVALID_MAP',
+  vetoComplete: 'VETO_COMPLETE',
+  substitutionNotAllowed: 'SUBSTITUTION_NOT_ALLOWED',
+  steamIdAlreadyBanned: 'STEAM_ID_ALREADY_BANNED',
 } as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];
 
@@ -74,4 +95,16 @@ export class ApiErrorDto {
 /** Body helper for HttpExceptions that carry a machine-readable code. */
 export function errorBody(message: string, code: ApiErrorCode): { message: string; code: string } {
   return { message, code };
+}
+
+/**
+ * Body helper for coded errors that also carry per-field `details` (e.g. 409 PLAYER_INELIGIBLE
+ * with one entry per user id, 400 ROSTER_INVALID). The global filter passes `details` through.
+ */
+export function errorBodyWithDetails(
+  message: string,
+  code: ApiErrorCode,
+  details: ApiErrorDetailDto[],
+): { message: string; code: string; details: ApiErrorDetailDto[] } {
+  return { message, code, details };
 }

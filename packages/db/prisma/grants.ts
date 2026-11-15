@@ -22,7 +22,11 @@ import { loadRootEnv, ownerDatabaseUrl } from './load-env.js';
 export const DEFAULT_APP_ROLE = 'rage_app';
 
 /** Tables the application may only SELECT and INSERT (raw history; see append-only triggers). */
-export const APPEND_ONLY_TABLES: readonly string[] = ['audit_logs', 'match_events'];
+export const APPEND_ONLY_TABLES: readonly string[] = [
+  'audit_logs',
+  'match_events',
+  'match_state_transitions',
+];
 
 /** Tables the application must not access at all. */
 export const NO_ACCESS_TABLES: readonly string[] = ['_prisma_migrations'];

@@ -135,23 +135,38 @@ enum MatchFormat {
   BO5
 }
 
-/// Series state machine (validated by the API):
-/// CREATED → SERVER_ASSIGNED → PREPARING → WARMUP → READY_CHECK → KNIFE? → LIVE ↔ PAUSED
-/// → MAP_FINISHED → (next map: WARMUP …) → COMPLETED; branches CANCELLED / FAILED / DISPUTED.
+/// Series-level state machine (validated by the API, docs/TOURNAMENTS.md §7, ADR-018 Q5):
+/// CREATED → SERVER_ASSIGNED → PREPARING → WARMUP → READY_CHECK → LIVE ↔ PAUSED → COMPLETED;
+/// branches CANCELLED / FAILED / DISPUTED. Map-level progress (knife, map finished) lives in
+/// MatchMapStatus. KNIFE / MAP_FINISHED were removed by migration 20261114000000_m3_tournaments.
+/// Every transition is appended to match_state_transitions.
 enum MatchStatus {
   CREATED
   SERVER_ASSIGNED
   PREPARING
   WARMUP
   READY_CHECK
-  KNIFE
   LIVE
   PAUSED
-  MAP_FINISHED
   COMPLETED
   CANCELLED
   FAILED
   DISPUTED
+}
+
+/// Who caused a match state transition (match_state_transitions.source).
+enum MatchTransitionSource {
+  ADMIN
+  SYSTEM
+  SERVER
+}
+
+/// Origin of a match result. ADMIN_OVERRIDE / FORFEIT results are never server-verified
+/// (SQL CHECK: result_verified_at stays NULL). SERVER arrives with real game servers (M4/M5).
+enum MatchResultSource {
+  SERVER
+  ADMIN_OVERRIDE
+  FORFEIT
 }
 
 enum MatchMapStatus {
@@ -295,6 +310,9 @@ model User {
   playerRoundStats       PlayerRoundStat[]
   auditLogs              AuditLog[]
   idempotencyKeys        IdempotencyKey[]
+  matchStateTransitions  MatchStateTransition[]
+  steamBansCreated       BannedSteamId[]          @relation("SteamBanCreator")
+  steamBansLifted        BannedSteamId[]          @relation("SteamBanLifter")
 
   @@index([status])
   @@map("users")
@@ -374,6 +392,29 @@ model UserRoleGrant {
   @@index([revokedById])
   @@index([role, scopeType, scopeId])
   @@map("user_role_grants")
+}
+
+/// SteamID64 bans (docs/TOURNAMENTS.md §5). Active ⇔ lifted_at IS NULL.
+/// SQL: one active ban per steam_id64 (partial unique); 17-digit format; non-blank reasons;
+/// lifted_at / lifted_by / lift_reason all set or all NULL. Not tied to users.id on purpose:
+/// a SteamID64 can be banned before it ever signs in.
+model BannedSteamId {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  steamId64   String    @map("steam_id64") @db.VarChar(17)
+  reason      String
+  createdById String    @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  liftedAt    DateTime? @map("lifted_at") @db.Timestamptz(6)
+  liftedById  String?   @map("lifted_by") @db.Uuid
+  liftReason  String?   @map("lift_reason")
+
+  createdBy User  @relation("SteamBanCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  liftedBy  User? @relation("SteamBanLifter", fields: [liftedById], references: [id], onDelete: Restrict)
+
+  @@index([createdById])
+  @@index([liftedById])
+  @@index([createdAt])
+  @@map("banned_steam_ids")
 }
 
 // ============================================================================
@@ -628,8 +669,11 @@ model TournamentRegistration {
   @@map("tournament_registrations")
 }
 
-/// Versioned roster snapshot for a registration. SQL: at most one LOCKED roster per registration.
-/// Entries are immutable once locked (service-enforced); substitutions create a new version.
+/// Versioned roster snapshot for a registration. SQL: at most one current (DRAFT or LOCKED) roster
+/// per registration; LOCKED ⇒ locked_at set, DRAFT ⇒ locked_at/locked_by NULL; status only moves
+/// DRAFT → LOCKED | SUPERSEDED, LOCKED → SUPERSEDED (trigger); registration/version immutable.
+/// Entries cannot be changed, and entries of a non-DRAFT roster cannot be deleted (trigger);
+/// roster updates and substitutions create a new version.
 model TournamentRoster {
   id                 String       @id @default(uuid(7)) @db.Uuid
   registrationId     String       @map("tournament_registration_id") @db.Uuid
@@ -716,29 +760,34 @@ model BracketSlot {
 
 /// A series (BO1/BO3/BO5). Per-map data lives in MatchMap.
 model Match {
-  id               String      @id @default(uuid(7)) @db.Uuid
-  tournamentId     String?     @map("tournament_id") @db.Uuid
-  stageId          String?     @map("stage_id") @db.Uuid
-  bracketSlotId    String?     @unique @map("bracket_slot_id") @db.Uuid
+  id               String             @id @default(uuid(7)) @db.Uuid
+  tournamentId     String?            @map("tournament_id") @db.Uuid
+  stageId          String?            @map("stage_id") @db.Uuid
+  bracketSlotId    String?            @unique @map("bracket_slot_id") @db.Uuid
   /// Nullable while a bracket slot awaits its participant (TBD).
-  teamAId          String?     @map("team_a_id") @db.Uuid
-  teamBId          String?     @map("team_b_id") @db.Uuid
-  format           MatchFormat @default(BO1)
-  status           MatchStatus @default(CREATED)
+  teamAId          String?            @map("team_a_id") @db.Uuid
+  teamBId          String?            @map("team_b_id") @db.Uuid
+  format           MatchFormat        @default(BO1)
+  status           MatchStatus        @default(CREATED)
   /// Maps won in the series; NULL until the series has server-confirmed map results.
-  teamAScore       Int?        @map("team_a_score")
-  teamBScore       Int?        @map("team_b_score")
-  winnerTeamId     String?     @map("winner_team_id") @db.Uuid
-  scheduledAt      DateTime?   @map("scheduled_at") @db.Timestamptz(6)
-  startedAt        DateTime?   @map("started_at") @db.Timestamptz(6)
-  completedAt      DateTime?   @map("completed_at") @db.Timestamptz(6)
-  resultVerifiedAt DateTime?   @map("result_verified_at") @db.Timestamptz(6)
-  statusReason     String?     @map("status_reason")
+  teamAScore       Int?               @map("team_a_score")
+  teamBScore       Int?               @map("team_b_score")
+  winnerTeamId     String?            @map("winner_team_id") @db.Uuid
+  scheduledAt      DateTime?          @map("scheduled_at") @db.Timestamptz(6)
+  startedAt        DateTime?          @map("started_at") @db.Timestamptz(6)
+  completedAt      DateTime?          @map("completed_at") @db.Timestamptz(6)
+  /// Set only for server-confirmed results (result_source = SERVER). SQL CHECK: NULL for
+  /// ADMIN_OVERRIDE / FORFEIT.
+  resultVerifiedAt DateTime?          @map("result_verified_at") @db.Timestamptz(6)
+  /// SQL CHECK: status = COMPLETED ⇒ result_source and winner_team_id NOT NULL;
+  /// FORFEIT ⇒ no scores.
+  resultSource     MatchResultSource? @map("result_source")
+  statusReason     String?            @map("status_reason")
   /// Optimistic concurrency counter for state transitions.
-  version          Int         @default(0)
-  isSample         Boolean     @default(false) @map("is_sample")
-  createdAt        DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  version          Int                @default(0)
+  isSample         Boolean            @default(false) @map("is_sample")
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   tournament  Tournament?            @relation(fields: [tournamentId], references: [id], onDelete: Restrict)
   stage       TournamentStage?       @relation(fields: [stageId], references: [id], onDelete: Restrict)
@@ -752,6 +801,7 @@ model Match {
   allocations ServerAllocation[]
   commands    ServerCommandRequest[]
   events      MatchEvent[]
+  transitions MatchStateTransition[]
 
   @@index([tournamentId, status])
   @@index([stageId])
@@ -808,6 +858,7 @@ model MatchMap {
   demos          Demo[]
 
   @@unique([matchId, mapOrder])
+  @@unique([matchId, mapName])
   @@index([winnerTeamId])
   @@index([startingCtTeamId])
   @@index([mapName])
@@ -835,7 +886,8 @@ model MatchMapPlayer {
   @@map("match_map_players")
 }
 
-/// SQL: a map can be banned/picked/decided at most once per match (partial unique).
+/// SQL: a map can be banned/picked/decided at most once per match (partial unique; SIDE_PICK is
+/// excluded because it refers to an already picked map); map_name `^de_[a-z0-9_]{2,30}$`.
 model MapVetoAction {
   id          String         @id @default(uuid(7)) @db.Uuid
   matchId     String         @map("match_id") @db.Uuid
@@ -875,6 +927,28 @@ model MatchRound {
   @@unique([matchMapId, roundNumber])
   @@index([winningTeamId])
   @@map("match_rounds")
+}
+
+/// Series state transition log (docs/TOURNAMENTS.md §7). APPEND-ONLY (UPDATE/DELETE/TRUNCATE
+/// rejected by trigger; the app role has only SELECT/INSERT). SQL: to_status differs from
+/// from_status; ADMIN ⇒ actor_user_id NOT NULL; reason non-blank when present.
+model MatchStateTransition {
+  id          String                @id @default(uuid(7)) @db.Uuid
+  matchId     String                @map("match_id") @db.Uuid
+  /// NULL for the initial state of a match.
+  fromStatus  MatchStatus?          @map("from_status")
+  toStatus    MatchStatus           @map("to_status")
+  source      MatchTransitionSource
+  actorUserId String?               @map("actor_user_id") @db.Uuid
+  reason      String?
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  match     Match @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  actorUser User? @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([matchId, createdAt])
+  @@index([actorUserId])
+  @@map("match_state_transitions")
 }
 
 // ============================================================================

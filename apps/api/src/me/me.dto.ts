@@ -48,6 +48,12 @@ export class MeRoleDto {
   @ApiProperty({ enum: RoleType, enumName: 'RoleType' }) role!: RoleType;
   @ApiProperty({ enum: RoleScopeType, enumName: 'RoleScopeType' }) scopeType!: RoleScopeType;
   @ApiProperty({ type: String, format: 'uuid', nullable: true }) scopeId!: string | null;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Team slug (TEAM scope) or tournament slug (TOURNAMENT scope); otherwise null',
+  })
+  scopeSlug!: string | null;
   @ApiProperty({ format: 'date-time' }) issuedAt!: string;
 }
 

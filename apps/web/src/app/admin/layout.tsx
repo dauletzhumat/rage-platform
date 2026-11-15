@@ -31,7 +31,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
   if (access.kind === 'allowed') {
     return (
-      <AdminShell viewer={toViewer(access.me)} showNav>
+      <AdminShell viewer={toViewer(access.me)} showNav superAdmin={access.superAdmin}>
         {children}
       </AdminShell>
     );

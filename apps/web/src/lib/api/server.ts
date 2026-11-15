@@ -14,10 +14,8 @@ import type {
   AuditListParams,
   AuditLogDto,
   ListParams,
-  MatchDetail,
   InvitationStatus,
   MeDtoM2,
-  MatchSummary,
   MyInvitationDto,
   MetaResponse,
   Paginated,
@@ -31,10 +29,25 @@ import type {
   TeamDetail,
   TeamManageDto,
   TeamSummary,
-  TournamentDetail,
   TournamentListParams,
   TournamentSummary,
+  // M3
+  AdminRegistrationDto,
+  AdminRegistrationListParams,
+  AdminTournamentDto,
+  AdminTournamentListParams,
+  AdminMatchListParams,
+  BannedSteamIdDto,
+  BannedSteamIdListParams,
+  BracketDto,
+  MatchDetailM3,
+  MatchSummaryM3,
+  PublicTournamentTeamDto,
+  RegistrationDto,
+  TournamentDetailM3,
+  VetoStateDto,
 } from './types';
+import { MATCH_STATUSES, REGISTRATION_STATUSES, TOURNAMENT_STATUSES } from './types';
 
 /**
  * Server-only data access for the RAGE API.
@@ -163,16 +176,18 @@ export const getTournaments = cache(
     get('/tournaments', { ...listQuery(params), status: params?.status }),
 );
 
-export const getTournament = cache((slug: string): Promise<ApiResult<TournamentDetail>> =>
+/** M3 shape (§10): map pool, formats, capacity, approved count. */
+export const getTournament = cache((slug: string): Promise<ApiResult<TournamentDetailM3>> =>
   bySlug('tournaments', slug),
 );
 
 export const getMatches = cache(
-  (params?: ListParams): Promise<ApiResult<Paginated<MatchSummary>>> =>
+  (params?: ListParams): Promise<ApiResult<Paginated<MatchSummaryM3>>> =>
     get('/matches', listQuery(params)),
 );
 
-export const getMatch = cache((id: string): Promise<ApiResult<MatchDetail>> =>
+/** M3 shape (§10): + `resultSource`, `tournament`, `round`, series scores. */
+export const getMatch = cache((id: string): Promise<ApiResult<MatchDetailM3>> =>
   UUID_PATTERN.test(id) ? get(`/matches/${seg(id)}`) : notFoundWithoutFetch(),
 );
 
@@ -285,4 +300,89 @@ export const getTeamRosterHistory = cache(
     SLUG_PATTERN.test(slug)
       ? get(`/teams/${seg(slug)}/roster-history`, { page, pageSize })
       : notFoundWithoutFetch(),
+);
+
+// ---------- tournaments, registrations, brackets, veto, bans (M3, docs/TOURNAMENTS.md §10) ----------
+
+const TOURNAMENT_STATUS_SET: ReadonlySet<string> = new Set(TOURNAMENT_STATUSES);
+const REGISTRATION_STATUS_SET: ReadonlySet<string> = new Set(REGISTRATION_STATUSES);
+
+/** Public: APPROVED registrations with seed and current LOCKED roster. Never forwards the session. */
+export const getTournamentTeams = cache(
+  (slug: string): Promise<ApiResult<PublicTournamentTeamDto[]>> =>
+    SLUG_PATTERN.test(slug) ? get(`/tournaments/${seg(slug)}/teams`) : notFoundWithoutFetch(),
+);
+
+/** Public bracket. 404 also means "not generated yet" when the tournament itself exists. */
+export const getTournamentBracket = cache((slug: string): Promise<ApiResult<BracketDto>> =>
+  SLUG_PATTERN.test(slug) ? get(`/tournaments/${seg(slug)}/bracket`) : notFoundWithoutFetch(),
+);
+
+/** Public veto state. Never forwards the session. */
+export const getMatchVeto = cache((id: string): Promise<ApiResult<VetoStateDto>> =>
+  UUID_PATTERN.test(id) ? get(`/matches/${seg(id)}/veto`) : notFoundWithoutFetch(),
+);
+
+/** Registrations of the teams the signed-in user operates (session required). */
+export const getMyRegistrations = cache((): Promise<ApiResult<RegistrationDto[]>> =>
+  sessionGet('/me/registrations'),
+);
+
+/** Admin list including DRAFT (tournament admins). */
+export const getAdminTournaments = cache(
+  (
+    params: AdminTournamentListParams = {},
+  ): Promise<ApiResult<PaginatedResponse<AdminTournamentDto>>> =>
+    sessionGet('/admin/tournaments', {
+      status: params.status && TOURNAMENT_STATUS_SET.has(params.status) ? params.status : undefined,
+      q: params.q,
+      page: params.page,
+      pageSize: params.pageSize,
+    }),
+);
+
+/** Admin read of one tournament (incl. DRAFT). */
+export const getAdminTournament = cache((id: string): Promise<ApiResult<AdminTournamentDto>> =>
+  UUID_PATTERN.test(id) ? sessionGet(`/admin/tournaments/${seg(id)}`) : notFoundWithoutFetch(),
+);
+
+export const getAdminRegistrations = cache(
+  (
+    tournamentId: string,
+    params: AdminRegistrationListParams = {},
+  ): Promise<ApiResult<PaginatedResponse<AdminRegistrationDto>>> =>
+    UUID_PATTERN.test(tournamentId)
+      ? sessionGet(`/admin/tournaments/${seg(tournamentId)}/registrations`, {
+          status:
+            params.status && REGISTRATION_STATUS_SET.has(params.status) ? params.status : undefined,
+          page: params.page,
+          pageSize: params.pageSize,
+        })
+      : notFoundWithoutFetch(),
+);
+
+/** SUPER_ADMIN only. */
+export const getBannedSteamIds = cache(
+  (params: BannedSteamIdListParams = {}): Promise<ApiResult<PaginatedResponse<BannedSteamIdDto>>> =>
+    sessionGet('/admin/banned-steam-ids', {
+      active: typeof params.active === 'boolean' ? params.active : undefined,
+      page: params.page,
+      pageSize: params.pageSize,
+    }),
+);
+
+const MATCH_STATUS_SET: ReadonlySet<string> = new Set(MATCH_STATUSES);
+
+/** Matches for result administration (match / tournament admins; scoped grants see theirs). */
+export const getAdminMatches = cache(
+  (params: AdminMatchListParams = {}): Promise<ApiResult<PaginatedResponse<MatchSummaryM3>>> =>
+    sessionGet('/admin/matches', {
+      tournamentId:
+        params.tournamentId && UUID_PATTERN.test(params.tournamentId)
+          ? params.tournamentId
+          : undefined,
+      status: params.status && MATCH_STATUS_SET.has(params.status) ? params.status : undefined,
+      page: params.page,
+      pageSize: params.pageSize,
+    }),
 );

@@ -1,6 +1,94 @@
 {
   "components": {
     "schemas": {
+      "AdminRegistrationDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isSample": {
+            "description": "Sample team (never mutated)",
+            "type": "boolean"
+          },
+          "reviewReason": {
+            "description": "Approval note or rejection reason (visible to the team operators)",
+            "nullable": true,
+            "type": "string"
+          },
+          "reviewedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "roster": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TournamentRosterDto"
+              }
+            ],
+            "description": "Current (latest) roster version"
+          },
+          "seed": {
+            "nullable": true,
+            "type": "number"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RegistrationStatus"
+              }
+            ]
+          },
+          "team": {
+            "$ref": "#/components/schemas/RegistrationTeamRefDto"
+          },
+          "tournament": {
+            "$ref": "#/components/schemas/RegistrationTournamentRefDto"
+          }
+        },
+        "required": [
+          "id",
+          "tournament",
+          "team",
+          "status",
+          "seed",
+          "reviewReason",
+          "createdAt",
+          "roster",
+          "isSample",
+          "reviewedAt"
+        ],
+        "type": "object"
+      },
+      "AdminRegistrationPageDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminRegistrationDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "example": 1,
+            "type": "number"
+          },
+          "pageSize": {
+            "example": 20,
+            "type": "number"
+          },
+          "total": {
+            "example": 0,
+            "type": "number"
+          }
+        },
+        "required": ["page", "pageSize", "total", "items"],
+        "type": "object"
+      },
       "AdminTeamApplicationDto": {
         "properties": {
           "applicant": {
@@ -91,6 +179,147 @@
           "items": {
             "items": {
               "$ref": "#/components/schemas/AdminTeamApplicationDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "example": 1,
+            "type": "number"
+          },
+          "pageSize": {
+            "example": 20,
+            "type": "number"
+          },
+          "total": {
+            "example": 0,
+            "type": "number"
+          }
+        },
+        "required": ["page", "pageSize", "total", "items"],
+        "type": "object"
+      },
+      "AdminTournamentDto": {
+        "properties": {
+          "approvedTeamCount": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "bracketGenerated": {
+            "description": "True once generate-bracket has run",
+            "type": "boolean"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "defaultMatchFormat": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchFormat"
+              }
+            ]
+          },
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "finalMatchFormat": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchFormat"
+              }
+            ],
+            "nullable": true
+          },
+          "format": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BracketFormat"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isSample": {
+            "type": "boolean"
+          },
+          "mapPool": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "maxTeams": {
+            "nullable": true,
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "pendingRegistrationCount": {
+            "minimum": 0,
+            "type": "number"
+          },
+          "registrationCloseAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "registrationOpenAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "startsAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TournamentStatus"
+              }
+            ]
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "description",
+          "format",
+          "status",
+          "isSample",
+          "defaultMatchFormat",
+          "finalMatchFormat",
+          "maxTeams",
+          "registrationOpenAt",
+          "registrationCloseAt",
+          "startsAt",
+          "mapPool",
+          "approvedTeamCount",
+          "pendingRegistrationCount",
+          "bracketGenerated",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "AdminTournamentPageDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AdminTournamentDto"
             },
             "type": "array"
           },
@@ -211,7 +440,7 @@
       "ApiErrorDto": {
         "properties": {
           "code": {
-            "description": "Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED, SAMPLE_RESOURCE, APPLICATION_ALREADY_PENDING, APPLICATION_NOT_PENDING, APPLICANT_IN_TEAM, APPLICANT_INELIGIBLE, TEAM_NAME_TAKEN, TEAM_TAG_TAKEN, TEAM_NOT_ACTIVE, PLAYER_NOT_FOUND, ALREADY_MEMBER, INVITATION_ALREADY_PENDING, INVITATION_LIMIT, INVITATION_NOT_PENDING, INVITATION_EXPIRED, ALREADY_IN_TEAM, ROSTER_FULL, NOT_TEAM_MEMBER, CAPTAIN_MUST_TRANSFER, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS, MEMBER_INELIGIBLE, APPLICATION_LIMIT, INVITATION_COOLDOWN. New codes may be added.",
+            "description": "Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED, SAMPLE_RESOURCE, APPLICATION_ALREADY_PENDING, APPLICATION_NOT_PENDING, APPLICANT_IN_TEAM, APPLICANT_INELIGIBLE, TEAM_NAME_TAKEN, TEAM_TAG_TAKEN, TEAM_NOT_ACTIVE, PLAYER_NOT_FOUND, ALREADY_MEMBER, INVITATION_ALREADY_PENDING, INVITATION_LIMIT, INVITATION_NOT_PENDING, INVITATION_EXPIRED, ALREADY_IN_TEAM, ROSTER_FULL, NOT_TEAM_MEMBER, CAPTAIN_MUST_TRANSFER, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS, MEMBER_INELIGIBLE, APPLICATION_LIMIT, INVITATION_COOLDOWN, INVALID_STATE_TRANSITION, FORMAT_NOT_SUPPORTED, TOURNAMENT_NAME_TAKEN, REGISTRATION_CLOSED, ALREADY_REGISTERED, ROSTER_INVALID, PLAYER_INELIGIBLE, TOURNAMENT_FULL, REGISTRATION_NOT_PENDING, SEEDS_INVALID, NOT_ENOUGH_TEAMS, BRACKET_EXISTS, MATCH_NOT_READY, MATCH_ALREADY_COMPLETED, SCORE_INVALID, VETO_NOT_YOUR_TURN, VETO_INVALID_MAP, VETO_COMPLETE, SUBSTITUTION_NOT_ALLOWED, STEAM_ID_ALREADY_BANNED. New codes may be added.",
             "example": "CSRF_FAILED",
             "type": "string"
           },
@@ -240,6 +469,18 @@
           }
         },
         "required": ["statusCode", "error", "message", "requestId"],
+        "type": "object"
+      },
+      "ApproveRegistrationDto": {
+        "properties": {
+          "note": {
+            "description": "Optional note (stored as review reason, visible to the team)",
+            "maxLength": 500,
+            "minLength": 3,
+            "nullable": true,
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "ApproveTeamApplicationDto": {
@@ -327,6 +568,309 @@
         "required": ["page", "pageSize", "total", "items"],
         "type": "object"
       },
+      "BanActorDto": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "nickname": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "nickname"],
+        "type": "object"
+      },
+      "BannedSteamIdDto": {
+        "properties": {
+          "active": {
+            "description": "True while not lifted",
+            "type": "boolean"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdBy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BanActorDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "liftReason": {
+            "nullable": true,
+            "type": "string"
+          },
+          "liftedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "liftedBy": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BanActorDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "steamId64": {
+            "example": "76561198000000000",
+            "type": "string"
+          },
+          "userId": {
+            "description": "Registered user with this SteamID64, if any",
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "steamId64",
+          "reason",
+          "createdAt",
+          "createdBy",
+          "liftedAt",
+          "liftedBy",
+          "liftReason",
+          "active",
+          "userId"
+        ],
+        "type": "object"
+      },
+      "BannedSteamIdPageDto": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BannedSteamIdDto"
+            },
+            "type": "array"
+          },
+          "page": {
+            "example": 1,
+            "type": "number"
+          },
+          "pageSize": {
+            "example": 20,
+            "type": "number"
+          },
+          "total": {
+            "example": 0,
+            "type": "number"
+          }
+        },
+        "required": ["page", "pageSize", "total", "items"],
+        "type": "object"
+      },
+      "BracketDto": {
+        "properties": {
+          "format": {
+            "example": "SINGLE_ELIMINATION",
+            "type": "string"
+          },
+          "rounds": {
+            "items": {
+              "$ref": "#/components/schemas/BracketRoundDto"
+            },
+            "type": "array"
+          },
+          "size": {
+            "description": "Bracket size (power of two)",
+            "type": "number"
+          }
+        },
+        "required": ["format", "size", "rounds"],
+        "type": "object"
+      },
+      "BracketFormat": {
+        "enum": ["SINGLE_ELIMINATION", "DOUBLE_ELIMINATION", "ROUND_ROBIN", "SWISS"],
+        "type": "string"
+      },
+      "BracketMatchDto": {
+        "properties": {
+          "format": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchFormat"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isBye": {
+            "description": "Round-1 slot with a bye (CANCELLED, statusReason \"bye\")",
+            "type": "boolean"
+          },
+          "isSample": {
+            "type": "boolean"
+          },
+          "nextMatchId": {
+            "description": "Winner goes here",
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "resultSource": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchResultSource"
+              }
+            ],
+            "description": "SERVER = server-confirmed; ADMIN_OVERRIDE / FORFEIT = audited admin action, never server-verified (\"Admin result\")",
+            "nullable": true
+          },
+          "resultVerifiedAt": {
+            "description": "Set only for server-verified results (always null for admin results)",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "round": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchRoundDto"
+              }
+            ],
+            "description": "Bracket round of the match (null outside a bracket)",
+            "nullable": true,
+            "type": "object"
+          },
+          "scheduledAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "slotNumber": {
+            "minimum": 1,
+            "type": "number"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchStatus"
+              }
+            ]
+          },
+          "statusReason": {
+            "description": "`bye` for a round-1 bye slot; `tournament_cancelled`; otherwise null",
+            "nullable": true,
+            "type": "string"
+          },
+          "teamA": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchTeamRefDto"
+              }
+            ],
+            "description": "Null while a bracket slot is TBD",
+            "nullable": true,
+            "type": "object"
+          },
+          "teamAScore": {
+            "description": "Series score = maps won (not rounds). Null until a result exists; always null for FORFEIT",
+            "nullable": true,
+            "type": "number"
+          },
+          "teamASeed": {
+            "nullable": true,
+            "type": "number"
+          },
+          "teamB": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchTeamRefDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "teamBScore": {
+            "nullable": true,
+            "type": "number"
+          },
+          "teamBSeed": {
+            "nullable": true,
+            "type": "number"
+          },
+          "tournament": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TournamentRefDto"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "winnerTeamId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
+          "winnerTeamSlug": {
+            "description": "Published winner: a COMPLETED match with an admin result (ADMIN_OVERRIDE / FORFEIT, labelled by `resultSource`) or a verified server result",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "format",
+          "scheduledAt",
+          "teamA",
+          "teamB",
+          "tournament",
+          "round",
+          "teamAScore",
+          "teamBScore",
+          "winnerTeamSlug",
+          "winnerTeamId",
+          "resultSource",
+          "resultVerifiedAt",
+          "statusReason",
+          "isSample",
+          "slotNumber",
+          "teamASeed",
+          "teamBSeed",
+          "isBye",
+          "nextMatchId"
+        ],
+        "type": "object"
+      },
+      "BracketRoundDto": {
+        "properties": {
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/BracketMatchDto"
+            },
+            "type": "array"
+          },
+          "name": {
+            "example": "Final",
+            "type": "string"
+          },
+          "roundNumber": {
+            "minimum": 1,
+            "type": "number"
+          }
+        },
+        "required": ["roundNumber", "name", "matches"],
+        "type": "object"
+      },
       "CreateInvitationDto": {
         "properties": {
           "role": {
@@ -343,6 +887,50 @@
           }
         },
         "required": ["steamId64", "role"],
+        "type": "object"
+      },
+      "CreateRegistrationDto": {
+        "properties": {
+          "starters": {
+            "description": "Exactly 5 distinct user ids (current active members of the team)",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "substitutes": {
+            "description": "0-2 distinct user ids, none of them a starter",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "teamId": {
+            "description": "Team being registered (you must operate it)",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": ["teamId", "starters", "substitutes"],
+        "type": "object"
+      },
+      "CreateSteamBanDto": {
+        "properties": {
+          "reason": {
+            "description": "Ban reason (audited; admin-only)",
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          },
+          "steamId64": {
+            "description": "SteamID64 (17 digits)",
+            "example": "76561198000000000",
+            "type": "string"
+          }
+        },
+        "required": ["steamId64", "reason"],
         "type": "object"
       },
       "CreateTeamApplicationDto": {
@@ -373,6 +961,81 @@
           }
         },
         "required": ["name", "tag"],
+        "type": "object"
+      },
+      "CreateTournamentDto": {
+        "properties": {
+          "defaultMatchFormat": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchFormat"
+              }
+            ]
+          },
+          "description": {
+            "maxLength": 2000,
+            "nullable": true,
+            "type": "string"
+          },
+          "finalMatchFormat": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchFormat"
+              }
+            ],
+            "description": "Format of the final (defaults to defaultMatchFormat)",
+            "nullable": true
+          },
+          "format": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BracketFormat"
+              }
+            ],
+            "description": "Only SINGLE_ELIMINATION in M3 (others → 409 FORMAT_NOT_SUPPORTED)"
+          },
+          "mapPool": {
+            "description": "Exactly 7 distinct map names ^de_[a-z0-9_]{2,30}$ (admin-supplied; no default pool)",
+            "example": ["de_map_one", "de_map_two", "…"],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 7,
+            "minItems": 7,
+            "type": "array"
+          },
+          "maxTeams": {
+            "maximum": 64,
+            "minimum": 2,
+            "type": "number"
+          },
+          "name": {
+            "description": "NFC, trimmed; team-name character rules; unique case-insensitively",
+            "example": "RAGE Autumn Cup",
+            "maxLength": 64,
+            "minLength": 3,
+            "type": "string"
+          },
+          "registrationCloseAt": {
+            "description": "Optional end of the registration window (must be after registrationOpenAt)",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "registrationOpenAt": {
+            "description": "Optional start of the registration window",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "startsAt": {
+            "description": "Optional scheduled start",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": ["name", "format", "defaultMatchFormat", "maxTeams", "mapPool"],
         "type": "object"
       },
       "Cs2IntegrationFeatureDto": {
@@ -415,6 +1078,23 @@
           }
         },
         "required": ["steamAuth", "cs2Integration"],
+        "type": "object"
+      },
+      "ForfeitDto": {
+        "properties": {
+          "forfeitingTeamId": {
+            "description": "Team that forfeits; the other team wins",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Forfeit reason (audited)",
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": ["forfeitingTeamId", "reason"],
         "type": "object"
       },
       "GrantRoleDto": {
@@ -489,6 +1169,18 @@
         "enum": ["PENDING", "ACCEPTED", "DECLINED", "REVOKED", "EXPIRED"],
         "type": "string"
       },
+      "LiftSteamBanDto": {
+        "properties": {
+          "reason": {
+            "description": "Why the ban is lifted (audited)",
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": ["reason"],
+        "type": "object"
+      },
       "LivenessDto": {
         "properties": {
           "status": {
@@ -521,6 +1213,31 @@
             },
             "type": "array"
           },
+          "resultSource": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchResultSource"
+              }
+            ],
+            "description": "SERVER = server-confirmed; ADMIN_OVERRIDE / FORFEIT = audited admin action, never server-verified (\"Admin result\")",
+            "nullable": true
+          },
+          "resultVerifiedAt": {
+            "description": "Set only for server-verified results (always null for admin results)",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "round": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchRoundDto"
+              }
+            ],
+            "description": "Bracket round of the match (null outside a bracket)",
+            "nullable": true,
+            "type": "object"
+          },
           "scheduledAt": {
             "format": "date-time",
             "nullable": true,
@@ -533,24 +1250,38 @@
               }
             ]
           },
+          "statusReason": {
+            "description": "`bye` for a round-1 bye slot; `tournament_cancelled`; otherwise null",
+            "nullable": true,
+            "type": "string"
+          },
           "teamA": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/TeamRefDto"
+                "$ref": "#/components/schemas/MatchTeamRefDto"
               }
             ],
             "description": "Null while a bracket slot is TBD",
             "nullable": true,
             "type": "object"
           },
+          "teamAScore": {
+            "description": "Series score = maps won (not rounds). Null until a result exists; always null for FORFEIT",
+            "nullable": true,
+            "type": "number"
+          },
           "teamB": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/TeamRefDto"
+                "$ref": "#/components/schemas/MatchTeamRefDto"
               }
             ],
             "nullable": true,
             "type": "object"
+          },
+          "teamBScore": {
+            "nullable": true,
+            "type": "number"
           },
           "tournament": {
             "allOf": [
@@ -561,8 +1292,13 @@
             "nullable": true,
             "type": "object"
           },
+          "winnerTeamId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
           "winnerTeamSlug": {
-            "description": "Only set once the result is server-confirmed and verified",
+            "description": "Published winner: a COMPLETED match with an admin result (ADMIN_OVERRIDE / FORFEIT, labelled by `resultSource`) or a verified server result",
             "nullable": true,
             "type": "string"
           }
@@ -575,7 +1311,14 @@
           "teamA",
           "teamB",
           "tournament",
+          "round",
+          "teamAScore",
+          "teamBScore",
           "winnerTeamSlug",
+          "winnerTeamId",
+          "resultSource",
+          "resultVerifiedAt",
+          "statusReason",
           "isSample",
           "maps"
         ],
@@ -642,6 +1385,25 @@
         "required": ["page", "pageSize", "total", "items"],
         "type": "object"
       },
+      "MatchResultSource": {
+        "description": "SERVER = server-confirmed; ADMIN_OVERRIDE / FORFEIT = audited admin action, never server-verified (\"Admin result\")",
+        "enum": ["SERVER", "ADMIN_OVERRIDE", "FORFEIT"],
+        "type": "string"
+      },
+      "MatchRoundDto": {
+        "properties": {
+          "name": {
+            "example": "Semifinals",
+            "type": "string"
+          },
+          "roundNumber": {
+            "minimum": 1,
+            "type": "number"
+          }
+        },
+        "required": ["roundNumber", "name"],
+        "type": "object"
+      },
       "MatchStatus": {
         "enum": [
           "CREATED",
@@ -649,10 +1411,8 @@
           "PREPARING",
           "WARMUP",
           "READY_CHECK",
-          "KNIFE",
           "LIVE",
           "PAUSED",
-          "MAP_FINISHED",
           "COMPLETED",
           "CANCELLED",
           "FAILED",
@@ -676,6 +1436,31 @@
           "isSample": {
             "type": "boolean"
           },
+          "resultSource": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchResultSource"
+              }
+            ],
+            "description": "SERVER = server-confirmed; ADMIN_OVERRIDE / FORFEIT = audited admin action, never server-verified (\"Admin result\")",
+            "nullable": true
+          },
+          "resultVerifiedAt": {
+            "description": "Set only for server-verified results (always null for admin results)",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "round": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchRoundDto"
+              }
+            ],
+            "description": "Bracket round of the match (null outside a bracket)",
+            "nullable": true,
+            "type": "object"
+          },
           "scheduledAt": {
             "format": "date-time",
             "nullable": true,
@@ -688,24 +1473,38 @@
               }
             ]
           },
+          "statusReason": {
+            "description": "`bye` for a round-1 bye slot; `tournament_cancelled`; otherwise null",
+            "nullable": true,
+            "type": "string"
+          },
           "teamA": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/TeamRefDto"
+                "$ref": "#/components/schemas/MatchTeamRefDto"
               }
             ],
             "description": "Null while a bracket slot is TBD",
             "nullable": true,
             "type": "object"
           },
+          "teamAScore": {
+            "description": "Series score = maps won (not rounds). Null until a result exists; always null for FORFEIT",
+            "nullable": true,
+            "type": "number"
+          },
           "teamB": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/TeamRefDto"
+                "$ref": "#/components/schemas/MatchTeamRefDto"
               }
             ],
             "nullable": true,
             "type": "object"
+          },
+          "teamBScore": {
+            "nullable": true,
+            "type": "number"
           },
           "tournament": {
             "allOf": [
@@ -716,8 +1515,13 @@
             "nullable": true,
             "type": "object"
           },
+          "winnerTeamId": {
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          },
           "winnerTeamSlug": {
-            "description": "Only set once the result is server-confirmed and verified",
+            "description": "Published winner: a COMPLETED match with an admin result (ADMIN_OVERRIDE / FORFEIT, labelled by `resultSource`) or a verified server result",
             "nullable": true,
             "type": "string"
           }
@@ -730,9 +1534,35 @@
           "teamA",
           "teamB",
           "tournament",
+          "round",
+          "teamAScore",
+          "teamBScore",
           "winnerTeamSlug",
+          "winnerTeamId",
+          "resultSource",
+          "resultVerifiedAt",
+          "statusReason",
           "isSample"
         ],
+        "type": "object"
+      },
+      "MatchTeamRefDto": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          }
+        },
+        "required": ["slug", "name", "tag", "id"],
         "type": "object"
       },
       "MeDto": {
@@ -843,6 +1673,11 @@
             "nullable": true,
             "type": "string"
           },
+          "scopeSlug": {
+            "description": "Team slug (TEAM scope) or tournament slug (TOURNAMENT scope); otherwise null",
+            "nullable": true,
+            "type": "string"
+          },
           "scopeType": {
             "allOf": [
               {
@@ -851,7 +1686,7 @@
             ]
           }
         },
-        "required": ["id", "role", "scopeType", "scopeId", "issuedAt"],
+        "required": ["id", "role", "scopeType", "scopeId", "scopeSlug", "issuedAt"],
         "type": "object"
       },
       "MeSteamProfileDto": {
@@ -1133,6 +1968,70 @@
         "required": ["id", "slug", "nickname", "countryCode", "avatarUrl", "steamId64", "isSample"],
         "type": "object"
       },
+      "PublicRosterEntryDto": {
+        "properties": {
+          "nicknameSnapshot": {
+            "description": "Nickname snapshot at registration / substitution",
+            "type": "string"
+          },
+          "playerSlug": {
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RosterEntryRole"
+              }
+            ]
+          }
+        },
+        "required": ["playerSlug", "nicknameSnapshot", "role"],
+        "type": "object"
+      },
+      "PublicTournamentRosterDto": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/PublicRosterEntryDto"
+            },
+            "type": "array"
+          },
+          "lockedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1,
+            "type": "number"
+          }
+        },
+        "required": ["version", "lockedAt", "entries"],
+        "type": "object"
+      },
+      "PublicTournamentTeamDto": {
+        "properties": {
+          "isSample": {
+            "type": "boolean"
+          },
+          "registrationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "roster": {
+            "$ref": "#/components/schemas/PublicTournamentRosterDto"
+          },
+          "seed": {
+            "nullable": true,
+            "type": "number"
+          },
+          "team": {
+            "$ref": "#/components/schemas/MatchTeamRefDto"
+          }
+        },
+        "required": ["registrationId", "seed", "team", "isSample", "roster"],
+        "type": "object"
+      },
       "ReadinessChecksDto": {
         "properties": {
           "database": {
@@ -1158,6 +2057,110 @@
         "required": ["status", "checks"],
         "type": "object"
       },
+      "RegistrationDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reviewReason": {
+            "description": "Approval note or rejection reason (visible to the team operators)",
+            "nullable": true,
+            "type": "string"
+          },
+          "roster": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TournamentRosterDto"
+              }
+            ],
+            "description": "Current (latest) roster version"
+          },
+          "seed": {
+            "nullable": true,
+            "type": "number"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RegistrationStatus"
+              }
+            ]
+          },
+          "team": {
+            "$ref": "#/components/schemas/RegistrationTeamRefDto"
+          },
+          "tournament": {
+            "$ref": "#/components/schemas/RegistrationTournamentRefDto"
+          }
+        },
+        "required": [
+          "id",
+          "tournament",
+          "team",
+          "status",
+          "seed",
+          "reviewReason",
+          "createdAt",
+          "roster"
+        ],
+        "type": "object"
+      },
+      "RegistrationStatus": {
+        "enum": ["PENDING", "APPROVED", "REJECTED", "WITHDRAWN"],
+        "type": "string"
+      },
+      "RegistrationTeamRefDto": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "slug", "name", "tag"],
+        "type": "object"
+      },
+      "RegistrationTournamentRefDto": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "slug", "name"],
+        "type": "object"
+      },
+      "RejectRegistrationDto": {
+        "properties": {
+          "reason": {
+            "description": "Visible to the team operators",
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": ["reason"],
+        "type": "object"
+      },
       "RejectTeamApplicationDto": {
         "properties": {
           "reason": {
@@ -1180,6 +2183,35 @@
           }
         },
         "required": ["reason"],
+        "type": "object"
+      },
+      "ResultOverrideDto": {
+        "properties": {
+          "reason": {
+            "description": "Why the result is entered by an admin (audited; not server-verified)",
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          },
+          "teamAScore": {
+            "description": "Maps won by team A",
+            "maximum": 3,
+            "minimum": 0,
+            "type": "number"
+          },
+          "teamBScore": {
+            "description": "Maps won by team B",
+            "maximum": 3,
+            "minimum": 0,
+            "type": "number"
+          },
+          "winnerTeamId": {
+            "description": "Team A or team B of the match",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": ["winnerTeamId", "teamAScore", "teamBScore", "reason"],
         "type": "object"
       },
       "RevokeInvitationDto": {
@@ -1270,6 +2302,10 @@
         "enum": ["SUPER_ADMIN", "TOURNAMENT_ADMIN", "MATCH_ADMIN", "OBSERVER", "TEAM_MANAGER"],
         "type": "string"
       },
+      "RosterEntryRole": {
+        "enum": ["STARTER", "SUBSTITUTE"],
+        "type": "string"
+      },
       "RosterHistoryEntryDto": {
         "properties": {
           "joinedAt": {
@@ -1336,6 +2372,38 @@
         "enum": ["left", "removed", "role_change", "captain_transfer", "admin"],
         "type": "string"
       },
+      "RosterStatus": {
+        "enum": ["DRAFT", "LOCKED", "SUPERSEDED"],
+        "type": "string"
+      },
+      "SeedEntryDto": {
+        "properties": {
+          "registrationId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "seed": {
+            "maximum": 64,
+            "minimum": 1,
+            "type": "number"
+          }
+        },
+        "required": ["registrationId", "seed"],
+        "type": "object"
+      },
+      "SeedsDto": {
+        "properties": {
+          "seeds": {
+            "description": "Every APPROVED registration, seeds 1..N",
+            "items": {
+              "$ref": "#/components/schemas/SeedEntryDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["seeds"],
+        "type": "object"
+      },
       "SteamAuthFeatureDto": {
         "properties": {
           "status": {
@@ -1345,6 +2413,54 @@
           }
         },
         "required": ["status"],
+        "type": "object"
+      },
+      "SubmitVetoDto": {
+        "properties": {
+          "action": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VetoTurnAction"
+              }
+            ]
+          },
+          "mapName": {
+            "example": "de_mirage",
+            "pattern": "^de_[a-z0-9_]{2,30}$",
+            "type": "string"
+          }
+        },
+        "required": ["action", "mapName"],
+        "type": "object"
+      },
+      "SubstituteRegistrationDto": {
+        "properties": {
+          "inUserId": {
+            "description": "Eligible current team member joining",
+            "format": "uuid",
+            "type": "string"
+          },
+          "outUserId": {
+            "description": "Player leaving the locked roster",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Substitution reason (stored as change_reason; audited)",
+            "maxLength": 500,
+            "minLength": 3,
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RosterEntryRole"
+              }
+            ],
+            "description": "Role of the incoming player (must keep 5 starters / ≤ 2 substitutes)"
+          }
+        },
+        "required": ["outUserId", "inUserId", "role", "reason"],
         "type": "object"
       },
       "TeamApplicantDto": {
@@ -1765,9 +2881,29 @@
       },
       "TournamentDetailDto": {
         "properties": {
+          "approvedTeamCount": {
+            "description": "Same as registeredTeamCount (M3 name)",
+            "minimum": 0,
+            "type": "number"
+          },
+          "defaultMatchFormat": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchFormat"
+              }
+            ]
+          },
           "description": {
             "nullable": true,
             "type": "string"
+          },
+          "finalMatchFormat": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchFormat"
+              }
+            ],
+            "nullable": true
           },
           "format": {
             "example": "SINGLE_ELIMINATION",
@@ -1779,6 +2915,17 @@
           },
           "isSample": {
             "type": "boolean"
+          },
+          "mapPool": {
+            "description": "Admin-supplied map pool (7 maps; empty if unset)",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "maxTeams": {
+            "nullable": true,
+            "type": "number"
           },
           "name": {
             "type": "string"
@@ -1792,6 +2939,10 @@
             "format": "date-time",
             "nullable": true,
             "type": "string"
+          },
+          "registrationOpen": {
+            "description": "REGISTRATION_OPEN and now inside the optional registration window",
+            "type": "boolean"
           },
           "registrationOpenAt": {
             "format": "date-time",
@@ -1825,7 +2976,13 @@
           "registrationCloseAt",
           "isSample",
           "description",
-          "registeredTeamCount"
+          "registeredTeamCount",
+          "approvedTeamCount",
+          "mapPool",
+          "defaultMatchFormat",
+          "finalMatchFormat",
+          "maxTeams",
+          "registrationOpen"
         ],
         "type": "object"
       },
@@ -1865,6 +3022,67 @@
         "required": ["slug", "name"],
         "type": "object"
       },
+      "TournamentRosterDto": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/TournamentRosterEntryDto"
+            },
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lockedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RosterStatus"
+              }
+            ]
+          },
+          "version": {
+            "minimum": 1,
+            "type": "number"
+          }
+        },
+        "required": ["id", "version", "status", "lockedAt", "entries"],
+        "type": "object"
+      },
+      "TournamentRosterEntryDto": {
+        "properties": {
+          "nickname": {
+            "description": "Nickname snapshot taken when this roster version was created",
+            "type": "string"
+          },
+          "playerSlug": {
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RosterEntryRole"
+              }
+            ]
+          },
+          "steamId64": {
+            "description": "SteamID64 snapshot (operator / admin views only)",
+            "example": "76561198000000000",
+            "type": "string"
+          },
+          "userId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": ["userId", "playerSlug", "steamId64", "nickname", "role"],
+        "type": "object"
+      },
       "TournamentStatus": {
         "enum": [
           "DRAFT",
@@ -1875,6 +3093,26 @@
           "CANCELLED"
         ],
         "type": "string"
+      },
+      "TournamentStatusChangeDto": {
+        "properties": {
+          "reason": {
+            "description": "Required when cancelling (3-500 chars); audited",
+            "maxLength": 500,
+            "minLength": 3,
+            "nullable": true,
+            "type": "string"
+          },
+          "to": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TournamentStatus"
+              }
+            ]
+          }
+        },
+        "required": ["to"],
+        "type": "object"
       },
       "TournamentSummaryDto": {
         "properties": {
@@ -1964,8 +3202,172 @@
         },
         "type": "object"
       },
+      "UpdateTournamentDto": {
+        "properties": {
+          "defaultMatchFormat": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchFormat"
+              }
+            ]
+          },
+          "description": {
+            "maxLength": 2000,
+            "nullable": true,
+            "type": "string"
+          },
+          "finalMatchFormat": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MatchFormat"
+              }
+            ],
+            "nullable": true
+          },
+          "format": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BracketFormat"
+              }
+            ]
+          },
+          "mapPool": {
+            "description": "Exactly 7 distinct map names ^de_[a-z0-9_]{2,30}$ (admin-supplied; no default pool)",
+            "example": ["de_map_one", "de_map_two", "…"],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 7,
+            "minItems": 7,
+            "type": "array"
+          },
+          "maxTeams": {
+            "maximum": 64,
+            "minimum": 2,
+            "type": "number"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 3,
+            "type": "string"
+          },
+          "registrationCloseAt": {
+            "description": "End of the registration window; null clears",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "registrationOpenAt": {
+            "description": "Start of the registration window; null clears",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "startsAt": {
+            "description": "Scheduled start; null clears",
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "UserStatus": {
         "enum": ["ACTIVE", "SUSPENDED", "BANNED"],
+        "type": "string"
+      },
+      "VetoAction": {
+        "enum": ["BAN", "PICK", "DECIDER"],
+        "type": "string"
+      },
+      "VetoActionDto": {
+        "properties": {
+          "action": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VetoAction"
+              }
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "mapName": {
+            "example": "de_mirage",
+            "type": "string"
+          },
+          "sequence": {
+            "minimum": 1,
+            "type": "number"
+          },
+          "teamId": {
+            "description": "Acting team; null for the server-inserted DECIDER",
+            "format": "uuid",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": ["sequence", "teamId", "action", "mapName", "createdAt"],
+        "type": "object"
+      },
+      "VetoNextDto": {
+        "properties": {
+          "action": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VetoTurnAction"
+              }
+            ]
+          },
+          "teamId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": ["teamId", "action"],
+        "type": "object"
+      },
+      "VetoStateDto": {
+        "properties": {
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/VetoActionDto"
+            },
+            "type": "array"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "next": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VetoNextDto"
+              }
+            ],
+            "description": "Whose turn it is; null when complete or not possible (teams TBD)",
+            "nullable": true,
+            "type": "object"
+          },
+          "pool": {
+            "description": "Tournament map pool (7 maps)",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "remaining": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["pool", "actions", "next", "remaining", "complete"],
+        "type": "object"
+      },
+      "VetoTurnAction": {
+        "enum": ["BAN", "PICK"],
         "type": "string"
       }
     },
@@ -2083,6 +3485,595 @@
           }
         ],
         "summary": "Audit log, newest first",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/banned-steam-ids": {
+      "get": {
+        "operationId": "AdminSteamBans_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "description": "true = only active bans, false = only lifted bans",
+            "in": "query",
+            "name": "active",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BannedSteamIdPageDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Missing role"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "SteamID64 bans, newest first (SUPER_ADMIN)",
+        "tags": ["admin"]
+      },
+      "post": {
+        "operationId": "AdminSteamBans_create",
+        "parameters": [
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSteamBanDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BannedSteamIdDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Missing role or CSRF validation failed"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "STEAM_ID_ALREADY_BANNED"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Ban a SteamID64 from tournament rosters (SUPER_ADMIN; audited)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/banned-steam-ids/{id}/lift": {
+      "post": {
+        "operationId": "AdminSteamBans_lift",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LiftSteamBanDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BannedSteamIdDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Missing role or CSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "INVALID_STATE_TRANSITION (already lifted)"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Lift an active ban (SUPER_ADMIN; audited)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/matches": {
+      "get": {
+        "operationId": "AdminMatches_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tournamentId",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/MatchStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchPageDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Matches for result administration (match / tournament admins; scoped grants see theirs)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/matches/{id}/forfeit": {
+      "post": {
+        "operationId": "AdminMatches_forfeit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForfeitDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchDetailDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE | CSRF_FAILED\n\nCSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "MATCH_NOT_READY | MATCH_ALREADY_COMPLETED | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Record a forfeit (match admin; audited): the other team wins, scores stay null",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/matches/{id}/result-override": {
+      "post": {
+        "description": "Scores are maps won (BO1 1-0; BO3 2-0/2-1; BO5 3-0/3-1/3-2). Sets COMPLETED with result_source ADMIN_OVERRIDE and advances the winner in the same transaction.",
+        "operationId": "AdminMatches_override",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResultOverrideDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchDetailDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "VALIDATION_FAILED | SCORE_INVALID"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE | CSRF_FAILED\n\nCSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "MATCH_NOT_READY | MATCH_ALREADY_COMPLETED | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Enter a series result as an admin (match admin; audited; NOT server-verified)",
         "tags": ["admin"]
       }
     },
@@ -2387,6 +4378,1119 @@
           }
         ],
         "summary": "Reject with a reason visible to the applicant (audited)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/tournaments": {
+      "get": {
+        "operationId": "AdminTournaments_list",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "description": "Case-insensitive search text",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/TournamentStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTournamentPageDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "All tournaments incl. DRAFT (SUPER_ADMIN / global TOURNAMENT_ADMIN; scoped admins see theirs)",
+        "tags": ["admin"]
+      },
+      "post": {
+        "operationId": "AdminTournaments_create",
+        "parameters": [
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTournamentDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTournamentDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "Missing role or CSRF validation failed"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "TOURNAMENT_NAME_TAKEN | FORMAT_NOT_SUPPORTED"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Create a DRAFT tournament (SUPER_ADMIN or global TOURNAMENT_ADMIN)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/tournaments/{id}": {
+      "get": {
+        "operationId": "AdminTournaments_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTournamentDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "One tournament incl. DRAFT (tournament admin)",
+        "tags": ["admin"]
+      },
+      "patch": {
+        "operationId": "AdminTournaments_update",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTournamentDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTournamentDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE (not a tournament admin of this tournament) | CSRF_FAILED\n\nCSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "INVALID_STATE_TRANSITION | TOURNAMENT_NAME_TAKEN | FORMAT_NOT_SUPPORTED | TOURNAMENT_FULL | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Edit settings while DRAFT or REGISTRATION_OPEN (tournament admin)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/tournaments/{id}/generate-bracket": {
+      "post": {
+        "operationId": "AdminTournaments_generate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BracketDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE (not a tournament admin of this tournament) | CSRF_FAILED\n\nCSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "BRACKET_EXISTS | NOT_ENOUGH_TEAMS | INVALID_STATE_TRANSITION | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Generate the single-elimination bracket; tournament → IN_PROGRESS (audited)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/tournaments/{id}/registrations": {
+      "get": {
+        "operationId": "AdminTournaments_registrations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/RegistrationStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRegistrationPageDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Registrations of a tournament, oldest first (tournament admin)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/tournaments/{id}/registrations/{registrationId}/approve": {
+      "post": {
+        "operationId": "AdminTournaments_approve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "registrationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveRegistrationDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRegistrationDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE (not a tournament admin of this tournament) | CSRF_FAILED\n\nCSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "REGISTRATION_NOT_PENDING | TOURNAMENT_FULL | PLAYER_INELIGIBLE | INVALID_STATE_TRANSITION | TEAM_NOT_ACTIVE | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Approve: re-validates the snapshot, locks the roster (tournament admin; audited)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/tournaments/{id}/registrations/{registrationId}/reject": {
+      "post": {
+        "operationId": "AdminTournaments_reject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "registrationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectRegistrationDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRegistrationDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE (not a tournament admin of this tournament) | CSRF_FAILED\n\nCSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "REGISTRATION_NOT_PENDING | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Reject with a reason visible to the team (tournament admin; audited)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/tournaments/{id}/registrations/{registrationId}/substitute": {
+      "post": {
+        "operationId": "AdminTournaments_substitute",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "registrationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubstituteRegistrationDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminRegistrationDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "VALIDATION_FAILED | ROSTER_INVALID"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE (not a tournament admin of this tournament) | CSRF_FAILED\n\nCSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "SUBSTITUTION_NOT_ALLOWED | PLAYER_INELIGIBLE | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Substitute a player in a LOCKED roster (new version; tournament admin; audited)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/tournaments/{id}/seeds": {
+      "put": {
+        "operationId": "AdminTournaments_seeds",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeedsDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AdminRegistrationDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "VALIDATION_FAILED | SEEDS_INVALID"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE (not a tournament admin of this tournament) | CSRF_FAILED\n\nCSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "INVALID_STATE_TRANSITION | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Set seeds 1..N for every APPROVED registration (REGISTRATION_CLOSED; audited)",
+        "tags": ["admin"]
+      }
+    },
+    "/api/v1/admin/tournaments/{id}/status": {
+      "post": {
+        "operationId": "AdminTournaments_changeStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TournamentStatusChangeDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTournamentDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE (not a tournament admin of this tournament) | CSRF_FAILED\n\nCSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "INVALID_STATE_TRANSITION | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Lifecycle transition { to, reason? } (reason required for CANCELLED; audited)",
         "tags": ["admin"]
       }
     },
@@ -3169,7 +6273,162 @@
             "description": ""
           }
         },
-        "summary": "Public match (series) detail with per-map scores",
+        "summary": "Public match (series) detail with result source and per-map scores",
+        "tags": ["matches"]
+      }
+    },
+    "/api/v1/matches/{id}/veto": {
+      "get": {
+        "operationId": "Matches_getVeto",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VetoStateDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Public map veto state (pool, actions, whose turn, remaining maps)",
+        "tags": ["matches"]
+      },
+      "post": {
+        "description": "Fixed sequences per BO1/BO3/BO5, team A starts (docs/TOURNAMENTS.md §8). When only the decider remains, the server records DECIDER and creates the match maps.",
+        "operationId": "Matches_submitVeto",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitVetoDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VetoStateDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE | CSRF_FAILED\n\nCSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "VETO_NOT_YOUR_TURN | VETO_INVALID_MAP | VETO_COMPLETE | MATCH_NOT_READY | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Ban / pick a map (operator of the team whose turn it is; audited)",
         "tags": ["matches"]
       }
     },
@@ -3333,6 +6592,44 @@
           }
         ],
         "summary": "Update own nickname / country / biography (audited)",
+        "tags": ["me"]
+      }
+    },
+    "/api/v1/me/registrations": {
+      "get": {
+        "operationId": "MyRegistrations_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RegistrationDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "summary": "Tournament registrations of teams you operate (captain / TEAM_MANAGER), max 50",
         "tags": ["me"]
       }
     },
@@ -4522,6 +7819,334 @@
         "tags": ["tournaments"]
       }
     },
+    "/api/v1/tournaments/{id}/registrations": {
+      "post": {
+        "description": "Creates a PENDING registration and roster version 1 (DRAFT) snapshotting SteamID64 and nickname of 5 starters and up to 2 substitutes (docs/TOURNAMENTS.md §4).",
+        "operationId": "Registrations_register",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRegistrationDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "VALIDATION_FAILED | ROSTER_INVALID"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE | CSRF_FAILED\n\nCSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "REGISTRATION_CLOSED | ALREADY_REGISTERED | PLAYER_INELIGIBLE (details: [{ field: userId, message: NOT_TEAM_MEMBER | USER_INACTIVE | SAMPLE | BANNED | ALREADY_REGISTERED_ELSEWHERE }]) | TEAM_NOT_ACTIVE | SAMPLE_RESOURCE | IDEMPOTENCY_KEY_REUSED | IDEMPOTENCY_IN_PROGRESS"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Register a team with a roster snapshot (team operator; audited)",
+        "tags": ["tournaments"]
+      }
+    },
+    "/api/v1/tournaments/{id}/registrations/{registrationId}/roster": {
+      "put": {
+        "operationId": "Registrations_updateRoster",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "registrationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRegistrationDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "VALIDATION_FAILED | ROSTER_INVALID"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE | CSRF_FAILED\n\nCSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "REGISTRATION_NOT_PENDING | REGISTRATION_CLOSED | ALREADY_REGISTERED | PLAYER_INELIGIBLE (details: [{ field: userId, message: NOT_TEAM_MEMBER | USER_INACTIVE | SAMPLE | BANNED | ALREADY_REGISTERED_ELSEWHERE }]) | TEAM_NOT_ACTIVE | SAMPLE_RESOURCE | IDEMPOTENCY_KEY_REUSED | IDEMPOTENCY_IN_PROGRESS"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Replace the roster of a PENDING registration (new DRAFT version; audited)",
+        "tags": ["tournaments"]
+      }
+    },
+    "/api/v1/tournaments/{id}/registrations/{registrationId}/withdraw": {
+      "post": {
+        "operationId": "Registrations_withdraw",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "registrationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 16,
+              "pattern": "^[A-Za-z0-9_-]{16,64}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "No valid session"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "FORBIDDEN_ROLE | CSRF_FAILED\n\nCSRF validation failed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": "REGISTRATION_NOT_PENDING | INVALID_STATE_TRANSITION | SAMPLE_RESOURCE"
+          }
+        },
+        "security": [
+          {
+            "csrf": [],
+            "session": []
+          }
+        ],
+        "summary": "Withdraw a PENDING/APPROVED registration before the tournament starts (audited)",
+        "tags": ["tournaments"]
+      }
+    },
     "/api/v1/tournaments/{slug}": {
       "get": {
         "operationId": "Tournaments_get",
@@ -4558,6 +8183,87 @@
           }
         },
         "summary": "Public tournament detail",
+        "tags": ["tournaments"]
+      }
+    },
+    "/api/v1/tournaments/{slug}/bracket": {
+      "get": {
+        "operationId": "Tournaments_bracket",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BracketDto"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Single-elimination bracket by round (rounds: [] before generation)",
+        "tags": ["tournaments"]
+      }
+    },
+    "/api/v1/tournaments/{slug}/teams": {
+      "get": {
+        "operationId": "Tournaments_teams",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PublicTournamentTeamDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "Approved teams with seed and locked roster snapshot (no SteamIDs)",
         "tags": ["tournaments"]
       }
     }

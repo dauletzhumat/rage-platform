@@ -246,7 +246,7 @@ describe('public read API', () => {
     it('publishes the winner once the result is verified', async () => {
       await prismaOf(app).match.update({
         where: { id: ids.match },
-        data: { status: 'COMPLETED', resultVerifiedAt: new Date() },
+        data: { status: 'COMPLETED', resultSource: 'SERVER', resultVerifiedAt: new Date() },
       });
       const res = await get(`/matches/${ids.match}`).expect(200);
       expect(res.body.winnerTeamSlug).toBe('sample-falcons');

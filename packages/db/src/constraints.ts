@@ -47,6 +47,50 @@ export const DB_CONSTRAINTS = {
   idempotencyInProgressEmpty: 'idempotency_keys_in_progress_empty_chk',
   idempotencyResponseStatus2xx: 'idempotency_keys_response_status_2xx_chk',
   idempotencyExpiry: 'idempotency_keys_expiry_chk',
+
+  // --- M3 tournaments (migration 20261114000000_m3_tournaments, docs/TOURNAMENTS.md) ---
+  /** One active ban per SteamID64 → STEAM_ID_ALREADY_BANNED. */
+  steamBanOneActivePerSteamId: 'banned_steam_ids_one_active_per_steam_id_uniq',
+  steamBanSteamIdFormat: 'banned_steam_ids_steam_id64_format_chk',
+  steamBanReasonNotBlank: 'banned_steam_ids_reason_not_blank_chk',
+  steamBanLiftedFields: 'banned_steam_ids_lifted_fields_chk',
+  steamBanLiftedAfterCreated: 'banned_steam_ids_lifted_after_created_chk',
+  matchTransitionChangesStatus: 'match_state_transitions_changes_status_chk',
+  matchTransitionAdminActor: 'match_state_transitions_admin_actor_chk',
+  matchTransitionReasonNotBlank: 'match_state_transitions_reason_not_blank_chk',
+  /** COMPLETED ⇒ result_source and winner_team_id set. */
+  matchCompletedResult: 'matches_completed_result_chk',
+  /** ADMIN_OVERRIDE / FORFEIT ⇒ result_verified_at IS NULL. */
+  matchAdminResultUnverified: 'matches_admin_result_unverified_chk',
+  matchForfeitNoScores: 'matches_forfeit_no_scores_chk',
+  /** One match per bracket slot (init). */
+  matchBracketSlotUnique: 'matches_bracket_slot_id_key',
+  /** max_teams NULL or 2..64 (tightened in M3). */
+  tournamentMaxTeams: 'tournaments_max_teams_chk',
+  tournamentNameNotBlank: 'tournaments_name_not_blank_chk',
+  /** Case-insensitive tournament name → TOURNAMENT_NAME_TAKEN. */
+  tournamentNameCaseInsensitiveUnique: 'tournaments_name_ci_uniq',
+  tournamentSlugUnique: 'tournaments_slug_key',
+  registrationSeedPositive: 'tournament_registrations_seed_chk',
+  /** Seeds unique among APPROVED registrations of a tournament → SEEDS_INVALID. */
+  registrationApprovedSeedUnique: 'tournament_registrations_approved_seed_uniq',
+  /** At most one DRAFT-or-LOCKED roster per registration. */
+  rosterOneCurrentPerRegistration: 'tournament_rosters_one_current_per_registration_uniq',
+  /** LOCKED ⇒ locked_at set; DRAFT ⇒ locked_at and locked_by NULL. */
+  rosterLockedFields: 'tournament_rosters_locked_fields_chk',
+  rosterChangeReasonNotBlank: 'tournament_rosters_change_reason_not_blank_chk',
+  rosterVersionUnique: 'tournament_rosters_tournament_registration_id_version_key',
+  rosterEntryNicknameNotBlank: 'tournament_roster_entries_nickname_not_blank_chk',
+  /** Concurrent veto submissions for the same turn → one wins. */
+  vetoSequenceUnique: 'map_veto_actions_match_id_sequence_key',
+  vetoMapNameFormat: 'map_veto_actions_map_name_format_chk',
+  matchMapNameUnique: 'match_maps_match_id_map_name_key',
+  matchMapOrderUnique: 'match_maps_match_id_map_order_key',
+  bracketSlotNumbers: 'bracket_slots_numbers_chk',
+  bracketSlotNotSelf: 'bracket_slots_not_self_chk',
+  bracketSlotNextPositionUnique: 'bracket_slots_next_position_uniq',
+  bracketGenerationUnique: 'brackets_tournament_stage_id_generation_version_key',
+  stageSequenceUnique: 'tournament_stages_tournament_id_sequence_key',
 } as const;
 
 export type DbConstraintName = (typeof DB_CONSTRAINTS)[keyof typeof DB_CONSTRAINTS];

@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react';
 import { cn } from '@/lib/utils';
-import type { MatchStatus, TournamentStatus } from '@/lib/api/types';
+import type { MatchStatus, SeriesMatchStatus, TournamentStatus } from '@/lib/api/types';
 
 export type StatusTone = 'live' | 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 
@@ -22,10 +22,13 @@ const dotClasses: Record<StatusTone, string> = {
   neutral: 'bg-muted',
 };
 
-export function matchStatusTone(status: MatchStatus): StatusTone {
+/**
+ * Tone for a series status (docs/TOURNAMENTS.md §7). Map-level states (`KNIFE`, `MAP_FINISHED`)
+ * are not series states; if an old payload still carries one it renders neutrally.
+ */
+export function matchStatusTone(status: MatchStatus | SeriesMatchStatus): StatusTone {
   switch (status) {
     case 'LIVE':
-    case 'KNIFE':
       return 'live';
     case 'PAUSED':
     case 'DISPUTED':
@@ -34,14 +37,12 @@ export function matchStatusTone(status: MatchStatus): StatusTone {
       return 'success';
     case 'FAILED':
       return 'danger';
-    case 'CANCELLED':
-      return 'neutral';
     case 'SERVER_ASSIGNED':
     case 'PREPARING':
     case 'WARMUP':
     case 'READY_CHECK':
-    case 'MAP_FINISHED':
       return 'info';
+    case 'CANCELLED':
     case 'CREATED':
     default:
       return 'neutral';

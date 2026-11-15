@@ -149,10 +149,11 @@ short `SESSION_SECRET`, `API_DOCS_ENABLED=true` (docs auth does not exist yet), 
 - Guards: `SessionGuard` (401 when missing/invalid), `RolesGuard` via `@Roles(...)` (403),
   `CsrfGuard` on unsafe methods. Unknown/forbidden objects the caller may not know about → 404.
 - Admin permissions never derive from Steam display names or any client input.
-- Grantable scopes (M1): `SUPER_ADMIN`: GLOBAL; `TOURNAMENT_ADMIN`/`MATCH_ADMIN`:
-  GLOBAL|TOURNAMENT; `OBSERVER`: GLOBAL|TOURNAMENT|MATCH; `TEAM_MANAGER`: TEAM. Scoped grants
+- Grantable scopes: `SUPER_ADMIN`: GLOBAL; `TOURNAMENT_ADMIN`: GLOBAL|TOURNAMENT;
+  `MATCH_ADMIN`: GLOBAL|TOURNAMENT|MATCH (MATCH scope added in M3); `OBSERVER`: GLOBAL|TOURNAMENT|MATCH; `TEAM_MANAGER`: TEAM. Scoped grants
   require an existing team/tournament/match (404); sample users cannot receive roles (409).
-  `RolesGuard` checks active GLOBAL grants only in M1.
+  `RolesGuard` checks active GLOBAL grants; scoped grants are resolved by the domain services
+  inside their transactions (M2 `TEAM_MANAGER`, M3 `TOURNAMENT_ADMIN`/`MATCH_ADMIN`).
 - Revoke locks all active SUPER_ADMIN grants (`SELECT … FOR UPDATE`): the actor must still be
   SUPER_ADMIN (else 403), may not revoke their own SUPER_ADMIN grant (409), and the last active
   SUPER_ADMIN grant can never be revoked (409).

@@ -17,9 +17,15 @@ export const adminNavItems = [
   { href: '/admin/servers', key: 'servers' },
   { href: '/admin/users', key: 'users' },
   { href: '/admin/audit', key: 'auditLog' },
+  { href: '/admin/bans', key: 'bans', superAdminOnly: true },
 ] as const;
 
 export type AdminNavKey = (typeof adminNavItems)[number]['key'];
+
+/** Admin links visible to this viewer (UX only — pages and the API re-check the role). */
+export function visibleAdminNavItems(superAdmin: boolean) {
+  return adminNavItems.filter((item) => superAdmin || !('superAdminOnly' in item));
+}
 
 /** `/` and section roots match exactly; other items also match their sub-paths. */
 export function isActivePath(

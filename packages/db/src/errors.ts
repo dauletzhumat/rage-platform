@@ -7,7 +7,7 @@
  */
 
 export type DbViolationKind =
-  'unique' | 'check' | 'foreign_key' | 'not_null' | 'append_only' | 'other';
+  'unique' | 'check' | 'foreign_key' | 'not_null' | 'append_only' | 'immutable' | 'other';
 
 export interface DbViolation {
   kind: DbViolationKind;
@@ -82,6 +82,8 @@ export function getDbViolation(error: unknown): DbViolation | undefined {
   let kind: DbViolationKind = (sqlState && SQLSTATE_KIND[sqlState]) || 'other';
   if (kind === 'other' && prismaCode === 'P2002') kind = 'unique';
   if (sqlState === 'P0001' && message.includes('is append-only')) kind = 'append_only';
+  // M3 roster snapshot guards (tournament_rosters / tournament_roster_entries triggers).
+  if (sqlState === 'P0001' && message.includes('is immutable')) kind = 'immutable';
 
   return { kind, constraint, sqlState, prismaCode, table: asString(cause.table) };
 }

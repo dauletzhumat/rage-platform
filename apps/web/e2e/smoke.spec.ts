@@ -26,6 +26,8 @@ const publicRoutes = [
 const protectedRoutes: Array<[string, string]> = [
   ['/teams/apply', '/teams/apply'],
   ['/teams/some-team/manage', '/teams/some-team/manage'],
+  // M3: operator registration (getMe answers "unauthenticated" without any API request).
+  ['/tournaments/some-cup/register', '/tournaments/some-cup/register'],
   // Not a UUID → returnTo falls back to the matches list.
   ['/matchroom/some-match', '/matches'],
 ];
@@ -41,6 +43,10 @@ const adminRoutes = [
   '/admin/servers',
   '/admin/users',
   '/admin/audit',
+  // M3
+  '/admin/tournaments/new',
+  '/admin/tournaments/0195f1d2-0000-7000-8000-000000000000',
+  '/admin/bans',
 ];
 
 function scriptSrc(csp: string): string {
@@ -219,6 +225,20 @@ test.describe('M2 team routes (no session, no API required)', () => {
   });
 });
 
+test.describe('M3 tournament routes (no session, no API required)', () => {
+  test('/tournaments/:slug/register renders no roster form anonymously', async ({ page }) => {
+    await page.goto('/tournaments/some-cup/register');
+    await expect(page.getByTestId('auth-required')).toBeVisible();
+    await expect(page.getByTestId('roster-selection-form')).toHaveCount(0);
+  });
+
+  test('/tournaments/:slug/register with an invalid slug renders not-found', async ({ page }) => {
+    await page.goto('/tournaments/NOT..VALID/register');
+    await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
+    await expect(page.getByTestId('auth-required')).toHaveCount(0);
+  });
+});
+
 test.describe('admin routes (no session)', () => {
   for (const route of adminRoutes) {
     test(`${route} redirects to login without rendering admin UI`, async ({ page, request }) => {
@@ -252,6 +272,7 @@ test.describe('error handling', () => {
       '/tournaments',
       '/matches',
       '/teams/any-slug',
+      '/tournaments/any-slug',
       // A well-formed UUID: malformed ids are rejected as not-found before any API call.
       '/matches/0195f1d2-0000-7000-8000-000000000000',
     ]) {

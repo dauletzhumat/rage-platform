@@ -17,7 +17,7 @@ function respond(status: number, body: unknown, headers: Record<string, string> 
   ) as unknown as typeof fetch;
 }
 
-/** TEAMS.md §8 + AUTH.md §9a — the contract list the catalogs must cover. */
+/** TEAMS.md §8 + AUTH.md §9a + TOURNAMENTS.md §11 — the contract list the catalogs must cover. */
 const CONTRACT_CODES = [
   'SAMPLE_RESOURCE',
   'APPLICATION_ALREADY_PENDING',
@@ -44,6 +44,27 @@ const CONTRACT_CODES = [
   'FORBIDDEN_ROLE',
   'VALIDATION_FAILED',
   'RATE_LIMITED',
+  // TOURNAMENTS.md §11
+  'INVALID_STATE_TRANSITION',
+  'FORMAT_NOT_SUPPORTED',
+  'TOURNAMENT_NAME_TAKEN',
+  'REGISTRATION_CLOSED',
+  'ALREADY_REGISTERED',
+  'ROSTER_INVALID',
+  'PLAYER_INELIGIBLE',
+  'TOURNAMENT_FULL',
+  'REGISTRATION_NOT_PENDING',
+  'SEEDS_INVALID',
+  'NOT_ENOUGH_TEAMS',
+  'BRACKET_EXISTS',
+  'MATCH_NOT_READY',
+  'MATCH_ALREADY_COMPLETED',
+  'SCORE_INVALID',
+  'VETO_NOT_YOUR_TURN',
+  'VETO_INVALID_MAP',
+  'VETO_COMPLETE',
+  'SUBSTITUTION_NOT_ALLOWED',
+  'STEAM_ID_ALREADY_BANNED',
 ];
 
 describe('error code catalog', () => {
@@ -125,5 +146,60 @@ describe('apiSend reads ApiErrorDto.code', () => {
     expect(readErrorCode({ code: 42 })).toBeUndefined();
     expect(readErrorCode(null)).toBeUndefined();
     expect(readErrorCode({ code: 'TEAM_TAG_TAKEN' })).toBe('TEAM_TAG_TAKEN');
+  });
+});
+
+describe('M3 status label catalogs', () => {
+  const NAMESPACES: Record<string, readonly string[]> = {
+    registrationStatus: ['PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN'],
+    rosterStatus: ['DRAFT', 'LOCKED', 'SUPERSEDED'],
+    rosterEntryRole: ['STARTER', 'SUBSTITUTE'],
+    resultSource: ['SERVER', 'ADMIN_OVERRIDE', 'FORFEIT'],
+    ineligibleReason: [
+      'NOT_TEAM_MEMBER',
+      'USER_INACTIVE',
+      'SAMPLE',
+      'BANNED',
+      'ALREADY_REGISTERED_ELSEWHERE',
+    ],
+    matchStatus: [
+      'CREATED',
+      'SERVER_ASSIGNED',
+      'PREPARING',
+      'WARMUP',
+      'READY_CHECK',
+      'LIVE',
+      'PAUSED',
+      'COMPLETED',
+      'CANCELLED',
+      'FAILED',
+      'DISPUTED',
+    ],
+  };
+
+  it.each([
+    ['en', en],
+    ['ru', ru],
+    ['kk', kk],
+  ])('%s labels every M3 status (and no KNIFE/MAP_FINISHED series status)', (_l, messages) => {
+    const catalog = messages as unknown as Record<string, Record<string, string>>;
+    for (const [ns, keys] of Object.entries(NAMESPACES)) {
+      for (const key of keys) expect(catalog[ns]?.[key], `${ns}.${key}`).toBeTruthy();
+    }
+    expect(catalog.matchStatus).not.toHaveProperty('KNIFE');
+    expect(catalog.matchStatus).not.toHaveProperty('MAP_FINISHED');
+  });
+
+  it.each([
+    ['ru', ru],
+    ['kk', kk],
+  ])('%s M3 labels are translated', (_l, messages) => {
+    const catalog = messages as unknown as Record<string, Record<string, string>>;
+    const english = en as unknown as Record<string, Record<string, string>>;
+    for (const ns of ['registrationStatus', 'resultSource', 'ineligibleReason']) {
+      for (const [key, value] of Object.entries(english[ns] ?? {})) {
+        expect(catalog[ns]?.[key], `${ns}.${key}`).not.toBe(value);
+      }
+    }
   });
 });

@@ -2,7 +2,7 @@ import type { ApiFailure } from './types';
 
 /**
  * Machine-readable `ApiErrorDto.code` values the web app translates
- * (docs/AUTH.md §9a + docs/TEAMS.md §8). Each one has a message under `apiErrors.<CODE>`
+ * (docs/AUTH.md §9a, docs/TEAMS.md §8, docs/TOURNAMENTS.md §11). Each one has a message under `apiErrors.<CODE>`
  * in every catalog; unknown codes fall back to the generic per-kind message.
  */
 export const KNOWN_ERROR_CODES = [
@@ -39,6 +39,27 @@ export const KNOWN_ERROR_CODES = [
   'APPLICATION_LIMIT',
   'INVITATION_COOLDOWN',
   'MEMBER_INELIGIBLE',
+  // M3 (docs/TOURNAMENTS.md §11)
+  'INVALID_STATE_TRANSITION',
+  'FORMAT_NOT_SUPPORTED',
+  'TOURNAMENT_NAME_TAKEN',
+  'REGISTRATION_CLOSED',
+  'ALREADY_REGISTERED',
+  'ROSTER_INVALID',
+  'PLAYER_INELIGIBLE',
+  'TOURNAMENT_FULL',
+  'REGISTRATION_NOT_PENDING',
+  'SEEDS_INVALID',
+  'NOT_ENOUGH_TEAMS',
+  'BRACKET_EXISTS',
+  'MATCH_NOT_READY',
+  'MATCH_ALREADY_COMPLETED',
+  'SCORE_INVALID',
+  'VETO_NOT_YOUR_TURN',
+  'VETO_INVALID_MAP',
+  'VETO_COMPLETE',
+  'SUBSTITUTION_NOT_ALLOWED',
+  'STEAM_ID_ALREADY_BANNED',
 ] as const;
 
 export type KnownErrorCode = (typeof KNOWN_ERROR_CODES)[number];

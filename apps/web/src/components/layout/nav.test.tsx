@@ -59,6 +59,15 @@ describe('AdminNav', () => {
       'aria-current',
     );
   });
+
+  it('shows the Bans link only to super administrators', () => {
+    pathname.current = '/admin/bans';
+    const { unmount } = renderWithIntl(<AdminNav />);
+    expect(screen.queryByRole('link', { name: 'Bans' })).not.toBeInTheDocument();
+    unmount();
+    renderWithIntl(<AdminNav superAdmin />);
+    expect(screen.getByRole('link', { name: 'Bans' })).toHaveAttribute('aria-current', 'page');
+  });
 });
 
 describe('isActivePath', () => {
