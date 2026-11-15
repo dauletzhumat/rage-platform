@@ -1,6 +1,7 @@
 import { type Prisma } from '@rage/db';
 import { type AuditRequestContext, type AuditService } from '../audit/audit.service.js';
 import { lockMatch } from '../matches/transitions.js';
+import { sampleAuditTag } from './sample-policy.js';
 
 type Tx = Prisma.TransactionClient;
 
@@ -12,6 +13,8 @@ export interface AdvanceInput {
   loserTeamId: string;
   actorUserId: string;
   now: Date;
+  /** Sample tournament (dev-only demo mode): audit rows get `sample: true`. */
+  sample?: boolean;
 }
 
 export interface AdvanceOutcome {
@@ -66,6 +69,7 @@ export async function advanceWinner(
           finalMatchId: input.match.id,
           winnerTeamId: input.winnerTeamId,
           runnerUpTeamId: input.loserTeamId,
+          ...sampleAuditTag(input.sample === true),
         },
       },
       ctx,
@@ -103,6 +107,7 @@ export async function advanceWinner(
         fromMatchId: input.match.id,
         teamId: input.winnerTeamId,
         position,
+        ...sampleAuditTag(input.sample === true),
       },
     },
     ctx,

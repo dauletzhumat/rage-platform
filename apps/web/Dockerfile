@@ -4,7 +4,12 @@
 #   docker build -f apps/web/Dockerfile --target runtime \
 #     --build-arg NEXT_PUBLIC_API_BASE_URL=http://localhost:4000/api/v1 \
 #     --build-arg NEXT_PUBLIC_SITE_URL=http://localhost:3000 \
+#     --build-arg NEXT_PUBLIC_DISPLAY_TIMEZONE=Etc/GMT-5 \
+#     --build-arg NEXT_PUBLIC_DISPLAY_TIMEZONE_LABEL=UTC+5 \
 #     -t rage/web:local .
+#
+# Display time zone: an IANA name (note the inverted sign of Etc/ zones: Etc/GMT-5 = UTC+5)
+# plus the short label shown next to times. Invalid values fall back to Etc/GMT-5 / UTC+5.
 #
 # NEXT_PUBLIC_* values are inlined into the browser bundle at build time, so they are
 # build args (public, non-secret). Server-only settings such as API_INTERNAL_URL are
@@ -41,8 +46,12 @@ RUN --mount=type=cache,id=rage-pnpm-store,target=/pnpm/store \
 FROM fetch AS build
 ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:4000/api/v1
 ARG NEXT_PUBLIC_SITE_URL=http://localhost:3000
+ARG NEXT_PUBLIC_DISPLAY_TIMEZONE=Etc/GMT-5
+ARG NEXT_PUBLIC_DISPLAY_TIMEZONE_LABEL=UTC+5
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL} \
-    NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
+    NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL} \
+    NEXT_PUBLIC_DISPLAY_TIMEZONE=${NEXT_PUBLIC_DISPLAY_TIMEZONE} \
+    NEXT_PUBLIC_DISPLAY_TIMEZONE_LABEL=${NEXT_PUBLIC_DISPLAY_TIMEZONE_LABEL}
 # NOTE: do not set NODE_ENV=production before `pnpm install` — pnpm would skip the
 # devDependencies (TypeScript, Tailwind, ...) that `next build` needs. Next sets it itself.
 COPY . .

@@ -26,6 +26,8 @@ export interface EligibilityInput {
   userIds: readonly string[];
   /** Approval re-validation skips this: the snapshot is what counts (§4). */
   checkMembership: boolean;
+  /** `SamplePolicy.samplePlayersAllowed(tournament)` — demo mode inside sample tournaments. */
+  allowSamplePlayers: boolean;
 }
 
 export interface EligibilityResult {
@@ -114,7 +116,7 @@ export async function evaluateEligibility(
     }
     if (input.checkMembership && !memberIds.has(id)) add(id, 'NOT_TEAM_MEMBER');
     if (u.status !== 'ACTIVE') add(id, 'USER_INACTIVE');
-    if (u.is_sample) add(id, 'SAMPLE');
+    if (u.is_sample && !input.allowSamplePlayers) add(id, 'SAMPLE');
     if (banned.has(u.steam_id64)) add(id, 'BANNED');
     if (elsewhereIds.has(id)) add(id, 'ALREADY_REGISTERED_ELSEWHERE');
     snapshots.set(id, {

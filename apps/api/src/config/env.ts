@@ -71,6 +71,13 @@ export const envSchema = z.object({
   STEAM_WEB_API_KEY: z.string().optional(),
   BOOTSTRAP_SUPER_ADMIN_STEAM_ID64: z.string().optional(),
   INTERNAL_SSR_TOKEN: z.string().optional(),
+
+  /**
+   * DEV-ONLY demo mode: lets the M3 tournament flow (admin actions, veto, results) mutate SAMPLE
+   * tournaments/teams/matches so the flow can be clicked through on demo data. Rejected in
+   * production. M1/M2 sample guards are unaffected. See tournament-domain/sample-policy.ts.
+   */
+  ALLOW_SAMPLE_MUTATIONS: booleanish.default(false),
 });
 
 type RawEnv = z.infer<typeof envSchema>;
@@ -240,6 +247,12 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
     }
     if (raw.COOKIE_SECURE === false) {
       issues.push({ key: 'COOKIE_SECURE', message: 'must not be false in production' });
+    }
+    if (raw.ALLOW_SAMPLE_MUTATIONS) {
+      issues.push({
+        key: 'ALLOW_SAMPLE_MUTATIONS',
+        message: 'must not be true in production (development-only demo mode)',
+      });
     }
   }
 

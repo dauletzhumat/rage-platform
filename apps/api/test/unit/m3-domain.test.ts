@@ -424,3 +424,72 @@ describe('gate I-1: tournament datetimes need an explicit offset', () => {
     }
   });
 });
+
+describe('dev-only sample mutation mode (ALLOW_SAMPLE_MUTATIONS)', () => {
+  const dev = {
+    NODE_ENV: 'development',
+    DATABASE_URL: 'postgresql://u:p@127.0.0.1:1/db',
+    REDIS_URL: 'redis://127.0.0.1:1',
+  };
+  const prod = {
+    ...dev,
+    NODE_ENV: 'production',
+    API_CORS_ORIGINS: 'https://rage.example',
+    SESSION_SECRET: 'x'.repeat(43),
+    INTERNAL_SSR_TOKEN: 'y'.repeat(43),
+  };
+
+  it('defaults to off; can be enabled outside production; production rejects it', async () => {
+    const { parseEnv, EnvValidationError } = await import('../../src/config/env.js');
+    expect(parseEnv(dev).ALLOW_SAMPLE_MUTATIONS).toBe(false);
+    expect(parseEnv({ ...dev, ALLOW_SAMPLE_MUTATIONS: 'true' }).ALLOW_SAMPLE_MUTATIONS).toBe(true);
+    expect(parseEnv(prod).ALLOW_SAMPLE_MUTATIONS).toBe(false);
+    expect(parseEnv({ ...prod, ALLOW_SAMPLE_MUTATIONS: 'false' }).ALLOW_SAMPLE_MUTATIONS).toBe(
+      false,
+    );
+    for (const value of ['true', '1', 'yes']) {
+      let error: unknown;
+      try {
+        parseEnv({ ...prod, ALLOW_SAMPLE_MUTATIONS: value });
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(EnvValidationError);
+      expect((error as InstanceType<typeof EnvValidationError>).issues).toEqual([
+        expect.objectContaining({ key: 'ALLOW_SAMPLE_MUTATIONS' }),
+      ]);
+    }
+  });
+
+  it('policy: off blocks every sample resource; on allows sample data inside sample tournaments only', async () => {
+    const { SamplePolicy } = await import('../../src/tournament-domain/sample-policy.js');
+    const off = new SamplePolicy({ ALLOW_SAMPLE_MUTATIONS: false });
+    const on = new SamplePolicy({ ALLOW_SAMPLE_MUTATIONS: true });
+    const sample = { isSample: true };
+    const real = { isSample: false };
+    const code = (fn: () => void) => {
+      try {
+        fn();
+        return null;
+      } catch (e) {
+        return (e as { getResponse(): { code: string } }).getResponse().code;
+      }
+    };
+    expect(code(() => off.assertTournamentMutable(sample))).toBe('SAMPLE_RESOURCE');
+    expect(code(() => off.assertTournamentMutable(real))).toBeNull();
+    expect(code(() => on.assertTournamentMutable(sample))).toBeNull();
+    // Sample teams: only inside sample tournaments, only when on. Real teams: anywhere.
+    expect(code(() => on.assertTeamAllowedIn(sample, sample))).toBeNull();
+    expect(code(() => on.assertTeamAllowedIn(sample, real))).toBe('SAMPLE_RESOURCE');
+    expect(code(() => off.assertTeamAllowedIn(sample, sample))).toBe('SAMPLE_RESOURCE');
+    expect(code(() => on.assertTeamAllowedIn(real, sample))).toBeNull();
+    // Sample matches: only inside sample tournaments, only when on.
+    expect(code(() => on.assertMatchMutable(sample, sample))).toBeNull();
+    expect(code(() => on.assertMatchMutable(sample, real))).toBe('SAMPLE_RESOURCE');
+    expect(code(() => on.assertMatchMutable(sample, null))).toBe('SAMPLE_RESOURCE');
+    expect(code(() => off.assertMatchMutable(sample, sample))).toBe('SAMPLE_RESOURCE');
+    expect(on.samplePlayersAllowed(sample)).toBe(true);
+    expect(on.samplePlayersAllowed(real)).toBe(false);
+    expect(off.samplePlayersAllowed(sample)).toBe(false);
+  });
+});

@@ -20,7 +20,6 @@
     "closeMenu": "Close menu",
     "requestId": "Request ID: {id}",
     "notAvailable": "—",
-    "utc": "UTC",
     "results": "{total, plural, =0 {No results} one {# result} other {# results}}",
     "searchResultsFor": "Results for “{q}”",
     "noSearchResults": "Nothing matches “{q}”",
@@ -109,7 +108,7 @@
     "statusDegraded": "Degraded",
     "statusUnreachable": "API unreachable",
     "statusUnreachableDescription": "The web app is running, but the RAGE API did not respond.",
-    "checkedAt": "Checked {time} UTC",
+    "checkedAt": "Checked {time} ({tz})",
     "apiVersion": "API version",
     "environment": "Environment",
     "database": "Database",
@@ -240,7 +239,11 @@
     "starters": "Starters",
     "substitutes": "Substitutes",
     "rosterLocked": "Roster v{version} locked",
-    "registrationClosedHint": "Registration is open only while the tournament status is “Registration open” and within its registration window."
+    "registrationClosedHint": "Registration is open only while the tournament status is “Registration open” and within its registration window.",
+    "registrationOpensAt": "Registration opens at {time} ({tz}).",
+    "registrationClosedAt": "Registration closed at {time} ({tz}).",
+    "registrationUnavailable": "Registration is not accepting entries right now.",
+    "operatorOnlyHint": "Only a team captain or manager can register a team."
   },
   "tournamentStatus": {
     "DRAFT": "Draft",
@@ -882,10 +885,10 @@
     "maxTeams": "Maximum teams",
     "maxTeamsHint": "{min}–{max} teams.",
     "schedule": "Schedule",
-    "scheduleHint": "All times are UTC. Optional; registration must close after it opens.",
-    "registrationOpenAt": "Registration opens (UTC)",
-    "registrationCloseAt": "Registration closes (UTC)",
-    "startsAt": "Starts (UTC)",
+    "scheduleHint": "Time in {tz}. Optional; registration must close after it opens.",
+    "registrationOpenAt": "Registration opens ({tz})",
+    "registrationCloseAt": "Registration closes ({tz})",
+    "startsAt": "Starts ({tz})",
     "mapPool": "Map pool",
     "mapPoolHint": "Enter exactly {count} distinct map names, e.g. de_name. There is no built-in pool — enter the current competitive maps yourself.",
     "mapSlot": "Map {n}",
@@ -980,5 +983,9 @@
     "steamIdInvalid": "Enter a valid 17-digit SteamID64.",
     "ban": "Ban",
     "banned": "SteamID64 banned."
+  },
+  "demoMode": {
+    "banner": "Demo mode — actions on sample data (development only).",
+    "bannerDetail": "Changes to sample tournaments are allowed for testing; they never count as real results."
   }
 }

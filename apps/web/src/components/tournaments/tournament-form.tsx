@@ -9,10 +9,10 @@ import { FieldError, FieldHint, Input, Label, NativeSelect, Textarea } from '@/c
 import { createTournament, updateTournament } from '@/lib/api/browser';
 import type { AdminTournamentDto, ApiFailure } from '@/lib/api/types';
 import { MATCH_FORMATS } from '@/lib/api/types';
+import { DISPLAY_TIMEZONE_LABEL, isoToZonedInput } from '@/lib/display-time';
 import { UUID_PATTERN_CLIENT } from '@/lib/tournaments/slug';
 import { textLength } from '@/lib/teams/validation';
 import {
-  isoToUtcInput,
   MAP_POOL_SIZE,
   MAX_TEAMS_MAX,
   MAX_TEAMS_MIN,
@@ -49,9 +49,9 @@ function fromTournament(t: AdminTournamentDto): TournamentFormInput {
     defaultMatchFormat: t.defaultMatchFormat,
     finalMatchFormat: t.finalMatchFormat ?? '',
     maxTeams: t.maxTeams !== null ? String(t.maxTeams) : '',
-    registrationOpenAt: isoToUtcInput(t.registrationOpenAt),
-    registrationCloseAt: isoToUtcInput(t.registrationCloseAt),
-    startsAt: isoToUtcInput(t.startsAt),
+    registrationOpenAt: isoToZonedInput(t.registrationOpenAt),
+    registrationCloseAt: isoToZonedInput(t.registrationCloseAt),
+    startsAt: isoToZonedInput(t.startsAt),
     description: t.description ?? '',
     mapPool: Array.from({ length: MAP_POOL_SIZE }, (_, i) => t.mapPool?.[i] ?? ''),
   };
@@ -72,7 +72,8 @@ const FIELD_ORDER: TournamentField[] = [
 /**
  * Create (`POST /admin/tournaments`) or edit (`PATCH /admin/tournaments/:id`) a tournament
  * (docs/TOURNAMENTS.md §3.1). Single elimination only; exactly 7 admin-supplied map names.
- * Times are entered and shown in UTC.
+ * Times are entered and shown in the platform display time zone (UTC+5 by default) and sent
+ * as ISO instants with an explicit offset.
  */
 export function TournamentForm({ tournament }: { tournament?: AdminTournamentDto }) {
   const t = useTranslations('adminTournaments');
@@ -262,11 +263,11 @@ export function TournamentForm({ tournament }: { tournament?: AdminTournamentDto
 
       <fieldset className="space-y-3">
         <legend className="text-sm font-medium">{t('schedule')}</legend>
-        <p className="text-xs text-muted">{t('scheduleHint')}</p>
+        <p className="text-xs text-muted">{t('scheduleHint', { tz: DISPLAY_TIMEZONE_LABEL })}</p>
         <div className="grid gap-4 sm:grid-cols-3">
           {(['registrationOpenAt', 'registrationCloseAt', 'startsAt'] as const).map((field) => (
             <div key={field} className="space-y-1.5">
-              <Label htmlFor={`${id}-${field}`}>{t(field)}</Label>
+              <Label htmlFor={`${id}-${field}`}>{t(field, { tz: DISPLAY_TIMEZONE_LABEL })}</Label>
               <Input
                 {...a11y(field, false)}
                 type="datetime-local"

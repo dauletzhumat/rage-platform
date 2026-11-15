@@ -1,10 +1,11 @@
 import Link from 'next/link';
-import { useTranslations } from 'next-intl';
-import { Lock } from 'lucide-react';
+import { useFormatter, useTranslations } from 'next-intl';
+import { CalendarClock, Lock } from 'lucide-react';
 import { FormattedDate, InitialsAvatar } from '@/components/domain/formatting';
 import { Badge } from '@/components/ui/badge';
 import { SampleDataBadge } from '@/components/ui/sample-data-badge';
-import type { PublicTournamentTeamDto } from '@/lib/api/types';
+import type { PublicTournamentTeamDto, TournamentStatus } from '@/lib/api/types';
+import { DISPLAY_TIMEZONE_LABEL } from '@/lib/display-time';
 import { SLUG_PATTERN_CLIENT } from '@/lib/tournaments/slug';
 
 /** The tournament's 7-map pool (admin-supplied; the platform ships no default pool). */
@@ -116,5 +117,67 @@ function RosterList({
         ))}
       </ul>
     </div>
+  );
+}
+
+export type RegistrationWindowState =
+  'open' | 'notYetOpen' | 'closedWindow' | 'unavailable' | 'notOpenStatus';
+
+/**
+ * Why registration is (not) accepting entries, from the API's `registrationOpen` (status
+ * REGISTRATION_OPEN and now() inside the optional window) plus the window bounds.
+ */
+export function registrationWindowState(
+  t: {
+    status: TournamentStatus;
+    registrationOpen: boolean;
+    registrationOpenAt: string | null;
+    registrationCloseAt: string | null;
+  },
+  now: number,
+): RegistrationWindowState {
+  if (t.status !== 'REGISTRATION_OPEN') return 'notOpenStatus';
+  if (t.registrationOpen) return 'open';
+  const openAt = t.registrationOpenAt ? Date.parse(t.registrationOpenAt) : NaN;
+  const closeAt = t.registrationCloseAt ? Date.parse(t.registrationCloseAt) : NaN;
+  if (!Number.isNaN(openAt) && now < openAt) return 'notYetOpen';
+  if (!Number.isNaN(closeAt) && now >= closeAt) return 'closedWindow';
+  return 'unavailable';
+}
+
+/**
+ * Notice for a REGISTRATION_OPEN tournament whose window is not currently accepting entries
+ * ("opens at …" / "closed at …"), with the display time zone label. Server-rendered only.
+ */
+export function RegistrationWindowNotice({
+  state,
+  registrationOpenAt,
+  registrationCloseAt,
+}: {
+  state: RegistrationWindowState;
+  registrationOpenAt: string | null;
+  registrationCloseAt: string | null;
+}) {
+  const t = useTranslations('tournaments');
+  const format = useFormatter();
+  if (state === 'open' || state === 'notOpenStatus') return null;
+  const at = (iso: string | null) =>
+    iso ? format.dateTime(new Date(iso), { dateStyle: 'medium', timeStyle: 'short' }) : '';
+  const text =
+    state === 'notYetOpen'
+      ? t('registrationOpensAt', { time: at(registrationOpenAt), tz: DISPLAY_TIMEZONE_LABEL })
+      : state === 'closedWindow'
+        ? t('registrationClosedAt', { time: at(registrationCloseAt), tz: DISPLAY_TIMEZONE_LABEL })
+        : t('registrationUnavailable');
+  return (
+    <p
+      role="note"
+      data-testid="registration-window"
+      data-state={state}
+      className="flex items-center gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm"
+    >
+      <CalendarClock aria-hidden="true" className="size-4 shrink-0 text-warning" />
+      {text}
+    </p>
   );
 }

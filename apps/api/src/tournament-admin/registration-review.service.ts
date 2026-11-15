@@ -6,8 +6,9 @@ import { iso } from '../common/http/dto.js';
 import { type Page, pageOf, toSkipTake } from '../common/pagination/pagination.js';
 import { PrismaService } from '../infra/prisma/prisma.service.js';
 import { hasSuperAdminLocked, lockTeam } from '../team-domain/team-access.js';
+import { SamplePolicy, sampleAuditTag } from '../tournament-domain/sample-policy.js';
 import { conflictOfInterest, operatedTeamIds } from '../tournament-domain/conflict-of-interest.js';
-import { conflict, forbiddenRole, sampleResource } from '../team-domain/team-errors.js';
+import { conflict, forbiddenRole } from '../team-domain/team-errors.js';
 import { evaluateEligibility, type RosterEntryInput } from '../tournament-domain/eligibility.js';
 import {
   registrationSelect,
@@ -117,6 +118,7 @@ export class RegistrationReviewService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly samples: SamplePolicy,
   ) {}
 
   async list(
@@ -159,11 +161,11 @@ export class RegistrationReviewService {
     ctx: AuditRequestContext,
   ): Promise<AdminRegistrationDto> {
     await this.prisma.client.$transaction(async (tx) => {
-      const t = await lockTournament(tx, tournamentId, 'update');
+      const t = await lockTournament(tx, tournamentId, 'update', this.samples);
       const reg = await lockRegistration(tx, tournamentId, registrationId);
       await requireTournamentAdmin(tx, actorUserId, t);
       const override = await reviewConflictOverride(tx, actorUserId, reg.teamId);
-      await this.assertTeamUsable(tx, reg.teamId);
+      await this.assertTeamUsable(tx, reg.teamId, t);
       if (reg.status !== 'PENDING') throw registrationNotPending();
       if (!APPROVABLE_TOURNAMENT_STATUSES.has(t.status)) {
         throw invalidStateTransition(`Registrations cannot be approved while ${t.status}`);
@@ -182,6 +184,7 @@ export class RegistrationReviewService {
         teamId: reg.teamId,
         userIds: roster.entries.map((e) => e.userId),
         checkMembership: false,
+        allowSamplePlayers: this.samples.samplePlayersAllowed(t),
       });
       if (problems.length > 0) throw playerIneligible(problems);
       const now = new Date();
@@ -213,6 +216,7 @@ export class RegistrationReviewService {
             maxTeams: t.maxTeams,
             note: note ?? null,
             ...(override ? { override: true, conflictOfInterest: true } : {}),
+            ...sampleAuditTag(t.isSample),
           },
         },
         ctx,
@@ -230,11 +234,11 @@ export class RegistrationReviewService {
     ctx: AuditRequestContext,
   ): Promise<AdminRegistrationDto> {
     await this.prisma.client.$transaction(async (tx) => {
-      const t = await lockTournament(tx, tournamentId, 'update');
+      const t = await lockTournament(tx, tournamentId, 'update', this.samples);
       const reg = await lockRegistration(tx, tournamentId, registrationId);
       await requireTournamentAdmin(tx, actorUserId, t);
       const override = await reviewConflictOverride(tx, actorUserId, reg.teamId);
-      await this.assertTeamUsable(tx, reg.teamId, { requireActive: false });
+      await this.assertTeamUsable(tx, reg.teamId, t, { requireActive: false });
       if (reg.status !== 'PENDING') throw registrationNotPending();
       await tx.tournamentRegistration.update({
         where: { id: registrationId },
@@ -256,6 +260,7 @@ export class RegistrationReviewService {
             teamId: reg.teamId,
             reason,
             ...(override ? { override: true, conflictOfInterest: true } : {}),
+            ...sampleAuditTag(t.isSample),
           },
         },
         ctx,
@@ -278,9 +283,10 @@ export class RegistrationReviewService {
     ctx: AuditRequestContext,
   ): Promise<AdminRegistrationDto> {
     await this.prisma.client.$transaction(async (tx) => {
-      const t = await lockTournament(tx, tournamentId, 'update');
+      const t = await lockTournament(tx, tournamentId, 'update', this.samples);
       const reg = await lockRegistration(tx, tournamentId, registrationId);
-      await lockTeam(tx, reg.teamId);
+      const team = await lockTeam(tx, reg.teamId, { allowSample: true });
+      this.samples.assertTeamAllowedIn(team, t);
       await requireTournamentAdmin(tx, actorUserId, t);
       if (!SUBSTITUTION_TOURNAMENT_STATUSES.has(t.status)) {
         throw substitutionNotAllowed(`Substitutions are not possible while ${t.status}`);
@@ -332,6 +338,7 @@ export class RegistrationReviewService {
         teamId: reg.teamId,
         userIds: [dto.inUserId],
         checkMembership: true,
+        allowSamplePlayers: this.samples.samplePlayersAllowed(t),
       });
       if (problems.length > 0) throw playerIneligible(problems);
       const incoming = snapshots.get(dto.inUserId)!;
@@ -371,6 +378,7 @@ export class RegistrationReviewService {
             previousRosterId: roster.id,
             rosterId: next.id,
             rosterVersion: next.version,
+            ...sampleAuditTag(t.isSample),
           },
         },
         ctx,
@@ -384,13 +392,14 @@ export class RegistrationReviewService {
   private async assertTeamUsable(
     tx: Tx,
     teamId: string,
+    tournament: { isSample: boolean },
     options: { requireActive: boolean } = { requireActive: true },
   ): Promise<void> {
     const team = await tx.team.findUniqueOrThrow({
       where: { id: teamId },
       select: { isSample: true, status: true },
     });
-    if (team.isSample) throw sampleResource();
+    this.samples.assertTeamAllowedIn(team, tournament);
     if (options.requireActive && team.status !== 'ACTIVE') {
       throw conflict(API_ERROR_CODES.teamNotActive, 'Team is not active');
     }

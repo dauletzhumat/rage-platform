@@ -4,6 +4,7 @@ import { type AuditRequestContext, AuditService } from '../audit/audit.service.j
 import { PrismaService } from '../infra/prisma/prisma.service.js';
 import { resolveTeamAccess } from '../team-domain/team-access.js';
 import { forbiddenRole, rethrowMapped, sampleResource } from '../team-domain/team-errors.js';
+import { SamplePolicy, sampleAuditTag } from '../tournament-domain/sample-policy.js';
 import { conflictOfInterest, operatedTeamIds } from '../tournament-domain/conflict-of-interest.js';
 import { lockTournament, M3_TX_OPTIONS } from '../tournament-domain/tournament-access.js';
 import {
@@ -84,6 +85,7 @@ export class VetoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly samples: SamplePolicy,
   ) {}
 
   async getState(matchId: string): Promise<VetoStateDto> {
@@ -124,9 +126,12 @@ export class VetoService {
           select: { tournamentId: true, isSample: true },
         });
         if (!ref) throw matchNotFound();
-        if (ref.isSample) throw sampleResource();
-        if (!ref.tournamentId) throw matchNotReady('Veto is only available for tournament matches');
-        const tournament = await lockTournament(tx, ref.tournamentId, 'share');
+        if (!ref.tournamentId) {
+          if (ref.isSample) throw sampleResource();
+          throw matchNotReady('Veto is only available for tournament matches');
+        }
+        const tournament = await lockTournament(tx, ref.tournamentId, 'share', this.samples);
+        this.samples.assertMatchMutable(ref, tournament);
         if (tournament.status === 'DRAFT') throw matchNotFound();
         const match = await lockMatch(tx, matchId);
         if (!match) throw matchNotFound();
@@ -232,6 +237,7 @@ export class VetoService {
               ...(decider ? { decider, complete: true } : {}),
               ...(access.override || conflictOverride ? { override: true } : {}),
               ...(conflictOverride ? { conflictOfInterest: true } : {}),
+              ...sampleAuditTag(tournament.isSample),
             },
           },
           ctx,

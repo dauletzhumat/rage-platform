@@ -1141,11 +1141,14 @@
           "cs2Integration": {
             "$ref": "#/components/schemas/Cs2IntegrationFeatureDto"
           },
+          "sampleMutations": {
+            "$ref": "#/components/schemas/SampleMutationsFeatureDto"
+          },
           "steamAuth": {
             "$ref": "#/components/schemas/SteamAuthFeatureDto"
           }
         },
-        "required": ["steamAuth", "cs2Integration"],
+        "required": ["steamAuth", "cs2Integration", "sampleMutations"],
         "type": "object"
       },
       "ForfeitDto": {
@@ -2443,6 +2446,17 @@
       "RosterStatus": {
         "enum": ["DRAFT", "LOCKED", "SUPERSEDED"],
         "type": "string"
+      },
+      "SampleMutationsFeatureDto": {
+        "properties": {
+          "status": {
+            "description": "DEV-ONLY demo mode (ALLOW_SAMPLE_MUTATIONS): when \"enabled\", the M3 tournament flow may mutate SAMPLE tournaments/teams/matches (inside sample tournaments only). Always \"disabled\" in production.",
+            "enum": ["enabled", "disabled"],
+            "type": "string"
+          }
+        },
+        "required": ["status"],
+        "type": "object"
       },
       "SeedEntryDto": {
         "properties": {

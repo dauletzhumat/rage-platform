@@ -8,6 +8,7 @@ import { ListPagination } from '@/components/domain/list-controls';
 import { DetailSection, Facts } from '@/components/domain/section';
 import { TournamentStatusPill } from '@/components/domain/status';
 import { ApiErrorState } from '@/components/states/api-error-state';
+import { DemoModeBanner } from '@/components/states/demo-mode-banner';
 import { ForbiddenState } from '@/components/states/forbidden-state';
 import { BracketView } from '@/components/tournaments/bracket-view';
 import { SeedingEditor } from '@/components/tournaments/seeding-editor';
@@ -46,6 +47,7 @@ import {
 import {
   getAdminRegistrations,
   getAdminTournament,
+  getDemoMode,
   getMe,
   getTeam,
   getTournamentBracket,
@@ -66,6 +68,7 @@ import {
   type RawSearchParams,
 } from '@/lib/list-params';
 import { canEditTournament, manualStatusTargets } from '@/lib/tournaments/validation';
+import { sampleActionsAllowed } from '@/lib/demo-mode';
 import { cn } from '@/lib/utils';
 
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<RawSearchParams> };
@@ -112,7 +115,10 @@ export default async function AdminTournamentPage({ params, searchParams }: Prop
   }
 
   const tournament = result.data;
-  const readOnly = tournament.isSample;
+  const demoMode = await getDemoMode();
+  // Sample tournaments are read-only unless dev-only demo mode allows sample mutations.
+  const readOnly = !sampleActionsAllowed(tournament.isSample, demoMode);
+  const showDemoBanner = demoMode && tournament.isSample;
   const targets = readOnly ? [] : manualStatusTargets(tournament.status);
   const publicHref =
     tournament.status !== 'DRAFT' && SLUG_PATTERN.test(tournament.slug)
@@ -147,6 +153,7 @@ export default async function AdminTournamentPage({ params, searchParams }: Prop
         }
       />
 
+      {showDemoBanner ? <DemoModeBanner /> : null}
       {readOnly ? (
         <p className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm" role="note">
           {ta('sampleReadOnly')}
@@ -198,7 +205,12 @@ export default async function AdminTournamentPage({ params, searchParams }: Prop
         )}
       </DetailSection>
 
-      <RegistrationsSection tournament={tournament} raw={raw} readOnly={readOnly} />
+      <RegistrationsSection
+        tournament={tournament}
+        raw={raw}
+        readOnly={readOnly}
+        demoMode={demoMode}
+      />
 
       {tournament.status === 'REGISTRATION_CLOSED' && !tournament.bracketGenerated && !readOnly ? (
         <SeedingSection tournament={tournament} />
@@ -251,10 +263,12 @@ async function RegistrationsSection({
   tournament,
   raw,
   readOnly,
+  demoMode,
 }: {
   tournament: AdminTournamentDto;
   raw: RawSearchParams;
   readOnly: boolean;
+  demoMode: boolean;
 }) {
   const [ta, ts] = await Promise.all([
     getTranslations('adminTournaments'),
@@ -348,7 +362,8 @@ async function RegistrationsSection({
                   key={registration.id}
                   tournamentId={tournament.id}
                   registration={registration}
-                  canReview={canReview && !registration.isSample}
+                  canReview={canReview && sampleActionsAllowed(registration.isSample, demoMode)}
+                  allowSample={demoMode}
                   candidates={canSubstitute ? (candidatesByReg.get(registration.id) ?? []) : null}
                 />
               ))}
@@ -372,12 +387,15 @@ async function RegistrationRow({
   registration,
   canReview,
   candidates,
+  allowSample,
 }: {
   tournamentId: string;
   registration: AdminRegistrationDto;
   canReview: boolean;
   /** null = substitution not offered. */
   candidates: SubstitutePlayer[] | null;
+  /** Demo mode: sample registrations accept admin actions. */
+  allowSample: boolean;
 }) {
   const ta = await getTranslations('adminTournaments');
   const roster = registration.roster;
@@ -451,7 +469,9 @@ async function RegistrationRow({
               />
             </>
           ) : null}
-          {candidates !== null && registration.status === 'APPROVED' && !registration.isSample ? (
+          {candidates !== null &&
+          registration.status === 'APPROVED' &&
+          sampleActionsAllowed(registration.isSample, allowSample) ? (
             <SubstituteDialog
               tournamentId={tournamentId}
               registrationId={registration.id}

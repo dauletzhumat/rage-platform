@@ -32,6 +32,7 @@ import {
   tournamentSlugBase,
   writeSettings,
 } from '../tournament-domain/tournament-policy.js';
+import { SamplePolicy, sampleAuditTag } from '../tournament-domain/sample-policy.js';
 import type {
   AdminTournamentDto,
   AdminTournamentsQueryDto,
@@ -88,6 +89,7 @@ export class TournamentAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly samples: SamplePolicy,
   ) {}
 
   async list(
@@ -210,7 +212,7 @@ export class TournamentAdminService {
     if (dto.format !== undefined && !isSupportedFormat(dto.format)) throw formatNotSupported();
     try {
       await this.prisma.client.$transaction(async (tx) => {
-        const t = await lockTournament(tx, tournamentId, 'update');
+        const t = await lockTournament(tx, tournamentId, 'update', this.samples);
         await requireTournamentAdmin(tx, actorUserId, t);
         if (!EDITABLE_TOURNAMENT_STATUSES.has(t.status)) {
           throw invalidStateTransition(`Settings cannot be edited while ${t.status}`);
@@ -263,7 +265,11 @@ export class TournamentAdminService {
             actorUserId,
             resourceType: 'tournament',
             resourceId: tournamentId,
-            detail: { changed, patch: dto as unknown as Record<string, unknown> },
+            detail: {
+              changed,
+              patch: dto as unknown as Record<string, unknown>,
+              ...sampleAuditTag(t.isSample),
+            },
           },
           ctx,
           tx,
@@ -289,7 +295,7 @@ export class TournamentAdminService {
       throw fieldError('reason', 'reason is required when cancelling a tournament');
     }
     await this.prisma.client.$transaction(async (tx) => {
-      const t = await lockTournament(tx, tournamentId, 'update');
+      const t = await lockTournament(tx, tournamentId, 'update', this.samples);
       await requireTournamentAdmin(tx, actorUserId, t);
       if (!canChangeTournamentStatus(t.status, dto.to)) {
         throw invalidStateTransition(`Tournament status ${t.status} → ${dto.to} is not allowed`);
@@ -315,6 +321,7 @@ export class TournamentAdminService {
             from: t.status,
             to: dto.to,
             reason: dto.reason ?? null,
+            ...sampleAuditTag(t.isSample),
             ...(dto.to === 'CANCELLED' ? { cancelledMatches } : {}),
           },
         },

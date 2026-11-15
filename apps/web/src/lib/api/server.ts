@@ -4,6 +4,7 @@ import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { isWellFormedToken, SESSION_COOKIE } from '@/lib/auth/cookies';
 import { apiGet, DEFAULT_API_BASE_URL, type QueryValue } from './http';
+import { isSampleMutationsEnabled } from '@/lib/demo-mode';
 import { buildServerHeaders, parseTrustedHops } from './ssr-headers';
 import type {
   AdminTeamApplicationDto,
@@ -148,6 +149,11 @@ function bySlug<T>(collection: string, slug: string): Promise<ApiResult<T>> {
 }
 
 export const getMeta = cache((): Promise<ApiResult<MetaResponse>> => get('/meta'));
+
+/** Dev-only demo mode flag from `/meta` (disabled on any failure). */
+export const getDemoMode = cache(async (): Promise<boolean> =>
+  isSampleMutationsEnabled(await getMeta()),
+);
 
 /** 503 is a valid readiness payload (`status: "error"`). */
 export const getReadiness = cache((): Promise<ApiResult<ReadinessResponse>> =>

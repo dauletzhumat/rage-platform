@@ -20,7 +20,6 @@
     "closeMenu": "Закрыть меню",
     "requestId": "ID запроса: {id}",
     "notAvailable": "—",
-    "utc": "UTC",
     "results": "{total, plural, =0 {Нет результатов} one {# результат} few {# результата} many {# результатов} other {# результата}}",
     "searchResultsFor": "Результаты по запросу «{q}»",
     "noSearchResults": "По запросу «{q}» ничего не найдено",
@@ -109,7 +108,7 @@
     "statusDegraded": "Частичный сбой",
     "statusUnreachable": "API недоступен",
     "statusUnreachableDescription": "Веб-приложение работает, но API RAGE не отвечает.",
-    "checkedAt": "Проверено в {time} UTC",
+    "checkedAt": "Проверено {time} ({tz})",
     "apiVersion": "Версия API",
     "environment": "Окружение",
     "database": "База данных",
@@ -240,7 +239,11 @@
     "starters": "Основной состав",
     "substitutes": "Запасные",
     "rosterLocked": "Состав v{version} зафиксирован",
-    "registrationClosedHint": "Регистрация доступна, только пока у турнира статус «Регистрация открыта» и идёт окно регистрации."
+    "registrationClosedHint": "Регистрация доступна, только пока у турнира статус «Регистрация открыта» и идёт окно регистрации.",
+    "registrationOpensAt": "Регистрация откроется {time} ({tz}).",
+    "registrationClosedAt": "Регистрация закрыта {time} ({tz}).",
+    "registrationUnavailable": "Сейчас регистрация не принимает заявки.",
+    "operatorOnlyHint": "Зарегистрировать команду может только её капитан или менеджер."
   },
   "tournamentStatus": {
     "DRAFT": "Черновик",
@@ -882,10 +885,10 @@
     "maxTeams": "Максимум команд",
     "maxTeamsHint": "От {min} до {max} команд.",
     "schedule": "Расписание",
-    "scheduleHint": "Время указывается в UTC. Необязательно; регистрация должна закрываться позже, чем открывается.",
-    "registrationOpenAt": "Открытие регистрации (UTC)",
-    "registrationCloseAt": "Закрытие регистрации (UTC)",
-    "startsAt": "Начало (UTC)",
+    "scheduleHint": "Время в {tz}. Необязательно; регистрация должна закрываться позже, чем открывается.",
+    "registrationOpenAt": "Открытие регистрации ({tz})",
+    "registrationCloseAt": "Закрытие регистрации ({tz})",
+    "startsAt": "Начало ({tz})",
     "mapPool": "Маппул",
     "mapPoolHint": "Введите ровно {count} разных названий карт, например de_name. Встроенного маппула нет — укажите актуальные соревновательные карты сами.",
     "mapSlot": "Карта {n}",
@@ -980,5 +983,9 @@
     "steamIdInvalid": "Введите корректный SteamID64 из 17 цифр.",
     "ban": "Заблокировать",
     "banned": "SteamID64 заблокирован."
+  },
+  "demoMode": {
+    "banner": "Демо-режим — действия с демо-данными (только для разработки).",
+    "bannerDetail": "Изменения демо-турниров разрешены для проверки и никогда не считаются реальными результатами."
   }
 }

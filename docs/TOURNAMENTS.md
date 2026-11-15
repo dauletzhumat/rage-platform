@@ -280,3 +280,13 @@ validation, state machine table.
   Bracket generation refuses non-ACTIVE approved teams (`TEAM_NOT_ACTIVE`).
 - Known: the sample `sample-cup` seed is REGISTRATION_OPEN without a map pool (sample data,
   predates the rule); it cannot be re-seeded while real users exist and is labelled sample.
+
+## 18. Development demo mode (sample data)
+`ALLOW_SAMPLE_MUTATIONS=true` (refused when `NODE_ENV=production`) lets tournament admins run the M3
+flow on **sample tournaments** only: edit/status, approve/reject/substitute, seeds, bracket, veto
+(SUPER_ADMIN override), result override, forfeit; sample players are eligible only inside sample
+tournaments; a sample player/team can never enter a non-sample tournament; a sample match in a
+real tournament stays read-only; M1/M2 sample guards are unchanged. Audit rows carry
+`detail.sample: true`. `GET /meta` exposes `features.sampleMutations.status`. Seed:
+`pnpm db:seed:demo` with `ALLOW_DEMO_SEED=true` (RUNBOOK §11). Demo runs are not verification
+evidence.

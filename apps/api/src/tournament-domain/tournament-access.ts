@@ -1,6 +1,7 @@
 import { type BracketFormat, type MatchFormat, type Prisma, type TournamentStatus } from '@rage/db';
 import { hasSuperAdminLocked } from '../team-domain/team-access.js';
-import { forbiddenRole, sampleResource } from '../team-domain/team-errors.js';
+import { forbiddenRole } from '../team-domain/team-errors.js';
+import type { SamplePolicy } from './sample-policy.js';
 import { tournamentNotFound } from './tournament-errors.js';
 
 type Tx = Prisma.TransactionClient;
@@ -43,14 +44,15 @@ interface TournamentRow {
 }
 
 /**
- * `SELECT … FROM tournaments WHERE id = $1 FOR UPDATE | FOR SHARE`. 404 if missing. Sample
- * tournaments are rejected (409 SAMPLE_RESOURCE) unless `allowSample` (read-only checks).
+ * `SELECT … FROM tournaments WHERE id = $1 FOR UPDATE | FOR SHARE`. 404 if missing. Whether a
+ * sample tournament may be mutated is decided by `SamplePolicy` (409 SAMPLE_RESOURCE unless the
+ * dev-only demo mode is on).
  */
 export async function lockTournament(
   tx: Tx,
   tournamentId: string,
-  mode: 'update' | 'share' = 'update',
-  options: { allowSample?: boolean } = {},
+  mode: 'update' | 'share',
+  samples: Pick<SamplePolicy, 'assertTournamentMutable'>,
 ): Promise<LockedTournament> {
   const rows =
     mode === 'update'
@@ -64,7 +66,7 @@ export async function lockTournament(
           FROM tournaments WHERE id = ${tournamentId}::uuid FOR SHARE`;
   const r = rows[0];
   if (!r) throw tournamentNotFound();
-  if (r.is_sample && !options.allowSample) throw sampleResource();
+  samples.assertTournamentMutable({ isSample: r.is_sample });
   return {
     id: r.id,
     slug: r.slug,

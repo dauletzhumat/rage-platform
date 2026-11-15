@@ -3,9 +3,10 @@ import { type Prisma } from '@rage/db';
 import { type AuditRequestContext, AuditService } from '../audit/audit.service.js';
 import { PrismaService } from '../infra/prisma/prisma.service.js';
 import { type Page, pageOf, toSkipTake } from '../common/pagination/pagination.js';
-import { fieldError, forbiddenRole, sampleResource } from '../team-domain/team-errors.js';
+import { fieldError, forbiddenRole } from '../team-domain/team-errors.js';
 import { hasSuperAdminLocked } from '../team-domain/team-access.js';
 import { advanceWinner } from '../tournament-domain/advancement.js';
+import { SamplePolicy, sampleAuditTag } from '../tournament-domain/sample-policy.js';
 import { conflictOfInterest, operatedTeamIds } from '../tournament-domain/conflict-of-interest.js';
 import { validateSeriesScore } from '../tournament-domain/series-score.js';
 import {
@@ -55,6 +56,7 @@ export class MatchResultsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly samples: SamplePolicy,
   ) {}
 
   private async prepare(tx: Tx, actorUserId: string, matchId: string): Promise<Prepared> {
@@ -63,11 +65,11 @@ export class MatchResultsService {
       select: { tournamentId: true, isSample: true },
     });
     if (!ref) throw matchNotFound();
-    if (ref.isSample) throw sampleResource();
     let tournament: LockedTournament | null = null;
     if (ref.tournamentId) {
-      tournament = await lockTournament(tx, ref.tournamentId, 'update');
+      tournament = await lockTournament(tx, ref.tournamentId, 'update', this.samples);
     }
+    this.samples.assertMatchMutable(ref, tournament);
     if (!(await isMatchAdminLocked(tx, actorUserId, matchId, ref.tournamentId))) {
       if (tournament?.status === 'DRAFT') throw matchNotFound();
       throw forbiddenRole();
@@ -140,6 +142,7 @@ export class MatchResultsService {
           reason: result.reason,
           ...(result.forfeitingTeamId ? { forfeitingTeamId: result.forfeitingTeamId } : {}),
           ...(p.conflictOverride ? { override: true, conflictOfInterest: true } : {}),
+          ...sampleAuditTag(p.tournament?.isSample === true),
         },
       },
       ctx,
@@ -154,6 +157,7 @@ export class MatchResultsService {
         loserTeamId,
         actorUserId,
         now,
+        sample: p.tournament.isSample,
       });
     }
   }

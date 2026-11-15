@@ -20,12 +20,26 @@ export class Cs2IntegrationFeatureDto {
   status!: 'not_implemented';
 }
 
+export class SampleMutationsFeatureDto {
+  @ApiProperty({
+    enum: ['enabled', 'disabled'],
+    description:
+      'DEV-ONLY demo mode (ALLOW_SAMPLE_MUTATIONS): when "enabled", the M3 tournament flow may ' +
+      'mutate SAMPLE tournaments/teams/matches (inside sample tournaments only). Always ' +
+      '"disabled" in production.',
+  })
+  status!: 'enabled' | 'disabled';
+}
+
 export class FeaturesDto {
   @ApiProperty({ type: SteamAuthFeatureDto })
   steamAuth!: SteamAuthFeatureDto;
 
   @ApiProperty({ type: Cs2IntegrationFeatureDto })
   cs2Integration!: Cs2IntegrationFeatureDto;
+
+  @ApiProperty({ type: SampleMutationsFeatureDto })
+  sampleMutations!: SampleMutationsFeatureDto;
 }
 
 export class MetaDto {
@@ -62,6 +76,7 @@ export class MetaController {
       features: {
         steamAuth: { status: this.env.steamAuth ? 'configured' : 'unconfigured' },
         cs2Integration: { status: 'not_implemented' },
+        sampleMutations: { status: this.env.ALLOW_SAMPLE_MUTATIONS ? 'enabled' : 'disabled' },
       },
     };
   }

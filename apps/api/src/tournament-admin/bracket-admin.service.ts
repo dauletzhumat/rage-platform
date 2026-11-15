@@ -24,6 +24,7 @@ import {
   seedsInvalid,
 } from '../tournament-domain/tournament-errors.js';
 import { matchFormatFor, readSettings } from '../tournament-domain/tournament-policy.js';
+import { SamplePolicy, sampleAuditTag } from '../tournament-domain/sample-policy.js';
 import type { BracketDto } from '../tournaments/tournaments.dto.js';
 import { registrationSelect } from '../tournament-domain/registration-view.js';
 import { toAdminRegistrationDtos } from './registration-review.service.js';
@@ -42,6 +43,7 @@ export class BracketAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly samples: SamplePolicy,
   ) {}
 
   async setSeeds(
@@ -52,7 +54,7 @@ export class BracketAdminService {
   ): Promise<AdminRegistrationDto[]> {
     try {
       await this.prisma.client.$transaction(async (tx) => {
-        const t = await lockTournament(tx, tournamentId, 'update');
+        const t = await lockTournament(tx, tournamentId, 'update', this.samples);
         await requireTournamentAdmin(tx, actorUserId, t);
         if (t.status !== 'REGISTRATION_CLOSED') {
           throw invalidStateTransition('Seeds can only be set while registration is closed');
@@ -84,6 +86,7 @@ export class BracketAdminService {
             resourceType: 'tournament',
             resourceId: tournamentId,
             detail: {
+              ...sampleAuditTag(t.isSample),
               seeds: [...dto.seeds]
                 .sort((a, b) => a.seed - b.seed)
                 .map((s) => ({ registrationId: s.registrationId, seed: s.seed })),
@@ -114,7 +117,7 @@ export class BracketAdminService {
     let format = 'SINGLE_ELIMINATION';
     try {
       await this.prisma.client.$transaction(async (tx) => {
-        const t = await lockTournament(tx, tournamentId, 'update');
+        const t = await lockTournament(tx, tournamentId, 'update', this.samples);
         await requireTournamentAdmin(tx, actorUserId, t);
         format = t.format;
         const existing = await tx.tournamentStage.count({ where: { tournamentId } });
@@ -163,6 +166,7 @@ export class BracketAdminService {
           format: t.format,
           defaultMatchFormat: t.defaultMatchFormat,
           settingsJson: t.settingsJson,
+          isSample: t.isSample,
           teamBySeed,
         });
         await tx.tournament.update({
@@ -182,6 +186,7 @@ export class BracketAdminService {
               teamCount: seeded.length,
               size: result.size,
               byes: result.byes,
+              ...sampleAuditTag(t.isSample),
               seeds: seeded.map((r) => ({
                 registrationId: r.id,
                 teamId: r.teamId,
@@ -198,7 +203,12 @@ export class BracketAdminService {
             actorUserId,
             resourceType: 'tournament',
             resourceId: tournamentId,
-            detail: { from: 'REGISTRATION_CLOSED', to: 'IN_PROGRESS', trigger: 'generate_bracket' },
+            detail: {
+              from: 'REGISTRATION_CLOSED',
+              to: 'IN_PROGRESS',
+              trigger: 'generate_bracket',
+              ...sampleAuditTag(t.isSample),
+            },
           },
           ctx,
           tx,
@@ -228,6 +238,8 @@ export class BracketAdminService {
       format: Prisma.TournamentGetPayload<object>['format'];
       defaultMatchFormat: Prisma.TournamentGetPayload<object>['defaultMatchFormat'];
       settingsJson: unknown;
+      /** Matches of a sample tournament are sample data too (dev-only demo mode). */
+      isSample: boolean;
       teamBySeed: Map<number, string>;
     },
   ): Promise<{ stageId: string; bracketId: string; size: number; byes: number }> {
@@ -314,6 +326,7 @@ export class BracketAdminService {
         format: m.format,
         status: m.status,
         statusReason: m.statusReason,
+        isSample: input.isSample,
         createdAt: now,
       })),
     });

@@ -8,7 +8,12 @@ import { DetailSection, EmptySection, Facts } from '@/components/domain/section'
 import { TournamentStatusPill } from '@/components/domain/status';
 import { ApiErrorState } from '@/components/states/api-error-state';
 import { BracketView } from '@/components/tournaments/bracket-view';
-import { ApprovedTeams, MapPoolList } from '@/components/tournaments/tournament-parts';
+import {
+  ApprovedTeams,
+  MapPoolList,
+  RegistrationWindowNotice,
+  registrationWindowState,
+} from '@/components/tournaments/tournament-parts';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Container } from '@/components/ui/container';
@@ -16,6 +21,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { SampleDataBadge } from '@/components/ui/sample-data-badge';
 import { getMe, getTournament, getTournamentBracket, getTournamentTeams } from '@/lib/api/server';
+import { requestTime } from '@/lib/display-time';
 import { operatedTeamIds } from '@/lib/tournaments/access';
 
 type Props = { params: Promise<{ slug: string }> };
@@ -65,6 +71,9 @@ export default async function TournamentPage({ params }: Props) {
   const operates = me.ok && operatedTeamIds(me.data).size > 0;
   const registrationOpen = tournament.registrationOpen;
   const showRegister = operates && !tournament.isSample && registrationOpen;
+  const windowState = registrationWindowState(tournament, requestTime());
+  // Signed in, window open, but no team to operate: explain instead of showing nothing.
+  const showOperatorHint = me.ok && !operates && registrationOpen && !tournament.isSample;
   const approvedCount =
     typeof tournament.approvedTeamCount === 'number'
       ? tournament.approvedTeamCount
@@ -93,6 +102,21 @@ export default async function TournamentPage({ params }: Props) {
           ) : null
         }
       />
+
+      <RegistrationWindowNotice
+        state={windowState}
+        registrationOpenAt={tournament.registrationOpenAt}
+        registrationCloseAt={tournament.registrationCloseAt}
+      />
+      {showOperatorHint ? (
+        <p
+          role="note"
+          data-testid="operator-only-hint"
+          className="rounded-md border border-border bg-raised p-3 text-sm text-muted"
+        >
+          {t('operatorOnlyHint')}
+        </p>
+      ) : null}
 
       <Card>
         <CardContent>

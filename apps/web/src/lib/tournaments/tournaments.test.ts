@@ -11,10 +11,8 @@ import { isByeMatch, roundLabel, winnerSide } from './bracket';
 import {
   canEditTournament,
   ineligiblePlayers,
-  isoToUtcInput,
   manualStatusTargets,
   selectionToLists,
-  utcInputToIso,
   validateMapPool,
   validateRosterSelection,
   validateSeeds,
@@ -23,6 +21,13 @@ import {
   type TournamentFormInput,
 } from './validation';
 import { mapStates, VETO_SEQUENCES, vetoTurn } from './veto';
+import {
+  DEFAULT_DISPLAY_TIMEZONE,
+  isoToZonedInput,
+  resolveDisplayTimeZone,
+  resolveDisplayTimeZoneLabel,
+  zonedInputToIso,
+} from '@/lib/display-time';
 
 const POOL = ['de_alpha', 'de_bravo', 'de_charlie', 'de_delta', 'de_echo', 'de_foxtrot', 'de_golf'];
 const ids = (n: number) =>
@@ -87,8 +92,9 @@ describe('validateTournamentForm', () => {
         defaultMatchFormat: 'BO3',
         finalMatchFormat: null,
         maxTeams: 16,
-        registrationOpenAt: '2026-12-01T10:00:00.000Z',
-        registrationCloseAt: '2026-12-05T18:30:00.000Z',
+        // Entered in UTC+5 → sent as UTC instants.
+        registrationOpenAt: '2026-12-01T05:00:00.000Z',
+        registrationCloseAt: '2026-12-05T13:30:00.000Z',
         startsAt: null,
         description: null,
         mapPool: POOL,
@@ -123,14 +129,49 @@ describe('validateTournamentForm', () => {
   });
 });
 
-describe('UTC datetime helpers', () => {
-  it('round-trips and rejects impossible dates', () => {
-    expect(utcInputToIso('2026-02-28T23:59')).toBe('2026-02-28T23:59:00.000Z');
-    expect(utcInputToIso('2026-02-30T10:00')).toBeUndefined();
-    expect(utcInputToIso('garbage')).toBeUndefined();
-    expect(utcInputToIso('')).toBeNull();
-    expect(isoToUtcInput('2026-12-01T10:00:00.000Z')).toBe('2026-12-01T10:00');
-    expect(isoToUtcInput(null)).toBe('');
+describe('display time zone (UTC+5) conversions', () => {
+  it('defaults to Etc/GMT-5 (UTC+5) and validates configuration', () => {
+    expect(DEFAULT_DISPLAY_TIMEZONE).toBe('Etc/GMT-5');
+    expect(resolveDisplayTimeZone(undefined)).toBe('Etc/GMT-5');
+    expect(resolveDisplayTimeZone('Not/AZone')).toBe('Etc/GMT-5');
+    expect(resolveDisplayTimeZone('Asia/Almaty')).toBe('Asia/Almaty');
+    expect(resolveDisplayTimeZoneLabel(undefined)).toBe('UTC+5');
+    expect(resolveDisplayTimeZoneLabel('<b>')).toBe('UTC+5');
+  });
+
+  it('input (UTC+5) → ISO instant with explicit offset', () => {
+    expect(zonedInputToIso('2026-11-15T20:59')).toBe('2026-11-15T15:59:00.000Z');
+    expect(zonedInputToIso('2026-11-15T20:59:30')).toBe('2026-11-15T15:59:30.000Z');
+    // Day boundaries: local early morning is the previous UTC day; year rollover.
+    expect(zonedInputToIso('2026-12-01T03:00')).toBe('2026-11-30T22:00:00.000Z');
+    expect(zonedInputToIso('2027-01-01T00:00')).toBe('2026-12-31T19:00:00.000Z');
+    expect(zonedInputToIso('2026-03-01T04:59')).toBe('2026-02-28T23:59:00.000Z');
+  });
+
+  it('ISO → input (UTC+5), incl. day boundaries, and round-trips', () => {
+    expect(isoToZonedInput('2026-11-15T15:59:00.000Z')).toBe('2026-11-15T20:59');
+    expect(isoToZonedInput('2026-11-30T19:00:00Z')).toBe('2026-12-01T00:00');
+    expect(isoToZonedInput('2026-12-31T22:30:00Z')).toBe('2027-01-01T03:30');
+    expect(isoToZonedInput('2026-11-15T20:59:00+05:00')).toBe('2026-11-15T20:59');
+    expect(isoToZonedInput(null)).toBe('');
+    expect(isoToZonedInput('garbage')).toBe('');
+    for (const v of ['2026-01-01T00:00', '2026-06-30T23:59', '2028-02-29T12:00']) {
+      expect(isoToZonedInput(zonedInputToIso(v))).toBe(v);
+    }
+  });
+
+  it('rejects malformed and impossible dates', () => {
+    expect(zonedInputToIso('2026-02-30T10:00')).toBeUndefined();
+    expect(zonedInputToIso('2026-13-01T10:00')).toBeUndefined();
+    expect(zonedInputToIso('2026-01-01T24:00')).toBeUndefined();
+    expect(zonedInputToIso('garbage')).toBeUndefined();
+    expect(zonedInputToIso('')).toBeNull();
+  });
+
+  it('works for other zones, e.g. UTC and a DST zone', () => {
+    expect(zonedInputToIso('2026-11-15T20:59', 'UTC')).toBe('2026-11-15T20:59:00.000Z');
+    expect(zonedInputToIso('2026-07-01T12:00', 'Europe/Berlin')).toBe('2026-07-01T10:00:00.000Z');
+    expect(isoToZonedInput('2026-01-01T12:00:00Z', 'Europe/Berlin')).toBe('2026-01-01T13:00');
   });
 });
 

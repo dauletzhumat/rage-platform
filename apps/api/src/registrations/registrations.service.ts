@@ -4,6 +4,7 @@ import { type AuditRequestContext, AuditService } from '../audit/audit.service.j
 import { PrismaService } from '../infra/prisma/prisma.service.js';
 import { assertTeamActive, lockTeam, requireOperator } from '../team-domain/team-access.js';
 import { fieldError, rethrowMapped } from '../team-domain/team-errors.js';
+import { SamplePolicy, sampleAuditTag } from '../tournament-domain/sample-policy.js';
 import { assertNoSharedOperator } from '../tournament-domain/conflict-of-interest.js';
 import { entriesFromSelection, evaluateEligibility } from '../tournament-domain/eligibility.js';
 import { registrationSelect, toRegistrationDto } from '../tournament-domain/registration-view.js';
@@ -47,11 +48,12 @@ export class RegistrationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly samples: SamplePolicy,
   ) {}
 
   /** Tournament lock for operator actions: DRAFT tournaments are unpublished → 404. */
   private async lockPublishedTournament(tx: Tx, tournamentId: string): Promise<LockedTournament> {
-    const t = await lockTournament(tx, tournamentId, 'update');
+    const t = await lockTournament(tx, tournamentId, 'update', this.samples);
     if (t.status === 'DRAFT') throw tournamentNotFound();
     return t;
   }
@@ -67,7 +69,8 @@ export class RegistrationsService {
     try {
       const id = await this.prisma.client.$transaction(async (tx) => {
         const tournament = await this.lockPublishedTournament(tx, tournamentId);
-        const team = await lockTeam(tx, dto.teamId);
+        const team = await lockTeam(tx, dto.teamId, { allowSample: true });
+        this.samples.assertTeamAllowedIn(team, tournament);
         const access = await requireOperator(tx, dto.teamId, actorUserId);
         assertTeamActive(team);
         const now = new Date();
@@ -83,6 +86,7 @@ export class RegistrationsService {
           teamId: dto.teamId,
           userIds: [...dto.starters, ...dto.substitutes],
           checkMembership: true,
+          allowSamplePlayers: this.samples.samplePlayersAllowed(tournament),
         });
         if (problems.length > 0) throw playerIneligible(problems);
         const registration = await tx.tournamentRegistration.create({
@@ -116,6 +120,8 @@ export class RegistrationsService {
               starters: dto.starters,
               substitutes: dto.substitutes,
               ...(access.override ? { override: true } : {}),
+              ...sampleAuditTag(tournament.isSample),
+              ...sampleAuditTag(tournament.isSample),
             },
           },
           ctx,
@@ -146,7 +152,8 @@ export class RegistrationsService {
       if (registration.teamId !== dto.teamId) {
         throw fieldError('teamId', 'teamId does not match the registration');
       }
-      await lockTeam(tx, registration.teamId);
+      const team = await lockTeam(tx, registration.teamId, { allowSample: true });
+      this.samples.assertTeamAllowedIn(team, tournament);
       const access = await requireOperator(tx, registration.teamId, actorUserId);
       if (registration.status !== 'PENDING') throw registrationNotPending();
       const now = new Date();
@@ -158,6 +165,7 @@ export class RegistrationsService {
         teamId: registration.teamId,
         userIds: [...dto.starters, ...dto.substitutes],
         checkMembership: true,
+        allowSamplePlayers: this.samples.samplePlayersAllowed(tournament),
       });
       if (problems.length > 0) throw playerIneligible(problems);
       const roster = await writeRosterVersion(tx, {
@@ -182,6 +190,7 @@ export class RegistrationsService {
             starters: dto.starters,
             substitutes: dto.substitutes,
             ...(access.override ? { override: true } : {}),
+            ...sampleAuditTag(tournament.isSample),
           },
         },
         ctx,
@@ -200,7 +209,8 @@ export class RegistrationsService {
     await this.prisma.client.$transaction(async (tx) => {
       const tournament = await this.lockPublishedTournament(tx, tournamentId);
       const registration = await lockRegistration(tx, tournamentId, registrationId);
-      await lockTeam(tx, registration.teamId);
+      const team = await lockTeam(tx, registration.teamId, { allowSample: true });
+      this.samples.assertTeamAllowedIn(team, tournament);
       const access = await requireOperator(tx, registration.teamId, actorUserId);
       if (registration.status !== 'PENDING' && registration.status !== 'APPROVED') {
         throw registrationNotPending();
@@ -223,6 +233,7 @@ export class RegistrationsService {
             teamId: registration.teamId,
             previousStatus: registration.status,
             ...(access.override ? { override: true } : {}),
+            ...sampleAuditTag(tournament.isSample),
           },
         },
         ctx,

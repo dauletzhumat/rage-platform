@@ -38,7 +38,12 @@ import {
 import { getMe, getMyRegistrations, getTeam, getTournament, SLUG_PATTERN } from '@/lib/api/server';
 import type { RegistrationDto, TeamDetailM2 } from '@/lib/api/types';
 import type { RawSearchParams } from '@/lib/list-params';
+import { requestTime } from '@/lib/display-time';
 import { operatedTeamIds, operatedTeamSlugs } from '@/lib/tournaments/access';
+import {
+  RegistrationWindowNotice,
+  registrationWindowState,
+} from '@/components/tournaments/tournament-parts';
 import type { RosterChoice } from '@/lib/tournaments/validation';
 import { cn } from '@/lib/utils';
 
@@ -182,6 +187,7 @@ export default async function TournamentRegisterPage({ params, searchParams }: P
   }));
   // API-computed: status REGISTRATION_OPEN and now() inside the optional window.
   const registrationOpen = tournament.registrationOpen;
+  const windowState = registrationWindowState(tournament, requestTime());
   const readOnly = tournament.isSample || team.isSample;
   const canWithdraw =
     registration !== null &&
@@ -289,11 +295,17 @@ export default async function TournamentRegisterPage({ params, searchParams }: P
             />
           )}
         </DetailSection>
-      ) : (
+      ) : windowState === 'notOpenStatus' ? (
         <EmptyState
           icon={CalendarX}
           title={t('closedTitle')}
           description={tt('registrationClosedHint')}
+        />
+      ) : (
+        <RegistrationWindowNotice
+          state={windowState}
+          registrationOpenAt={tournament.registrationOpenAt}
+          registrationCloseAt={tournament.registrationCloseAt}
         />
       )}
     </Container>

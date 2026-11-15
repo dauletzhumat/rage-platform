@@ -20,15 +20,27 @@ export interface LockedTeam {
  * matches AdminService.revokeRole (SUPER_ADMIN grants → scoped grant), which takes no team lock,
  * so these transactions cannot deadlock each other or a concurrent grant revocation.
  * 404 if missing; 409 SAMPLE_RESOURCE for sample teams (never part of an M2 mutation).
+ * `allowSample` is used ONLY by the M3 tournament flow, which must then ask
+ * `SamplePolicy.assertTeamAllowedIn` (dev-only demo mode, sample tournaments only).
  */
-export async function lockTeam(tx: Tx, teamId: string): Promise<LockedTeam> {
+export async function lockTeam(
+  tx: Tx,
+  teamId: string,
+  options: { allowSample?: boolean } = {},
+): Promise<LockedTeam> {
   const rows = await tx.$queryRaw<
     { id: string; slug: string; name: string; status: TeamStatus; is_sample: boolean }[]
   >`SELECT id, slug, name, status, is_sample FROM teams WHERE id = ${teamId}::uuid FOR UPDATE`;
   const row = rows[0];
   if (!row) throw new NotFoundException('Team not found');
-  if (row.is_sample) throw sampleResource();
-  return { id: row.id, slug: row.slug, name: row.name, status: row.status, isSample: false };
+  if (row.is_sample && !options.allowSample) throw sampleResource();
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    status: row.status,
+    isSample: row.is_sample,
+  };
 }
 
 export function assertTeamActive(team: LockedTeam): void {

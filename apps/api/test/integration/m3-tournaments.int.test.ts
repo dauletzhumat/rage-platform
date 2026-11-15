@@ -261,6 +261,9 @@ describe('M3 tournaments API (real PostgreSQL + Redis)', () => {
       );
       expect((await get('/admin/matches', someone).expect(403)).body.code).toBe('FORBIDDEN_ROLE');
       expect(await db().tournament.count({ where: { name: 'Nope Cup' } })).toBe(0);
+      // Demo mode is off by default (ALLOW_SAMPLE_MUTATIONS unset).
+      const meta = await get('/meta').expect(200);
+      expect(meta.body.features.sampleMutations).toEqual({ status: 'disabled' });
     });
   });
 

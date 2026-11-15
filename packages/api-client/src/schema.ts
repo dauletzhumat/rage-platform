@@ -1420,6 +1420,7 @@ export interface components {
     };
     FeaturesDto: {
       cs2Integration: components['schemas']['Cs2IntegrationFeatureDto'];
+      sampleMutations: components['schemas']['SampleMutationsFeatureDto'];
       steamAuth: components['schemas']['SteamAuthFeatureDto'];
     };
     ForfeitDto: {
@@ -1860,6 +1861,13 @@ export interface components {
     RosterLeftReason: 'left' | 'removed' | 'role_change' | 'captain_transfer' | 'admin';
     /** @enum {string} */
     RosterStatus: 'DRAFT' | 'LOCKED' | 'SUPERSEDED';
+    SampleMutationsFeatureDto: {
+      /**
+       * @description DEV-ONLY demo mode (ALLOW_SAMPLE_MUTATIONS): when "enabled", the M3 tournament flow may mutate SAMPLE tournaments/teams/matches (inside sample tournaments only). Always "disabled" in production.
+       * @enum {string}
+       */
+      status: 'enabled' | 'disabled';
+    };
     SeedEntryDto: {
       /** Format: uuid */
       registrationId: string;

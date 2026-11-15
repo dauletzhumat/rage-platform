@@ -21,10 +21,12 @@ import { FormattedDate, InitialsAvatar } from '@/components/domain/formatting';
 import { DetailSection, EmptySection, Facts } from '@/components/domain/section';
 import { MatchStatusPill } from '@/components/domain/status';
 import { ApiErrorState } from '@/components/states/api-error-state';
+import { DemoModeBanner } from '@/components/states/demo-mode-banner';
 import { RefreshButton } from '@/components/tournaments/refresh-button';
 import { ResultSourceBadge } from '@/components/tournaments/status-badges';
 import { VetoBoard } from '@/components/tournaments/veto-board';
-import { getMatch, getMatchVeto, getMe } from '@/lib/api/server';
+import { getDemoMode, getMatch, getMatchVeto, getMe } from '@/lib/api/server';
+import { sampleActionsAllowed } from '@/lib/demo-mode';
 import type { MatchDetailM3, MatchTeamRefM3 } from '@/lib/api/types';
 import { isSuperAdmin } from '@/lib/auth/roles';
 import { operatedTeamIds } from '@/lib/tournaments/access';
@@ -189,7 +191,12 @@ export default async function MatchPage({ params }: Props) {
   const me = vetoActive ? await getMe() : null;
   const operated = me && me.ok && !match.isSample ? [...operatedTeamIds(me.data)] : [];
   // SUPER_ADMIN may veto for the acting team as an audited override (labelled in the board).
-  const canOverride = Boolean(me && me.ok && !match.isSample && isSuperAdmin(me.data.roles));
+  // Sample matches only in dev-only demo mode (sample captains cannot sign in).
+  const demoMode = match.isSample ? await getDemoMode() : false;
+  const canOverride = Boolean(
+    me && me.ok && isSuperAdmin(me.data.roles) && sampleActionsAllowed(match.isSample, demoMode),
+  );
+  const showDemoBanner = demoMode && canOverride;
   const nameA = teamLabel(match.teamA, t('tbd'));
   const nameB = teamLabel(match.teamB, t('tbd'));
 
@@ -198,6 +205,7 @@ export default async function MatchPage({ params }: Props) {
       <h1 className="sr-only">
         {nameA} {t('vs')} {nameB}
       </h1>
+      {showDemoBanner ? <DemoModeBanner /> : null}
       <Card>
         <CardContent className="space-y-6 p-5">
           <div className="flex flex-wrap items-center justify-center gap-2">

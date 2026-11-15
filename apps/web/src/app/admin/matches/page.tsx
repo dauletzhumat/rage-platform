@@ -5,6 +5,7 @@ import { Swords } from 'lucide-react';
 import { ListPagination } from '@/components/domain/list-controls';
 import { MatchStatusPill } from '@/components/domain/status';
 import { ApiErrorState } from '@/components/states/api-error-state';
+import { DemoModeBanner } from '@/components/states/demo-mode-banner';
 import { ForbiddenState } from '@/components/states/forbidden-state';
 import { ForfeitDialog, ResultOverrideDialog } from '@/components/tournaments/match-admin-dialogs';
 import { ResultSourceBadge } from '@/components/tournaments/status-badges';
@@ -20,7 +21,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { getAdminMatches, getMe, getTournaments, UUID_PATTERN } from '@/lib/api/server';
+import {
+  getAdminMatches,
+  getDemoMode,
+  getMe,
+  getTournaments,
+  UUID_PATTERN,
+} from '@/lib/api/server';
+import { sampleActionsAllowed } from '@/lib/demo-mode';
 import type { MatchSummaryM3, SeriesMatchStatus } from '@/lib/api/types';
 import { listHref, parseListParams, totalPages, type RawSearchParams } from '@/lib/list-params';
 import { hasTournamentOrMatchRole } from '@/lib/tournaments/access';
@@ -81,9 +89,10 @@ export default async function AdminMatchesPage({
   const status: SeriesMatchStatus | undefined = filter === 'ALL' ? undefined : filter;
 
   // Tournament tabs come from the public in-progress list (no admin scope needed to read it).
-  const [tournaments, result] = await Promise.all([
+  const [tournaments, result, demoMode] = await Promise.all([
     getTournaments({ status: 'IN_PROGRESS', page: 1, pageSize: 100 }),
     getAdminMatches({ tournamentId, status, page, pageSize }),
+    getDemoMode(),
   ]);
   const list = tournaments.ok ? tournaments.data.items : [];
   const params = (next: { tournamentId?: string | undefined; status?: Filter }) => {
@@ -105,6 +114,7 @@ export default async function AdminMatchesPage({
   return (
     <div className="space-y-6 px-4 py-8 sm:px-6">
       <PageHeader title={t('matches')} description={tm('description')} />
+      {demoMode ? <DemoModeBanner /> : null}
 
       <p
         role="note"
@@ -171,6 +181,7 @@ export default async function AdminMatchesPage({
         <div>
           <MatchesTable
             matches={result.data.items}
+            demoMode={demoMode}
             caption={tm('captionPaged', {
               page,
               totalPages: totalPages(result.data.total, result.data.pageSize),
@@ -189,7 +200,15 @@ export default async function AdminMatchesPage({
   );
 }
 
-async function MatchesTable({ matches, caption }: { matches: MatchSummaryM3[]; caption: string }) {
+async function MatchesTable({
+  matches,
+  caption,
+  demoMode,
+}: {
+  matches: MatchSummaryM3[];
+  caption: string;
+  demoMode: boolean;
+}) {
   const [tm, tmatch] = await Promise.all([
     getTranslations('adminMatches'),
     getTranslations('matches'),
@@ -216,7 +235,7 @@ async function MatchesTable({ matches, caption }: { matches: MatchSummaryM3[]; c
             match.status === 'CREATED' &&
             match.teamA !== null &&
             match.teamB !== null &&
-            !match.isSample;
+            sampleActionsAllowed(match.isSample, demoMode);
           return (
             <TableRow key={match.id}>
               <TableCell className="align-top">

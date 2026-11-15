@@ -1,7 +1,11 @@
 import { useFormatter, useLocale, useTranslations } from 'next-intl';
+import { DISPLAY_TIMEZONE_LABEL } from '@/lib/display-time';
 import { cn, initials } from '@/lib/utils';
 
-/** Date/time rendered in UTC (timeZone is fixed in i18n/request.ts) inside a <time> element. */
+/**
+ * Date/time rendered in the platform display zone (UTC+5 by default; set in i18n/request.ts)
+ * inside a <time> element; times carry the zone label.
+ */
 export function FormattedDate({
   value,
   withTime = false,
@@ -24,7 +28,7 @@ export function FormattedDate({
         date,
         withTime ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' },
       )}
-      {withTime ? <span className="ml-1 text-muted">{tc('utc')}</span> : null}
+      {withTime ? <span className="ml-1 text-muted">{DISPLAY_TIMEZONE_LABEL}</span> : null}
     </time>
   );
 }

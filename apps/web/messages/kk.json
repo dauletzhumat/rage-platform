@@ -20,7 +20,6 @@
     "closeMenu": "Мәзірді жабу",
     "requestId": "Сұраныс ID: {id}",
     "notAvailable": "—",
-    "utc": "UTC",
     "results": "{total, plural, =0 {Нәтиже жоқ} one {# нәтиже} other {# нәтиже}}",
     "searchResultsFor": "«{q}» бойынша нәтижелер",
     "noSearchResults": "«{q}» бойынша ештеңе табылмады",
@@ -109,7 +108,7 @@
     "statusDegraded": "Ішінара ақау",
     "statusUnreachable": "API қолжетімсіз",
     "statusUnreachableDescription": "Веб-қосымша жұмыс істеп тұр, бірақ RAGE API жауап бермеді.",
-    "checkedAt": "Тексерілді: {time} UTC",
+    "checkedAt": "Тексерілді: {time} ({tz})",
     "apiVersion": "API нұсқасы",
     "environment": "Орта",
     "database": "Дерекқор",
@@ -240,7 +239,11 @@
     "starters": "Негізгі құрам",
     "substitutes": "Қосалқы ойыншылар",
     "rosterLocked": "Құрам v{version} бекітілді",
-    "registrationClosedHint": "Тіркеу турнир мәртебесі «Тіркеу ашық» болғанда және тіркеу кезеңі ішінде ғана қолжетімді."
+    "registrationClosedHint": "Тіркеу турнир мәртебесі «Тіркеу ашық» болғанда және тіркеу кезеңі ішінде ғана қолжетімді.",
+    "registrationOpensAt": "Тіркеу {time} ({tz}) ашылады.",
+    "registrationClosedAt": "Тіркеу {time} ({tz}) жабылды.",
+    "registrationUnavailable": "Қазір тіркеу өтінімдерді қабылдамайды.",
+    "operatorOnlyHint": "Команданы тек оның капитаны немесе менеджері тіркей алады."
   },
   "tournamentStatus": {
     "DRAFT": "Жоба",
@@ -882,10 +885,10 @@
     "maxTeams": "Командалардың ең көп саны",
     "maxTeamsHint": "{min}–{max} команда.",
     "schedule": "Кесте",
-    "scheduleHint": "Уақыт UTC бойынша. Міндетті емес; тіркеу ашылғаннан кейін жабылуы тиіс.",
-    "registrationOpenAt": "Тіркеудің ашылуы (UTC)",
-    "registrationCloseAt": "Тіркеудің жабылуы (UTC)",
-    "startsAt": "Басталуы (UTC)",
+    "scheduleHint": "Уақыт {tz} бойынша. Міндетті емес; тіркеу ашылғаннан кейін жабылуы тиіс.",
+    "registrationOpenAt": "Тіркеудің ашылуы ({tz})",
+    "registrationCloseAt": "Тіркеудің жабылуы ({tz})",
+    "startsAt": "Басталуы ({tz})",
     "mapPool": "Карталар пулы",
     "mapPoolHint": "Дәл {count} түрлі карта атауын енгізіңіз, мысалы de_name. Кірістірілген пул жоқ — қазіргі жарыс карталарын өзіңіз көрсетіңіз.",
     "mapSlot": "{n}-карта",
@@ -980,5 +983,9 @@
     "steamIdInvalid": "17 саннан тұратын дұрыс SteamID64 енгізіңіз.",
     "ban": "Бұғаттау",
     "banned": "SteamID64 бұғатталды."
+  },
+  "demoMode": {
+    "banner": "Демо-режим — демо-деректермен әрекеттер (тек әзірлеу үшін).",
+    "bannerDetail": "Демо-турнирлерді өзгертуге тексеру үшін рұқсат етілген; олар ешқашан нақты нәтиже болып саналмайды."
   }
 }

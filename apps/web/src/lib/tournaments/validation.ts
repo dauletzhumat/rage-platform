@@ -14,6 +14,7 @@ import {
   NAME_PATTERN,
   textLength,
 } from '@/lib/teams/validation';
+import { zonedInputToIso } from '@/lib/display-time';
 
 /**
  * Client-side mirror of the M3 rules (docs/TOURNAMENTS.md §3.1, §4, §6, §9).
@@ -89,7 +90,7 @@ export interface TournamentFormInput {
   /** '' = same as default. */
   finalMatchFormat: string;
   maxTeams: string;
-  /** `datetime-local` values in UTC, or ''. */
+  /** `datetime-local` values in the display time zone (UTC+5 by default), or ''. */
   registrationOpenAt: string;
   registrationCloseAt: string;
   startsAt: string;
@@ -109,45 +110,6 @@ const MATCH_FORMAT_SET: ReadonlySet<string> = new Set(['BO1', 'BO3', 'BO5']);
 
 export function isMatchFormat(value: string): value is MatchFormat {
   return MATCH_FORMAT_SET.has(value);
-}
-
-/**
- * `datetime-local` value interpreted as **UTC** (the whole app displays UTC) → ISO string;
- * '' → null; malformed → undefined.
- */
-export function utcInputToIso(value: string): string | null | undefined {
-  const trimmed = value.trim();
-  if (trimmed === '') return null;
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(trimmed);
-  if (!match) return undefined;
-  const [y, mo, d, h, mi] = match.slice(1, 6).map(Number) as [
-    number,
-    number,
-    number,
-    number,
-    number,
-  ];
-  const sec = match[6] ? Number(match[6]) : 0;
-  const date = new Date(Date.UTC(y, mo - 1, d, h, mi, sec));
-  if (
-    Number.isNaN(date.getTime()) ||
-    date.getUTCMonth() !== mo - 1 ||
-    date.getUTCDate() !== d ||
-    h > 23 ||
-    mi > 59 ||
-    sec > 59
-  ) {
-    return undefined;
-  }
-  return date.toISOString();
-}
-
-/** ISO string → `datetime-local` value in UTC ('' for null/invalid). */
-export function isoToUtcInput(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toISOString().slice(0, 16);
 }
 
 /** Validate the create/edit form (§3.1). Format is always SINGLE_ELIMINATION in M3. */
@@ -173,9 +135,9 @@ export function validateTournamentForm(input: TournamentFormInput): TournamentVa
     errors.maxTeams = 'maxTeamsRange';
   }
 
-  const open = utcInputToIso(input.registrationOpenAt);
-  const close = utcInputToIso(input.registrationCloseAt);
-  const starts = utcInputToIso(input.startsAt);
+  const open = zonedInputToIso(input.registrationOpenAt);
+  const close = zonedInputToIso(input.registrationCloseAt);
+  const starts = zonedInputToIso(input.startsAt);
   if (open === undefined) errors.registrationOpenAt = 'dateInvalid';
   if (close === undefined) errors.registrationCloseAt = 'dateInvalid';
   if (starts === undefined) errors.startsAt = 'dateInvalid';
