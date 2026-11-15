@@ -102,7 +102,7 @@ export class TournamentAdminService {
       ...(query.status ? { status: query.status } : {}),
       ...(query.q ? { name: { contains: escapeLike(query.q), mode: 'insensitive' } } : {}),
     };
-    const [rows, total] = await db.$transaction([
+    const [rows, total] = await Promise.all([
       db.tournament.findMany({
         where,
         select: adminTournamentSelect,

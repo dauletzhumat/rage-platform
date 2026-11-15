@@ -1034,7 +1034,7 @@ export interface components {
       /** @description Approval note or rejection reason (visible to the team operators) */
       reviewReason: string | null;
       /** @description Current (latest) roster version */
-      roster: components['schemas']['TournamentRosterDto'];
+      roster: components['schemas']['AdminTournamentRosterDto'];
       seed: number | null;
       status: components['schemas']['RegistrationStatus'];
       team: components['schemas']['RegistrationTeamRefDto'];
@@ -1118,6 +1118,30 @@ export interface components {
       /** @example 0 */
       total: number;
     };
+    AdminTournamentRosterDto: {
+      entries: components['schemas']['AdminTournamentRosterEntryDto'][];
+      /** Format: uuid */
+      id: string;
+      /** Format: date-time */
+      lockedAt: string | null;
+      status: components['schemas']['RosterStatus'];
+      version: number;
+    };
+    AdminTournamentRosterEntryDto: {
+      /** @description Nickname snapshot taken when this roster version was created */
+      nickname: string;
+      /** @description True when the player is no longer an active member of the registering team (the snapshot is unchanged; an admin substitution may be needed) */
+      noLongerMember: boolean;
+      playerSlug: string;
+      role: components['schemas']['RosterEntryRole'];
+      /**
+       * @description SteamID64 snapshot (operator / admin views only)
+       * @example 76561198000000000
+       */
+      steamId64: string;
+      /** Format: uuid */
+      userId: string;
+    };
     AdminUserDto: {
       /** Format: date-time */
       createdAt: string;
@@ -1155,7 +1179,7 @@ export interface components {
     };
     ApiErrorDto: {
       /**
-       * @description Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED, SAMPLE_RESOURCE, APPLICATION_ALREADY_PENDING, APPLICATION_NOT_PENDING, APPLICANT_IN_TEAM, APPLICANT_INELIGIBLE, TEAM_NAME_TAKEN, TEAM_TAG_TAKEN, TEAM_NOT_ACTIVE, PLAYER_NOT_FOUND, ALREADY_MEMBER, INVITATION_ALREADY_PENDING, INVITATION_LIMIT, INVITATION_NOT_PENDING, INVITATION_EXPIRED, ALREADY_IN_TEAM, ROSTER_FULL, NOT_TEAM_MEMBER, CAPTAIN_MUST_TRANSFER, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS, MEMBER_INELIGIBLE, APPLICATION_LIMIT, INVITATION_COOLDOWN, INVALID_STATE_TRANSITION, FORMAT_NOT_SUPPORTED, TOURNAMENT_NAME_TAKEN, REGISTRATION_CLOSED, ALREADY_REGISTERED, ROSTER_INVALID, PLAYER_INELIGIBLE, TOURNAMENT_FULL, REGISTRATION_NOT_PENDING, SEEDS_INVALID, NOT_ENOUGH_TEAMS, BRACKET_EXISTS, MATCH_NOT_READY, MATCH_ALREADY_COMPLETED, SCORE_INVALID, VETO_NOT_YOUR_TURN, VETO_INVALID_MAP, VETO_COMPLETE, SUBSTITUTION_NOT_ALLOWED, STEAM_ID_ALREADY_BANNED. New codes may be added.
+       * @description Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED, SAMPLE_RESOURCE, APPLICATION_ALREADY_PENDING, APPLICATION_NOT_PENDING, APPLICANT_IN_TEAM, APPLICANT_INELIGIBLE, TEAM_NAME_TAKEN, TEAM_TAG_TAKEN, TEAM_NOT_ACTIVE, PLAYER_NOT_FOUND, ALREADY_MEMBER, INVITATION_ALREADY_PENDING, INVITATION_LIMIT, INVITATION_NOT_PENDING, INVITATION_EXPIRED, ALREADY_IN_TEAM, ROSTER_FULL, NOT_TEAM_MEMBER, CAPTAIN_MUST_TRANSFER, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS, MEMBER_INELIGIBLE, APPLICATION_LIMIT, INVITATION_COOLDOWN, INVALID_STATE_TRANSITION, FORMAT_NOT_SUPPORTED, TOURNAMENT_NAME_TAKEN, REGISTRATION_CLOSED, ALREADY_REGISTERED, ROSTER_INVALID, PLAYER_INELIGIBLE, TOURNAMENT_FULL, REGISTRATION_NOT_PENDING, SEEDS_INVALID, NOT_ENOUGH_TEAMS, BRACKET_EXISTS, MATCH_NOT_READY, MATCH_ALREADY_COMPLETED, SCORE_INVALID, VETO_NOT_YOUR_TURN, VETO_INVALID_MAP, VETO_COMPLETE, SUBSTITUTION_NOT_ALLOWED, STEAM_ID_ALREADY_BANNED, CONFLICT_OF_INTEREST. New codes may be added.
        * @example CSRF_FAILED
        */
       code?: string;
@@ -1365,17 +1389,20 @@ export interface components {
       name: string;
       /**
        * Format: date-time
-       * @description Optional end of the registration window (must be after registrationOpenAt)
+       * @description Optional end of the registration window (must be after registrationOpenAt). Must carry an offset (Z or ±hh:mm)
+       * @example 2026-12-01T18:00:00Z
        */
       registrationCloseAt?: string | null;
       /**
        * Format: date-time
-       * @description Optional start of the registration window
+       * @description Optional start of the registration window. Must carry an offset (Z or ±hh:mm)
+       * @example 2026-12-01T18:00:00Z
        */
       registrationOpenAt?: string | null;
       /**
        * Format: date-time
-       * @description Optional scheduled start
+       * @description Optional scheduled start. Must carry an offset (Z or ±hh:mm)
+       * @example 2026-12-01T18:00:00Z
        */
       startsAt?: string | null;
     };
@@ -2128,17 +2155,20 @@ export interface components {
       name?: string;
       /**
        * Format: date-time
-       * @description End of the registration window; null clears
+       * @description End of the registration window; null clears. Must carry an offset (Z or ±hh:mm)
+       * @example 2026-12-01T18:00:00Z
        */
       registrationCloseAt?: string | null;
       /**
        * Format: date-time
-       * @description Start of the registration window; null clears
+       * @description Start of the registration window; null clears. Must carry an offset (Z or ±hh:mm)
+       * @example 2026-12-01T18:00:00Z
        */
       registrationOpenAt?: string | null;
       /**
        * Format: date-time
-       * @description Scheduled start; null clears
+       * @description Scheduled start; null clears. Must carry an offset (Z or ±hh:mm)
+       * @example 2026-12-01T18:00:00Z
        */
       startsAt?: string | null;
     };

@@ -98,6 +98,7 @@ describe('connection helpers', () => {
   it('restricts the append-only and migration tables', () => {
     expect([...APPEND_ONLY_TABLES].sort()).toEqual([
       'audit_logs',
+      'map_veto_actions',
       'match_events',
       'match_state_transitions',
     ]);

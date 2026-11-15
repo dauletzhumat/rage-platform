@@ -5,7 +5,8 @@ import { API_ERROR_CODES } from '../common/errors/api-error.js';
 import { iso } from '../common/http/dto.js';
 import { type Page, pageOf, toSkipTake } from '../common/pagination/pagination.js';
 import { PrismaService } from '../infra/prisma/prisma.service.js';
-import { lockTeam } from '../team-domain/team-access.js';
+import { hasSuperAdminLocked, lockTeam } from '../team-domain/team-access.js';
+import { conflictOfInterest, operatedTeamIds } from '../tournament-domain/conflict-of-interest.js';
 import { conflict, forbiddenRole, sampleResource } from '../team-domain/team-errors.js';
 import { evaluateEligibility, type RosterEntryInput } from '../tournament-domain/eligibility.js';
 import {
@@ -49,12 +50,61 @@ const SUBSTITUTION_TOURNAMENT_STATUSES = new Set([
   'IN_PROGRESS',
 ]);
 
-export function toAdminRegistrationDto(row: RegistrationRow): AdminRegistrationDto {
-  return {
-    ...toRegistrationDto(row),
-    isSample: row.team.isSample || row.tournament.isSample,
-    reviewedAt: iso(row.reviewedAt),
-  };
+type Db = Prisma.TransactionClient;
+
+/**
+ * Admin view (L-4): every roster entry carries `noLongerMember` — the player is not (any
+ * more) an active CAPTAIN/PLAYER/SUBSTITUTE member of the registering team. The locked snapshot
+ * is unchanged; this only tells the admin a substitution may be needed.
+ */
+export async function toAdminRegistrationDtos(
+  db: Db,
+  rows: RegistrationRow[],
+): Promise<AdminRegistrationDto[]> {
+  const pairs = rows.flatMap((r) =>
+    (r.rosters[0]?.entries ?? []).map((e) => ({ teamId: r.team.id, userId: e.userId })),
+  );
+  const active = new Set<string>();
+  if (pairs.length > 0) {
+    const members = await db.teamMembership.findMany({
+      where: {
+        leftAt: null,
+        role: { in: ['CAPTAIN', 'PLAYER', 'SUBSTITUTE'] },
+        teamId: { in: [...new Set(pairs.map((p) => p.teamId))] },
+        userId: { in: [...new Set(pairs.map((p) => p.userId))] },
+      },
+      select: { teamId: true, userId: true },
+    });
+    for (const m of members) active.add(`${m.teamId}:${m.userId}`);
+  }
+  return rows.map((row) => {
+    const base = toRegistrationDto(row);
+    return {
+      ...base,
+      roster: {
+        ...base.roster,
+        entries: base.roster.entries.map((e) => ({
+          ...e,
+          noLongerMember: !active.has(`${row.team.id}:${e.userId}`),
+        })),
+      },
+      isSample: row.team.isSample || row.tournament.isSample,
+      reviewedAt: iso(row.reviewedAt),
+    };
+  });
+}
+
+/**
+ * L-3 (c): a tournament admin who captains/manages the registering team must not review it.
+ * SUPER_ADMIN may, audited with `override: true`. Returns whether that override applies.
+ */
+async function reviewConflictOverride(tx: Tx, actorUserId: string, teamId: string) {
+  const operated = await operatedTeamIds(tx, actorUserId, [teamId]);
+  if (operated.size === 0) return false;
+  if (!(await hasSuperAdminLocked(tx, actorUserId))) {
+    throw conflictOfInterest('You operate the registering team');
+  }
+  return true;
 }
 
 /**
@@ -89,7 +139,7 @@ export class RegistrationReviewService {
       tournamentId,
       ...(query.status ? { status: query.status } : {}),
     };
-    const [rows, total] = await db.$transaction([
+    const [rows, total] = await Promise.all([
       db.tournamentRegistration.findMany({
         where,
         select: registrationSelect,
@@ -98,7 +148,7 @@ export class RegistrationReviewService {
       }),
       db.tournamentRegistration.count({ where }),
     ]);
-    return pageOf(rows.map(toAdminRegistrationDto), total, query);
+    return pageOf(await toAdminRegistrationDtos(db, rows), total, query);
   }
 
   async approve(
@@ -112,6 +162,7 @@ export class RegistrationReviewService {
       const t = await lockTournament(tx, tournamentId, 'update');
       const reg = await lockRegistration(tx, tournamentId, registrationId);
       await requireTournamentAdmin(tx, actorUserId, t);
+      const override = await reviewConflictOverride(tx, actorUserId, reg.teamId);
       await this.assertTeamUsable(tx, reg.teamId);
       if (reg.status !== 'PENDING') throw registrationNotPending();
       if (!APPROVABLE_TOURNAMENT_STATUSES.has(t.status)) {
@@ -161,6 +212,7 @@ export class RegistrationReviewService {
             approvedCount: approved + 1,
             maxTeams: t.maxTeams,
             note: note ?? null,
+            ...(override ? { override: true, conflictOfInterest: true } : {}),
           },
         },
         ctx,
@@ -181,6 +233,7 @@ export class RegistrationReviewService {
       const t = await lockTournament(tx, tournamentId, 'update');
       const reg = await lockRegistration(tx, tournamentId, registrationId);
       await requireTournamentAdmin(tx, actorUserId, t);
+      const override = await reviewConflictOverride(tx, actorUserId, reg.teamId);
       await this.assertTeamUsable(tx, reg.teamId, { requireActive: false });
       if (reg.status !== 'PENDING') throw registrationNotPending();
       await tx.tournamentRegistration.update({
@@ -198,7 +251,12 @@ export class RegistrationReviewService {
           actorUserId,
           resourceType: 'tournament_registration',
           resourceId: registrationId,
-          detail: { tournamentId, teamId: reg.teamId, reason },
+          detail: {
+            tournamentId,
+            teamId: reg.teamId,
+            reason,
+            ...(override ? { override: true, conflictOfInterest: true } : {}),
+          },
         },
         ctx,
         tx,
@@ -343,6 +401,6 @@ export class RegistrationReviewService {
       where: { id: registrationId },
       select: registrationSelect,
     });
-    return toAdminRegistrationDto(row);
+    return (await toAdminRegistrationDtos(this.prisma.client, [row]))[0]!;
   }
 }

@@ -522,7 +522,8 @@
     "VETO_INVALID_MAP": "This map is no longer available.",
     "VETO_COMPLETE": "The veto is already complete.",
     "SUBSTITUTION_NOT_ALLOWED": "Substitution is no longer allowed for this team.",
-    "STEAM_ID_ALREADY_BANNED": "This SteamID64 is already banned."
+    "STEAM_ID_ALREADY_BANNED": "This SteamID64 is already banned.",
+    "CONFLICT_OF_INTEREST": "You manage a team involved here, so another admin has to do this."
   },
   "teamActions": {
     "cancel": "Cancel",
@@ -690,7 +691,7 @@
     "title": "Map veto",
     "noLiveUpdates": "The veto does not update live yet — refresh to see the other team's choice.",
     "refresh": "Refresh",
-    "notAvailable": "The veto opens once both teams are known.",
+    "notAvailable": "The veto opens once the tournament is running and both teams are known.",
     "unknownTeam": "Unknown team",
     "complete": "Veto complete.",
     "yourTurnBan": "Your turn: ban a map.",
@@ -723,7 +724,8 @@
     "SERVER": "Server-verified",
     "ADMIN_OVERRIDE": "Admin result — not server-verified",
     "FORFEIT": "Forfeit",
-    "adminShort": "Admin result"
+    "adminShort": "Admin result",
+    "SERVER_UNVERIFIED": "Awaiting server verification"
   },
   "registrationStatus": {
     "PENDING": "Pending",
@@ -910,7 +912,8 @@
       "seedRange": "Use a number from 1 to {max}.",
       "seedDuplicate": "This seed is already used."
     },
-    "pendingCount": "{count} pending"
+    "pendingCount": "{count} pending",
+    "noLongerMember": "Left the team"
   },
   "adminMatches": {
     "forbiddenTitle": "Match administrators only",

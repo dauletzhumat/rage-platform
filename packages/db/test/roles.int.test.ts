@@ -93,6 +93,7 @@ describe('db:grants application role (ADR-016)', () => {
       'audit_logs',
       'match_events',
       'match_state_transitions',
+      'map_veto_actions',
     ]);
   });
 
@@ -237,7 +238,7 @@ describe('db:grants application role (ADR-016)', () => {
     });
   });
 
-  it.each(['audit_logs', 'match_events', 'match_state_transitions'])(
+  it.each(['audit_logs', 'match_events', 'match_state_transitions', 'map_veto_actions'])(
     'UPDATE, DELETE and TRUNCATE on %s are denied, even with the maintenance GUC',
     async (table) => {
       await withAppClient(async (app) => {
@@ -249,7 +250,9 @@ describe('db:grants application role (ADR-016)', () => {
                 ? 'action'
                 : table === 'match_events'
                   ? 'event_type'
-                  : 'reason';
+                  : table === 'map_veto_actions'
+                    ? 'map_name'
+                    : 'reason';
             await expectDenied(app, `UPDATE ${table} SET ${col} = 'x'`);
             await expectDenied(app, `DELETE FROM ${table}`);
             await expectDenied(app, `TRUNCATE ${table}`);
@@ -303,12 +306,15 @@ describe('db:grants application role (ADR-016)', () => {
           (x) =>
             x.startsWith('audit_logs:') ||
             x.startsWith('match_events:') ||
-            x.startsWith('match_state_transitions:'),
+            x.startsWith('match_state_transitions:') ||
+            x.startsWith('map_veto_actions:'),
         )
         .sort(),
     ).toEqual([
       'audit_logs:INSERT',
       'audit_logs:SELECT',
+      'map_veto_actions:INSERT',
+      'map_veto_actions:SELECT',
       'match_events:INSERT',
       'match_events:SELECT',
       'match_state_transitions:INSERT',

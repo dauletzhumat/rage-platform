@@ -54,6 +54,8 @@ export const API_ERROR_CODES = {
   vetoComplete: 'VETO_COMPLETE',
   substitutionNotAllowed: 'SUBSTITUTION_NOT_ALLOWED',
   steamIdAlreadyBanned: 'STEAM_ID_ALREADY_BANNED',
+  // M3 security gate L-3
+  conflictOfInterest: 'CONFLICT_OF_INTEREST',
 } as const;
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES];
 

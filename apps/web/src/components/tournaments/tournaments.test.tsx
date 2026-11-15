@@ -144,14 +144,21 @@ describe('ResultSourceBadge and series status', () => {
   it('labels admin and forfeit results; never as server-verified', () => {
     renderWithIntl(
       <>
-        <ResultSourceBadge source="ADMIN_OVERRIDE" />
-        <ResultSourceBadge source="FORFEIT" />
-        <ResultSourceBadge source={null} />
+        <ResultSourceBadge source="ADMIN_OVERRIDE" verifiedAt={null} />
+        <ResultSourceBadge source="FORFEIT" verifiedAt={null} />
+        <ResultSourceBadge source={null} verifiedAt={null} />
+        <ResultSourceBadge source="SERVER" verifiedAt={null} />
       </>,
     );
+    expect(screen.getByText('Awaiting server verification')).toBeInTheDocument();
     expect(screen.getByText('Admin result — not server-verified')).toBeInTheDocument();
     expect(screen.getByText('Forfeit')).toBeInTheDocument();
     expect(screen.queryByText('Server-verified')).not.toBeInTheDocument();
+  });
+
+  it('labels a SERVER result as verified only with resultVerifiedAt (security gate L-2)', () => {
+    renderWithIntl(<ResultSourceBadge source="SERVER" verifiedAt="2026-11-15T10:00:00.000Z" />);
+    expect(screen.getByText('Server-verified')).toBeInTheDocument();
   });
 
   it('does not render map states as series statuses', () => {

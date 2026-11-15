@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
+import { API_ERROR_CODES, errorBodyWithDetails } from '../common/errors/api-error.js';
 import { DB_CONSTRAINTS, type MatchStatus, type Prisma } from '@rage/db';
 import { type AuditRequestContext, AuditService } from '../audit/audit.service.js';
 import { uuidv7 } from '../common/idempotency/uuid7.js';
@@ -25,7 +26,7 @@ import {
 import { matchFormatFor, readSettings } from '../tournament-domain/tournament-policy.js';
 import type { BracketDto } from '../tournaments/tournaments.dto.js';
 import { registrationSelect } from '../tournament-domain/registration-view.js';
-import { toAdminRegistrationDto } from './registration-review.service.js';
+import { toAdminRegistrationDtos } from './registration-review.service.js';
 import type { AdminRegistrationDto, SeedsDto } from './tournament-admin.dto.js';
 
 type Tx = Prisma.TransactionClient;
@@ -102,7 +103,7 @@ export class BracketAdminService {
       select: registrationSelect,
       orderBy: [{ seed: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }],
     });
-    return rows.map(toAdminRegistrationDto);
+    return toAdminRegistrationDtos(this.prisma.client, rows);
   }
 
   async generate(
@@ -123,9 +124,27 @@ export class BracketAdminService {
         }
         const regs = await tx.tournamentRegistration.findMany({
           where: { tournamentId, status: 'APPROVED' },
-          select: { id: true, teamId: true, seed: true, reviewedAt: true },
+          select: {
+            id: true,
+            teamId: true,
+            seed: true,
+            reviewedAt: true,
+            team: { select: { status: true } },
+          },
         });
         if (regs.length < 2) throw notEnoughTeams();
+        // Gate I-5: a team disbanded/deactivated after approval cannot be bracketed; the
+        // registration must be withdrawn first (by an operator — incl. SUPER_ADMIN override).
+        const inactive = regs.filter((r) => r.team.status !== 'ACTIVE');
+        if (inactive.length > 0) {
+          throw new ConflictException(
+            errorBodyWithDetails(
+              'Approved registrations of inactive teams must be withdrawn first',
+              API_ERROR_CODES.teamNotActive,
+              inactive.map((r) => ({ field: r.id, message: 'TEAM_NOT_ACTIVE' })),
+            ),
+          );
+        }
         const seeded = assignFinalSeeds(regs.map((r) => ({ ...r, approvedAt: r.reviewedAt })));
         await tx.tournamentRegistration.updateMany({
           where: { tournamentId, status: 'APPROVED' },

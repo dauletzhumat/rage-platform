@@ -63,6 +63,10 @@ export const DB_CONSTRAINTS = {
   /** ADMIN_OVERRIDE / FORFEIT ⇒ result_verified_at IS NULL. */
   matchAdminResultUnverified: 'matches_admin_result_unverified_chk',
   matchForfeitNoScores: 'matches_forfeit_no_scores_chk',
+  /** Winner is team A or team B (init). */
+  matchWinnerIsParticipant: 'matches_winner_is_participant_chk',
+  /** M3 hardening: a SERVER result is COMPLETED only with result_verified_at set. */
+  matchServerResultVerified: 'matches_server_result_verified_chk',
   /** One match per bracket slot (init). */
   matchBracketSlotUnique: 'matches_bracket_slot_id_key',
   /** max_teams NULL or 2..64 (tightened in M3). */

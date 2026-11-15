@@ -420,6 +420,11 @@ async function RegistrationRow({
               <span className="font-medium">{entry.nickname}</span>
               <span className="font-mono text-muted">{entry.steamId64}</span>
               {entry.role === 'SUBSTITUTE' ? <RosterRoleBadge role={entry.role} /> : null}
+              {entry.noLongerMember ? (
+                <Badge tone="warning" data-testid="no-longer-member">
+                  {ta('noLongerMember')}
+                </Badge>
+              ) : null}
             </li>
           ))}
         </ul>

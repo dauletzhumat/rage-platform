@@ -258,7 +258,11 @@ async function MatchesTable({ matches, caption }: { matches: MatchSummaryM3[]; c
                       {match.teamAScore}:{match.teamBScore}
                     </span>
                   ) : null}
-                  <ResultSourceBadge source={match.resultSource} compact />
+                  <ResultSourceBadge
+                    source={match.resultSource}
+                    verifiedAt={match.resultVerifiedAt}
+                    compact
+                  />
                 </div>
               </TableCell>
               <TableCell className="align-top">

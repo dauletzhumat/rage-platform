@@ -58,9 +58,12 @@ export function RosterRoleBadge({ role }: { role: RosterEntryRole }) {
  */
 export function ResultSourceBadge({
   source,
+  verifiedAt,
   compact = false,
 }: {
   source: MatchResultSource | null;
+  /** `resultVerifiedAt`: a SERVER result is labelled verified only when this is set (gate L-2). */
+  verifiedAt: string | null | undefined;
   compact?: boolean;
 }) {
   const t = useTranslations('resultSource');
@@ -84,6 +87,13 @@ export function ResultSourceBadge({
       <Badge tone="danger" data-result-source={source}>
         <Flag aria-hidden="true" />
         {t('FORFEIT')}
+      </Badge>
+    );
+  }
+  if (source === 'SERVER' && !verifiedAt) {
+    return (
+      <Badge tone="neutral" data-result-source="SERVER_UNVERIFIED">
+        {t('SERVER_UNVERIFIED')}
       </Badge>
     );
   }

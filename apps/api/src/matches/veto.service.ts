@@ -4,6 +4,7 @@ import { type AuditRequestContext, AuditService } from '../audit/audit.service.j
 import { PrismaService } from '../infra/prisma/prisma.service.js';
 import { resolveTeamAccess } from '../team-domain/team-access.js';
 import { forbiddenRole, rethrowMapped, sampleResource } from '../team-domain/team-errors.js';
+import { conflictOfInterest, operatedTeamIds } from '../tournament-domain/conflict-of-interest.js';
 import { lockTournament, M3_TX_OPTIONS } from '../tournament-domain/tournament-access.js';
 import {
   matchNotFound,
@@ -155,6 +156,15 @@ export class VetoService {
           if (other.isOperator) throw vetoNotYourTurn();
           throw forbiddenRole();
         }
+        // L-3 (a): someone running BOTH teams must not veto for either (SUPER_ADMIN: audited).
+        const operated = await operatedTeamIds(tx, actorUserId, [match.teamAId, match.teamBId]);
+        let conflictOverride = false;
+        if (operated.size === 2) {
+          if (!access.isSuperAdmin) {
+            throw conflictOfInterest('You operate both teams of this match');
+          }
+          conflictOverride = true;
+        }
         if (dto.action !== state.next.action) throw vetoNotYourTurn();
         if (!state.remaining.includes(dto.mapName)) throw vetoInvalidMap();
 
@@ -220,7 +230,8 @@ export class VetoService {
               action: dto.action,
               mapName: dto.mapName,
               ...(decider ? { decider, complete: true } : {}),
-              ...(access.override ? { override: true } : {}),
+              ...(access.override || conflictOverride ? { override: true } : {}),
+              ...(conflictOverride ? { conflictOfInterest: true } : {}),
             },
           },
           ctx,

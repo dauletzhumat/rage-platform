@@ -165,7 +165,11 @@ export function BracketMatchCard({ match }: { match: BracketMatchDto }) {
       </div>
       <div className="flex flex-wrap items-center gap-1.5 border-t border-border bg-raised/40 px-3 py-1.5">
         {match.resultSource ? (
-          <ResultSourceBadge source={match.resultSource} compact />
+          <ResultSourceBadge
+            source={match.resultSource}
+            verifiedAt={match.resultVerifiedAt}
+            compact
+          />
         ) : (
           <MatchStatusPill status={match.status} />
         )}

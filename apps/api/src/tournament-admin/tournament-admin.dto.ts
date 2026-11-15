@@ -26,7 +26,11 @@ import { PageMetaDto, SearchPaginationQueryDto } from '../common/pagination/pagi
 import { PaginationQueryDto } from '../common/pagination/pagination.js';
 import { MATCH_FORMATS, type MatchFormatValue } from '../matches/matches.dto.js';
 import { BIOGRAPHY_PATTERN } from '../me/me.dto.js';
-import { RegistrationDto } from '../registrations/registrations.dto.js';
+import {
+  RegistrationDto,
+  TournamentRosterDto,
+  TournamentRosterEntryDto,
+} from '../registrations/registrations.dto.js';
 import { OptionalReasonField, ReasonField } from '../team-domain/team-input.dto.js';
 import { normalizeText, TEAM_NAME_PATTERN } from '../team-domain/team-policy.js';
 import {
@@ -92,11 +96,27 @@ function MapPoolField(optional: boolean) {
   );
 }
 
+/**
+ * Gate I-1: an ISO 8601 date-time WITH an explicit offset (`Z` or `±hh:mm`). A local time without
+ * offset would be interpreted in the server's zone, so it is rejected.
+ */
+export const DATETIME_WITH_OFFSET =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
 function DateField(description: string) {
   return applyDecorators(
-    ApiPropertyOptional({ type: String, format: 'date-time', nullable: true, description }),
+    ApiPropertyOptional({
+      type: String,
+      format: 'date-time',
+      nullable: true,
+      description: `${description}. Must carry an offset (Z or ±hh:mm)`,
+      example: '2026-12-01T18:00:00Z',
+    }),
     ValidateIf(presentNonNull),
     IsISO8601({ strict: true }),
+    Matches(DATETIME_WITH_OFFSET, {
+      message: '$property must be an ISO 8601 date-time with an explicit offset (Z or ±hh:mm)',
+    }),
   );
 }
 
@@ -263,7 +283,23 @@ export class AdminRegistrationsQueryDto extends PaginationQueryDto {
   status?: RegistrationStatus;
 }
 
+export class AdminTournamentRosterEntryDto extends TournamentRosterEntryDto {
+  @ApiProperty({
+    description:
+      'True when the player is no longer an active member of the registering team (the ' +
+      'snapshot is unchanged; an admin substitution may be needed)',
+  })
+  noLongerMember!: boolean;
+}
+
+export class AdminTournamentRosterDto extends TournamentRosterDto {
+  @ApiProperty({ type: [AdminTournamentRosterEntryDto] })
+  override entries!: AdminTournamentRosterEntryDto[];
+}
+
 export class AdminRegistrationDto extends RegistrationDto {
+  @ApiProperty({ type: AdminTournamentRosterDto, description: 'Current (latest) roster version' })
+  override roster!: AdminTournamentRosterDto;
   @ApiProperty({ description: 'Sample team (never mutated)' }) isSample!: boolean;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) reviewedAt!: string | null;
 }

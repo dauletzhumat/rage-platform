@@ -191,6 +191,14 @@ describe('M3 tournaments API (real PostgreSQL + Redis)', () => {
     return db().auditLog.count({ where: { action, ...(resourceId ? { resourceId } : {}) } });
   }
 
+  /** Revokes the user's TEAM_MANAGER grants directly (keeps later conflict checks clean). */
+  async function revokeTeamManagerGrants(userId: string) {
+    await db().userRoleGrant.updateMany({
+      where: { userId, role: 'TEAM_MANAGER', revokedAt: null },
+      data: { revokedAt: new Date(), revokedById: admin.id },
+    });
+  }
+
   async function grant(target: Who, role: string, scopeType: string, scopeId?: string) {
     await post(`/admin/users/${target.id}/roles`, admin, {
       role,
@@ -1383,6 +1391,209 @@ describe('M3 tournaments API (real PostgreSQL + Redis)', () => {
           }).expect(409)
         ).body.code,
       ).toBe('SAMPLE_RESOURCE');
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------
+  describe('M3 gate fixes', () => {
+    const auditOf = async (action: string, resourceId: string) =>
+      (await db().auditLog.findMany({ where: { action, resourceId } })).map(
+        (a) => a.detailJson as Record<string, unknown>,
+      );
+
+    it('L-3 (a): an operator of BOTH teams cannot veto (403 CONFLICT_OF_INTEREST); SUPER_ADMIN audited', async () => {
+      const { bracket, teams } = await setupBracket(2);
+      const m = matchAt(bracket, 1, 1);
+      const both = await user();
+      await grant(both, 'TEAM_MANAGER', 'TEAM', teams[0]!.id);
+      await grant(both, 'TEAM_MANAGER', 'TEAM', teams[1]!.id);
+      const res = await post(`/matches/${m.id}/veto`, both, {
+        action: 'BAN',
+        mapName: 'de_alpha',
+      }).expect(403);
+      expect(res.body.code).toBe('CONFLICT_OF_INTEREST');
+      expect(await db().mapVetoAction.count({ where: { matchId: m.id } })).toBe(0);
+      // A manager of only the acting team is fine.
+      const one = await user();
+      await grant(one, 'TEAM_MANAGER', 'TEAM', teams[0]!.id);
+      await post(`/matches/${m.id}/veto`, one, { action: 'BAN', mapName: 'de_alpha' }).expect(200);
+      // SUPER_ADMIN who manages both teams may act; audited as override + conflict.
+      await grant(admin, 'TEAM_MANAGER', 'TEAM', teams[0]!.id);
+      await grant(admin, 'TEAM_MANAGER', 'TEAM', teams[1]!.id);
+      await post(`/matches/${m.id}/veto`, admin, { action: 'BAN', mapName: 'de_bravo' }).expect(
+        200,
+      );
+      const details = await auditOf('match.veto', m.id);
+      expect(
+        details.filter((d) => d.conflictOfInterest === true && d.override === true),
+      ).toHaveLength(1);
+      await revokeTeamManagerGrants(admin.id);
+    });
+
+    it('L-3 (b): a match admin operating either team cannot enter results; SUPER_ADMIN audited', async () => {
+      const { bracket } = await setupBracket(4);
+      const [m1, m2] = [matchAt(bracket, 1, 1), matchAt(bracket, 1, 2)];
+      const ma = await user();
+      await grant(ma, 'MATCH_ADMIN', 'GLOBAL');
+      await grant(ma, 'TEAM_MANAGER', 'TEAM', m1.teamB!.id);
+      const forfeit = await post(`/admin/matches/${m1.id}/forfeit`, ma, {
+        forfeitingTeamId: m1.teamA!.id,
+        reason: 'no show',
+      }).expect(403);
+      expect(forfeit.body.code).toBe('CONFLICT_OF_INTEREST');
+      const override = await post(`/admin/matches/${m1.id}/result-override`, ma, {
+        winnerTeamId: m1.teamB!.id,
+        teamAScore: 0,
+        teamBScore: 1,
+        reason: 'referee decision',
+      }).expect(403);
+      expect(override.body.code).toBe('CONFLICT_OF_INTEREST');
+      expect((await db().match.findUniqueOrThrow({ where: { id: m1.id } })).status).toBe('CREATED');
+      // Not involved in m2 → allowed.
+      await post(`/admin/matches/${m2.id}/forfeit`, ma, {
+        forfeitingTeamId: m2.teamA!.id,
+        reason: 'no show',
+      }).expect(200);
+      // SUPER_ADMIN managing a team of m1: allowed, audited.
+      await grant(admin, 'TEAM_MANAGER', 'TEAM', m1.teamA!.id);
+      await post(`/admin/matches/${m1.id}/forfeit`, admin, {
+        forfeitingTeamId: m1.teamB!.id,
+        reason: 'no show',
+      }).expect(200);
+      expect(await auditOf('match.forfeit', m1.id)).toEqual([
+        expect.objectContaining({ override: true, conflictOfInterest: true }),
+      ]);
+      await revokeTeamManagerGrants(admin.id);
+    });
+
+    it('L-3 (c): a tournament admin operating the team cannot approve/reject it; SUPER_ADMIN audited', async () => {
+      const t = await mkTournament();
+      const ta = await user();
+      await grant(ta, 'TOURNAMENT_ADMIN', 'GLOBAL');
+      const own = await mkTeam(5, ta); // ta captains this team
+      const reg = await registerOk(t, own);
+      for (const action of ['approve', 'reject']) {
+        const res = await post(
+          `/admin/tournaments/${t.id}/registrations/${reg.id}/${action}`,
+          ta,
+          action === 'reject' ? { reason: 'self review' } : {},
+        ).expect(403);
+        expect(res.body.code).toBe('CONFLICT_OF_INTEREST');
+      }
+      const other = await mkTeam(5);
+      const otherReg = await registerOk(t, other);
+      await post(`/admin/tournaments/${t.id}/registrations/${otherReg.id}/approve`, ta, {}).expect(
+        200,
+      );
+      await grant(admin, 'TEAM_MANAGER', 'TEAM', own.id);
+      await post(`/admin/tournaments/${t.id}/registrations/${reg.id}/approve`, admin, {}).expect(
+        200,
+      );
+      expect(await auditOf('registration.approve', reg.id)).toEqual([
+        expect.objectContaining({ override: true, conflictOfInterest: true }),
+      ]);
+      await revokeTeamManagerGrants(admin.id);
+    });
+
+    it('L-3 (d): two teams sharing a captain/manager cannot both enter a tournament (409)', async () => {
+      const t = await mkTournament();
+      const x = await mkTeam(5);
+      const y = await mkTeam(5);
+      await grant(x.captain, 'TEAM_MANAGER', 'TEAM', y.id); // x's captain also manages y
+      const regX = await registerOk(t, x);
+      const res = await register(t, y).expect(409);
+      expect(res.body.code).toBe('CONFLICT_OF_INTEREST');
+      // A shared TEAM_MANAGER (not a captain) also counts.
+      const z = await mkTeam(5);
+      const w = await mkTeam(5);
+      const shared = await user();
+      await grant(shared, 'TEAM_MANAGER', 'TEAM', z.id);
+      await grant(shared, 'TEAM_MANAGER', 'TEAM', w.id);
+      await registerOk(t, z);
+      expect((await register(t, w).expect(409)).body.code).toBe('CONFLICT_OF_INTEREST');
+      // After X withdraws, Y may register.
+      await post(`/tournaments/${t.id}/registrations/${regX.id}/withdraw`, x.captain).expect(200);
+      await registerOk(t, y);
+    });
+
+    it('L-4: admin registration view flags players no longer on the team', async () => {
+      const t = await mkTournament();
+      const team = await mkTeam(5);
+      const reg = await registerOk(t, team);
+      await approveOk(t, reg.id);
+      const gone = team.members[3]!;
+      await db().teamMembership.updateMany({
+        where: { teamId: team.id, userId: gone, leftAt: null },
+        data: { leftAt: new Date(), leftReason: 'left' },
+      });
+      const list = await get(`/admin/tournaments/${t.id}/registrations`, admin).expect(200);
+      const entries = list.body.items[0].roster.entries as Array<{
+        userId: string;
+        noLongerMember: boolean;
+      }>;
+      expect(entries).toHaveLength(5);
+      for (const e of entries) expect(e.noLongerMember).toBe(e.userId === gone);
+      // The snapshot itself is unchanged; the operator view carries no such flag.
+      const mine = await get('/me/registrations', team.captain).expect(200);
+      expect(mine.body[0].roster.entries.map((e: { userId: string }) => e.userId)).toContain(gone);
+      expect(mine.body[0].roster.entries[0].noLongerMember).toBeUndefined();
+    });
+
+    it('I-1: tournament datetimes need an explicit offset', async () => {
+      const base = {
+        format: 'SINGLE_ELIMINATION',
+        defaultMatchFormat: 'BO1',
+        maxTeams: 8,
+        mapPool: POOL,
+      };
+      for (const value of ['2026-12-01T18:00:00', '2026-12-01', '2026-12-01T18:00:00.000']) {
+        const res = await post('/admin/tournaments', admin, {
+          ...base,
+          name: `Offsetless ${uniq()}`,
+          startsAt: value,
+        }).expect(400);
+        expect(res.body.details[0].field).toBe('startsAt');
+      }
+      const ok = await post('/admin/tournaments', admin, {
+        ...base,
+        name: `Offset ${uniq()}`,
+        registrationOpenAt: '2026-12-01T10:00:00+05:00',
+        registrationCloseAt: '2026-12-01T06:00:00Z',
+        startsAt: '2026-12-02T18:00:00.000Z',
+      }).expect(201);
+      expect(ok.body.registrationOpenAt).toBe('2026-12-01T05:00:00.000Z');
+      const bad = await patch(`/admin/tournaments/${ok.body.id}`, admin, {
+        registrationCloseAt: '2026-12-01T20:00:00',
+      }).expect(400);
+      expect(bad.body.code).toBe('VALIDATION_FAILED');
+    });
+
+    it('I-5: approve and generate-bracket require ACTIVE teams (409 TEAM_NOT_ACTIVE)', async () => {
+      const t = await mkTournament();
+      const teams = [await mkTeam(5), await mkTeam(5), await mkTeam(5)];
+      const regs = [];
+      for (const team of teams) regs.push(await registerOk(t, team));
+      await db().team.update({ where: { id: teams[2]!.id }, data: { status: 'DISBANDED' } });
+      const refused = await post(
+        `/admin/tournaments/${t.id}/registrations/${regs[2]!.id}/approve`,
+        admin,
+        {},
+      ).expect(409);
+      expect(refused.body.code).toBe('TEAM_NOT_ACTIVE');
+      await db().team.update({ where: { id: teams[2]!.id }, data: { status: 'ACTIVE' } });
+      for (const r of regs) await approveOk(t, r.id);
+      await db().team.update({ where: { id: teams[1]!.id }, data: { status: 'DISBANDED' } });
+      await setStatus(t, 'REGISTRATION_CLOSED').expect(200);
+      const gen = await post(`/admin/tournaments/${t.id}/generate-bracket`, admin).expect(409);
+      expect(gen.body).toMatchObject({
+        code: 'TEAM_NOT_ACTIVE',
+        details: [{ field: regs[1]!.id, message: 'TEAM_NOT_ACTIVE' }],
+      });
+      expect(await db().tournamentStage.count({ where: { tournamentId: t.id } })).toBe(0);
+      // SUPER_ADMIN (operator override) withdraws it; generation then succeeds with 2 teams.
+      await post(`/tournaments/${t.id}/registrations/${regs[1]!.id}/withdraw`, admin).expect(200);
+      const ok = await post(`/admin/tournaments/${t.id}/generate-bracket`, admin).expect(200);
+      expect(ok.body.size).toBe(2);
     });
   });
 

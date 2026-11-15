@@ -28,7 +28,7 @@
           "roster": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/TournamentRosterDto"
+                "$ref": "#/components/schemas/AdminTournamentRosterDto"
               }
             ],
             "description": "Current (latest) roster version"
@@ -339,6 +339,71 @@
         "required": ["page", "pageSize", "total", "items"],
         "type": "object"
       },
+      "AdminTournamentRosterDto": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/AdminTournamentRosterEntryDto"
+            },
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lockedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RosterStatus"
+              }
+            ]
+          },
+          "version": {
+            "minimum": 1,
+            "type": "number"
+          }
+        },
+        "required": ["id", "version", "status", "lockedAt", "entries"],
+        "type": "object"
+      },
+      "AdminTournamentRosterEntryDto": {
+        "properties": {
+          "nickname": {
+            "description": "Nickname snapshot taken when this roster version was created",
+            "type": "string"
+          },
+          "noLongerMember": {
+            "description": "True when the player is no longer an active member of the registering team (the snapshot is unchanged; an admin substitution may be needed)",
+            "type": "boolean"
+          },
+          "playerSlug": {
+            "type": "string"
+          },
+          "role": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RosterEntryRole"
+              }
+            ]
+          },
+          "steamId64": {
+            "description": "SteamID64 snapshot (operator / admin views only)",
+            "example": "76561198000000000",
+            "type": "string"
+          },
+          "userId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": ["userId", "playerSlug", "steamId64", "nickname", "role", "noLongerMember"],
+        "type": "object"
+      },
       "AdminUserDto": {
         "properties": {
           "createdAt": {
@@ -440,7 +505,7 @@
       "ApiErrorDto": {
         "properties": {
           "code": {
-            "description": "Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED, SAMPLE_RESOURCE, APPLICATION_ALREADY_PENDING, APPLICATION_NOT_PENDING, APPLICANT_IN_TEAM, APPLICANT_INELIGIBLE, TEAM_NAME_TAKEN, TEAM_TAG_TAKEN, TEAM_NOT_ACTIVE, PLAYER_NOT_FOUND, ALREADY_MEMBER, INVITATION_ALREADY_PENDING, INVITATION_LIMIT, INVITATION_NOT_PENDING, INVITATION_EXPIRED, ALREADY_IN_TEAM, ROSTER_FULL, NOT_TEAM_MEMBER, CAPTAIN_MUST_TRANSFER, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS, MEMBER_INELIGIBLE, APPLICATION_LIMIT, INVITATION_COOLDOWN, INVALID_STATE_TRANSITION, FORMAT_NOT_SUPPORTED, TOURNAMENT_NAME_TAKEN, REGISTRATION_CLOSED, ALREADY_REGISTERED, ROSTER_INVALID, PLAYER_INELIGIBLE, TOURNAMENT_FULL, REGISTRATION_NOT_PENDING, SEEDS_INVALID, NOT_ENOUGH_TEAMS, BRACKET_EXISTS, MATCH_NOT_READY, MATCH_ALREADY_COMPLETED, SCORE_INVALID, VETO_NOT_YOUR_TURN, VETO_INVALID_MAP, VETO_COMPLETE, SUBSTITUTION_NOT_ALLOWED, STEAM_ID_ALREADY_BANNED. New codes may be added.",
+            "description": "Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED, SAMPLE_RESOURCE, APPLICATION_ALREADY_PENDING, APPLICATION_NOT_PENDING, APPLICANT_IN_TEAM, APPLICANT_INELIGIBLE, TEAM_NAME_TAKEN, TEAM_TAG_TAKEN, TEAM_NOT_ACTIVE, PLAYER_NOT_FOUND, ALREADY_MEMBER, INVITATION_ALREADY_PENDING, INVITATION_LIMIT, INVITATION_NOT_PENDING, INVITATION_EXPIRED, ALREADY_IN_TEAM, ROSTER_FULL, NOT_TEAM_MEMBER, CAPTAIN_MUST_TRANSFER, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS, MEMBER_INELIGIBLE, APPLICATION_LIMIT, INVITATION_COOLDOWN, INVALID_STATE_TRANSITION, FORMAT_NOT_SUPPORTED, TOURNAMENT_NAME_TAKEN, REGISTRATION_CLOSED, ALREADY_REGISTERED, ROSTER_INVALID, PLAYER_INELIGIBLE, TOURNAMENT_FULL, REGISTRATION_NOT_PENDING, SEEDS_INVALID, NOT_ENOUGH_TEAMS, BRACKET_EXISTS, MATCH_NOT_READY, MATCH_ALREADY_COMPLETED, SCORE_INVALID, VETO_NOT_YOUR_TURN, VETO_INVALID_MAP, VETO_COMPLETE, SUBSTITUTION_NOT_ALLOWED, STEAM_ID_ALREADY_BANNED, CONFLICT_OF_INTEREST. New codes may be added.",
             "example": "CSRF_FAILED",
             "type": "string"
           },
@@ -1017,19 +1082,22 @@
             "type": "string"
           },
           "registrationCloseAt": {
-            "description": "Optional end of the registration window (must be after registrationOpenAt)",
+            "description": "Optional end of the registration window (must be after registrationOpenAt). Must carry an offset (Z or ±hh:mm)",
+            "example": "2026-12-01T18:00:00Z",
             "format": "date-time",
             "nullable": true,
             "type": "string"
           },
           "registrationOpenAt": {
-            "description": "Optional start of the registration window",
+            "description": "Optional start of the registration window. Must carry an offset (Z or ±hh:mm)",
+            "example": "2026-12-01T18:00:00Z",
             "format": "date-time",
             "nullable": true,
             "type": "string"
           },
           "startsAt": {
-            "description": "Optional scheduled start",
+            "description": "Optional scheduled start. Must carry an offset (Z or ±hh:mm)",
+            "example": "2026-12-01T18:00:00Z",
             "format": "date-time",
             "nullable": true,
             "type": "string"
@@ -3252,19 +3320,22 @@
             "type": "string"
           },
           "registrationCloseAt": {
-            "description": "End of the registration window; null clears",
+            "description": "End of the registration window; null clears. Must carry an offset (Z or ±hh:mm)",
+            "example": "2026-12-01T18:00:00Z",
             "format": "date-time",
             "nullable": true,
             "type": "string"
           },
           "registrationOpenAt": {
-            "description": "Start of the registration window; null clears",
+            "description": "Start of the registration window; null clears. Must carry an offset (Z or ±hh:mm)",
+            "example": "2026-12-01T18:00:00Z",
             "format": "date-time",
             "nullable": true,
             "type": "string"
           },
           "startsAt": {
-            "description": "Scheduled start; null clears",
+            "description": "Scheduled start; null clears. Must carry an offset (Z or ±hh:mm)",
+            "example": "2026-12-01T18:00:00Z",
             "format": "date-time",
             "nullable": true,
             "type": "string"

@@ -398,3 +398,29 @@ describe('tournament policy', () => {
     expect(pickFreeSlug('cup', new Set(['cup']), RESERVED_TOURNAMENT_SLUGS)).toBe('cup-2');
   });
 });
+
+describe('gate I-1: tournament datetimes need an explicit offset', () => {
+  it('accepts Z / ±hh:mm, rejects local times and dates', async () => {
+    const { DATETIME_WITH_OFFSET } =
+      await import('../../src/tournament-admin/tournament-admin.dto.js');
+    for (const ok of [
+      '2026-12-01T18:00:00Z',
+      '2026-12-01T18:00Z',
+      '2026-12-01T18:00:00.123Z',
+      '2026-12-01T18:00:00+05:00',
+      '2026-12-01T18:00:00.5-03:30',
+    ]) {
+      expect(DATETIME_WITH_OFFSET.test(ok), ok).toBe(true);
+    }
+    for (const bad of [
+      '2026-12-01T18:00:00',
+      '2026-12-01',
+      '2026-12-01T18:00:00.000',
+      '2026-12-01T18:00:00+0500',
+      '2026-12-01 18:00:00Z',
+      '2026-12-01T18:00:00z',
+    ]) {
+      expect(DATETIME_WITH_OFFSET.test(bad), bad).toBe(false);
+    }
+  });
+});

@@ -166,3 +166,29 @@ eligibility ("already on another team's current roster in this tournament") →
   triggers and guard functions, and the new indexes/CHECKs above; re-add `tournament_rosters_locked_at_chk`
   only after confirming no never-locked SUPERSEDED rows exist; restore `tournaments_max_teams_chk` as
   `>= 2`. Re-adding KNIFE / MAP_FINISHED is `ALTER TYPE "MatchStatus" ADD VALUE …` (non-destructive).
+
+## M3 hardening (migration `20261115000000_m3_hardening`, security gate L-1 / L-2)
+Raw SQL only (no `schema.prisma` change); forward-only, no data rewritten.
+
+| Object | Rule | Name |
+|---|---|---|
+| `tournament_roster_entries` | INSERT only when the parent roster is DRAFT **or** the parent roster row was written by the current transaction (`xmin = pg_current_xact_id()::xid`; parent read `FOR SHARE`) — a substitution inserts a LOCKED roster and its entries in one transaction | trigger `tournament_roster_entries_insert_guard` (fn `rage_guard_tournament_roster_entry_insert`) |
+| `tournament_rosters` | additionally: `change_reason` and `supersedes_roster_id` frozen once the roster left DRAFT (the API sets both at INSERT) | `rage_guard_tournament_roster` (replaced via `CREATE OR REPLACE`) |
+| `matches` | winner is team A or B | `matches_winner_is_participant_chk` (exists since init; now in `DB_CONSTRAINTS`) |
+| | COMPLETED with `result_source = 'SERVER'` ⇒ `result_verified_at` set | `matches_server_result_verified_chk` |
+| | once COMPLETED: winner, team A/B, scores, `result_source`, `result_verified_at` immutable and status may only stay COMPLETED or become DISPUTED (the move to DISPUTED may carry corrected result fields) | trigger `matches_completed_result_immutable` (fn `rage_guard_completed_match`) |
+| `map_veto_actions` | append-only (owner trigger; `rage_app` SELECT/INSERT only via `APPEND_ONLY_TABLES`) | triggers `map_veto_actions_append_only`, `…_append_only_truncate` |
+
+Notes
+- All guards honour `SET LOCAL rage.allow_append_only_maintenance = 'on'` (owner maintenance only).
+- `xmin` equality with the running top-level xid is wraparound-safe for live rows. The insert guard
+  fails closed if the roster was inserted inside a savepoint (sub-transaction xid). A DRAFT roster
+  locked earlier in the same transaction also passes; the API never inserts entries after locking.
+- Violations surface as SQLSTATE P0001; `getDbViolation()` → `kind: 'immutable'` (rosters, entries,
+  completed matches) or `'append_only'` (veto log).
+- Deploy: `migrate:deploy`, then **`db:grants`** (adds `map_veto_actions` to the append-only privilege
+  set). Pre-flight: `SELECT count(*) FROM matches WHERE status = 'COMPLETED' AND result_source = 'SERVER'
+  AND result_verified_at IS NULL` must be 0 (dev 2026-11-15: 0).
+- Rollback (new migration): drop the three new triggers and two new functions, restore the M3 body of
+  `rage_guard_tournament_roster`, drop `matches_server_result_verified_chk`, remove `map_veto_actions`
+  from `APPEND_ONLY_TABLES` and re-run `db:grants`. No data is affected.

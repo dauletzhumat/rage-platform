@@ -4,6 +4,7 @@ import { type AuditRequestContext, AuditService } from '../audit/audit.service.j
 import { PrismaService } from '../infra/prisma/prisma.service.js';
 import { assertTeamActive, lockTeam, requireOperator } from '../team-domain/team-access.js';
 import { fieldError, rethrowMapped } from '../team-domain/team-errors.js';
+import { assertNoSharedOperator } from '../tournament-domain/conflict-of-interest.js';
 import { entriesFromSelection, evaluateEligibility } from '../tournament-domain/eligibility.js';
 import { registrationSelect, toRegistrationDto } from '../tournament-domain/registration-view.js';
 import {
@@ -76,6 +77,7 @@ export class RegistrationsService {
           select: { id: true },
         });
         if (existing) throw alreadyRegistered();
+        await assertNoSharedOperator(tx, tournamentId, dto.teamId);
         const { snapshots, problems } = await evaluateEligibility(tx, {
           tournamentId,
           teamId: dto.teamId,

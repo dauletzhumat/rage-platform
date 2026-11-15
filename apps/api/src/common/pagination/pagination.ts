@@ -42,6 +42,13 @@ export class PageMetaDto {
   total!: number;
 }
 
+/**
+ * Page queries run `Promise.all([findMany, count])` on the pooled client, NOT inside
+ * `$transaction([...])`: Prisma 7.10's query interpreter fetches sibling relations of one
+ * `findMany` concurrently, and inside a transaction they all hit the same pg client ("Calling
+ * client.query() when the client is already executing a query" deprecation, an error in pg 9).
+ * A batch transaction gave no extra consistency (READ COMMITTED: one snapshot per statement).
+ */
 export interface Page<T> {
   items: T[];
   page: number;

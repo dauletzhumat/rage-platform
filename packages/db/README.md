@@ -58,28 +58,28 @@ const prisma = createPrismaClient(); // reads process.env.DATABASE_URL; wires @p
 
 ### Enforced by the database
 
-| Rule                                                                                                          | Mechanism                                                                                  |
-| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| SteamID64 unique, 17 digits                                                                                   | `users_steam_id64_key`, CHECK `users_steam_id64_format_chk` (also on the snapshot columns) |
-| One active membership per user                                                                                | partial unique `team_memberships_one_active_per_user_uniq` (`left_at IS NULL`)             |
-| One active captain per team                                                                                   | partial unique `team_memberships_one_active_captain_per_team_uniq`                         |
-| One PENDING application per applicant; no two pending apps for the same name or slug                          | partial uniques on `team_applications`                                                     |
-| APPROVED ⇔ `created_team_id` set; an application creates at most one team; REJECTED needs a reason            | CHECKs + UNIQUE `created_team_id`                                                          |
-| Team name and tag unique case-insensitively; slugs lowercase                                                  | `lower(name)`, `lower(tag)` unique indexes; slug CHECK                                     |
-| One PENDING invitation per (team, invitee); no self-invite                                                    | partial unique + CHECK                                                                     |
-| One LOCKED roster per registration; unique user and SteamID per roster                                        | partial unique + `UNIQUE(roster_id, user_id)`, `UNIQUE(roster_id, steam_id64_snapshot)`    |
-| One registration per (tournament, team)                                                                       | UNIQUE                                                                                     |
-| Map banned, picked or decided at most once per match                                                          | partial unique on `map_veto_actions`                                                       |
-| Match teams distinct; winner is a participant; scores ≥ 0                                                     | CHECKs on `matches`, `match_maps`                                                          |
-| One active allocation per server and per match                                                                | partial uniques (`released_at IS NULL`)                                                    |
-| Event dedup                                                                                                   | `UNIQUE(source_server_id, external_event_id)`                                              |
-| Non-negative stats, headshots ≤ kills, KAST ≤ rounds, CT + T = rounds won                                     | CHECKs                                                                                     |
-| `audit_logs`, `match_events` and `match_state_transitions` (M3) append-only                                   | `BEFORE UPDATE/DELETE/TRUNCATE` triggers                                                   |
-| M2: no two PENDING applications with the same tag (case-insensitive)                                          | partial unique `team_applications_pending_tag_ci_uniq`                                     |
-| M2: team/application tags `^[A-Za-z0-9]{2,10}$` (API enforces 2–6)                                            | CHECKs `teams_tag_format_chk`, `team_applications_tag_format_chk`                          |
-| M2: membership roles CAPTAIN/PLAYER/SUBSTITUTE; invitation roles PLAYER/SUBSTITUTE                            | CHECKs `team_memberships_role_m2_chk`, `team_invitations_role_m2_chk`                      |
-| M2: one `Idempotency-Key` per user; key/hash/method format; response consistent with status                   | unique `idempotency_keys_user_key_uniq` + `idempotency_keys_*_chk`                         |
-| M3: bans, result source, seeds, current roster, roster/entry immutability, veto map names, map once per match | see `docs/SCHEMA.md` ("M3 additions") and `DB_CONSTRAINTS`                                 |
+| Rule                                                                                                                                                        | Mechanism                                                                                  |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| SteamID64 unique, 17 digits                                                                                                                                 | `users_steam_id64_key`, CHECK `users_steam_id64_format_chk` (also on the snapshot columns) |
+| One active membership per user                                                                                                                              | partial unique `team_memberships_one_active_per_user_uniq` (`left_at IS NULL`)             |
+| One active captain per team                                                                                                                                 | partial unique `team_memberships_one_active_captain_per_team_uniq`                         |
+| One PENDING application per applicant; no two pending apps for the same name or slug                                                                        | partial uniques on `team_applications`                                                     |
+| APPROVED ⇔ `created_team_id` set; an application creates at most one team; REJECTED needs a reason                                                          | CHECKs + UNIQUE `created_team_id`                                                          |
+| Team name and tag unique case-insensitively; slugs lowercase                                                                                                | `lower(name)`, `lower(tag)` unique indexes; slug CHECK                                     |
+| One PENDING invitation per (team, invitee); no self-invite                                                                                                  | partial unique + CHECK                                                                     |
+| One LOCKED roster per registration; unique user and SteamID per roster                                                                                      | partial unique + `UNIQUE(roster_id, user_id)`, `UNIQUE(roster_id, steam_id64_snapshot)`    |
+| One registration per (tournament, team)                                                                                                                     | UNIQUE                                                                                     |
+| Map banned, picked or decided at most once per match                                                                                                        | partial unique on `map_veto_actions`                                                       |
+| Match teams distinct; winner is a participant; scores ≥ 0                                                                                                   | CHECKs on `matches`, `match_maps`                                                          |
+| One active allocation per server and per match                                                                                                              | partial uniques (`released_at IS NULL`)                                                    |
+| Event dedup                                                                                                                                                 | `UNIQUE(source_server_id, external_event_id)`                                              |
+| Non-negative stats, headshots ≤ kills, KAST ≤ rounds, CT + T = rounds won                                                                                   | CHECKs                                                                                     |
+| `audit_logs`, `match_events`, `match_state_transitions`, `map_veto_actions` (M3) append-only                                                                | `BEFORE UPDATE/DELETE/TRUNCATE` triggers                                                   |
+| M2: no two PENDING applications with the same tag (case-insensitive)                                                                                        | partial unique `team_applications_pending_tag_ci_uniq`                                     |
+| M2: team/application tags `^[A-Za-z0-9]{2,10}$` (API enforces 2–6)                                                                                          | CHECKs `teams_tag_format_chk`, `team_applications_tag_format_chk`                          |
+| M2: membership roles CAPTAIN/PLAYER/SUBSTITUTE; invitation roles PLAYER/SUBSTITUTE                                                                          | CHECKs `team_memberships_role_m2_chk`, `team_invitations_role_m2_chk`                      |
+| M2: one `Idempotency-Key` per user; key/hash/method format; response consistent with status                                                                 | unique `idempotency_keys_user_key_uniq` + `idempotency_keys_*_chk`                         |
+| M3: bans, result source, seeds, current roster, roster/entry immutability, completed-result immutability (M3 hardening), veto map names, map once per match | see `docs/SCHEMA.md` ("M3 additions") and `DB_CONSTRAINTS`                                 |
 
 The API should match on the constraint names exported as `DB_CONSTRAINTS`. An integration test checks that every exported name exists.
 
@@ -105,7 +105,7 @@ The API should match on the constraint names exported as `DB_CONSTRAINTS`. An in
 
 Restrictions that every run re-applies to the application role:
 
-- `audit_logs`, `match_events` and `match_state_transitions` (`APPEND_ONLY_TABLES`): SELECT and INSERT only. UPDATE, DELETE and TRUNCATE fail with `permission denied`, even with `rage.allow_append_only_maintenance = 'on'`.
+- `audit_logs`, `match_events`, `match_state_transitions` and `map_veto_actions` (`APPEND_ONLY_TABLES`): SELECT and INSERT only. UPDATE, DELETE and TRUNCATE fail with `permission denied`, even with `rage.allow_append_only_maintenance = 'on'`.
 - `_prisma_migrations` (`NO_ACCESS_TABLES`): no privileges.
 - TRUNCATE, REFERENCES, TRIGGER and MAINTAIN are revoked on every table. The role cannot create, alter or drop objects.
 

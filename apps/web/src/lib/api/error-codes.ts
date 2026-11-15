@@ -60,6 +60,8 @@ export const KNOWN_ERROR_CODES = [
   'VETO_COMPLETE',
   'SUBSTITUTION_NOT_ALLOWED',
   'STEAM_ID_ALREADY_BANNED',
+  // M3 gate hardening (TOURNAMENTS.md §17)
+  'CONFLICT_OF_INTEREST',
 ] as const;
 
 export type KnownErrorCode = (typeof KNOWN_ERROR_CODES)[number];

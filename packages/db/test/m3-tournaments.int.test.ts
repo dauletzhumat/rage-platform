@@ -304,10 +304,10 @@ describe('match results', () => {
       },
     });
     expect(done.resultVerifiedAt).toBeNull();
-    // Cannot be marked verified afterwards.
+    // Cannot be marked verified afterwards (completed results are frozen; M3 hardening).
     await expectDbError(
       prisma.match.update({ where: { id: match.id }, data: { resultVerifiedAt: new Date() } }),
-      re(DB_CONSTRAINTS.matchAdminResultUnverified),
+      /is immutable/,
     );
   });
 
@@ -831,5 +831,220 @@ describe('migration 20261114000000_m3_tournaments (replayed in an isolated schem
         await c.query(`DROP SCHEMA IF EXISTS ${SCHEMA} CASCADE`);
       }
     });
+  });
+});
+
+describe('M3 hardening (migration 20261115000000_m3_hardening)', () => {
+  async function lockedRoster() {
+    const reg = await newRegistration();
+    const admin = await newUser();
+    const roster = await prisma.tournamentRoster.create({
+      data: {
+        registrationId: reg.id,
+        version: 1,
+        status: 'LOCKED',
+        lockedAt: new Date(),
+        lockedById: admin.id,
+      },
+    });
+    return { reg, admin, roster };
+  }
+
+  async function entryData(rosterId: string) {
+    const u = await newUser();
+    return {
+      rosterId,
+      userId: u.id,
+      steamId64Snapshot: u.steamId64,
+      nicknameSnapshot: 'late',
+      role: 'STARTER' as const,
+    };
+  }
+
+  const failure = (p: Promise<unknown>): Promise<unknown> =>
+    p.then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+
+  it('rejects inserting entries into a LOCKED roster created by an earlier transaction', async () => {
+    const { roster } = await lockedRoster();
+    const error = await failure(
+      prisma.tournamentRosterEntry.create({ data: await entryData(roster.id) }),
+    );
+    expect(getDbViolation(error)?.kind).toBe('immutable');
+    await expectDbError(
+      prisma.tournamentRosterEntry.create({ data: await entryData(roster.id) }),
+      /INSERT of entries is not allowed/,
+    );
+    // Also for a SUPERSEDED roster.
+    await prisma.tournamentRoster.update({
+      where: { id: roster.id },
+      data: { status: 'SUPERSEDED' },
+    });
+    await expectDbError(
+      prisma.tournamentRosterEntry.create({ data: await entryData(roster.id) }),
+      /is immutable/,
+    );
+  });
+
+  it('allows entries for a LOCKED roster created in the same transaction (substitution)', async () => {
+    const { reg, admin, roster: v1 } = await lockedRoster();
+    const [d1, d2] = [await entryData('unused'), await entryData('unused')];
+    const v2 = await prisma.$transaction(async (tx) => {
+      await tx.tournamentRoster.update({ where: { id: v1.id }, data: { status: 'SUPERSEDED' } });
+      const created = await tx.tournamentRoster.create({
+        data: {
+          registrationId: reg.id,
+          version: 2,
+          status: 'LOCKED',
+          lockedAt: new Date(),
+          lockedById: admin.id,
+          supersedesRosterId: v1.id,
+          changeReason: 'substitution',
+        },
+      });
+      await tx.tournamentRosterEntry.createMany({
+        data: [
+          { ...d1, rosterId: created.id },
+          { ...d2, rosterId: created.id },
+        ],
+      });
+      return created;
+    });
+    expect(await prisma.tournamentRosterEntry.count({ where: { rosterId: v2.id } })).toBe(2);
+    // A later transaction cannot add more.
+    await expectDbError(
+      prisma.tournamentRosterEntry.create({ data: await entryData(v2.id) }),
+      /is immutable/,
+    );
+  });
+
+  it('maintenance flag allows a late entry insert (owner only)', async () => {
+    const { roster } = await lockedRoster();
+    const d = await entryData(roster.id);
+    await withPgClient(async (c) => {
+      await c.query('BEGIN');
+      await c.query("SET LOCAL rage.allow_append_only_maintenance = 'on'");
+      const r = await c.query(
+        `INSERT INTO tournament_roster_entries (id, roster_id, user_id, steam_id64_snapshot, nickname_snapshot, role)
+         VALUES ($1, $2, $3, $4, $5, 'STARTER')`,
+        [randomUUID(), d.rosterId, d.userId, d.steamId64Snapshot, d.nicknameSnapshot],
+      );
+      await c.query('ROLLBACK');
+      expect(r.rowCount).toBe(1);
+    });
+  });
+
+  it('change_reason and supersedes_roster_id are frozen once the roster left DRAFT', async () => {
+    const { reg, roster: v1 } = await lockedRoster();
+    await prisma.tournamentRoster.update({ where: { id: v1.id }, data: { status: 'SUPERSEDED' } });
+    const v2 = await prisma.tournamentRoster.create({
+      data: { registrationId: reg.id, version: 2, supersedesRosterId: v1.id, changeReason: 'edit' },
+    });
+    // While DRAFT the reason may still be edited.
+    await prisma.tournamentRoster.update({
+      where: { id: v2.id },
+      data: { changeReason: 'edit 2' },
+    });
+    await prisma.tournamentRoster.update({
+      where: { id: v2.id },
+      data: { status: 'LOCKED', lockedAt: new Date() },
+    });
+    for (const data of [
+      { changeReason: 'rewritten' },
+      { changeReason: null },
+      { supersedesRosterId: null },
+    ]) {
+      await expectDbError(
+        prisma.tournamentRoster.update({ where: { id: v2.id }, data }),
+        /is immutable/,
+      );
+    }
+    // NULL -> value after lock is rejected too.
+    const other = await lockedRoster();
+    await expectDbError(
+      prisma.tournamentRoster.update({
+        where: { id: other.roster.id },
+        data: { changeReason: 'late reason' },
+      }),
+      /provenance fields cannot change/,
+    );
+  });
+
+  it('completed match results are immutable unless the match moves to DISPUTED', async () => {
+    const match = await newMatch();
+    await prisma.match.update({
+      where: { id: match.id },
+      data: {
+        status: 'COMPLETED',
+        resultSource: 'ADMIN_OVERRIDE',
+        winnerTeamId: match.teamAId,
+        teamAScore: 2,
+        teamBScore: 0,
+      },
+    });
+    for (const data of [
+      { winnerTeamId: match.teamBId },
+      { resultSource: 'FORFEIT' as const, teamAScore: null, teamBScore: null },
+      { teamBScore: 1 },
+      { status: 'CREATED' as const },
+      { status: 'CANCELLED' as const },
+    ]) {
+      await expectDbError(prisma.match.update({ where: { id: match.id }, data }), /is immutable/);
+    }
+    const error = await failure(
+      prisma.match.update({ where: { id: match.id }, data: { teamAScore: 0 } }),
+    );
+    expect(getDbViolation(error)?.kind).toBe('immutable');
+    // Non-result columns may still change (version bump, status_reason).
+    await prisma.match.update({
+      where: { id: match.id },
+      data: { version: { increment: 1 }, statusReason: 'note' },
+    });
+    // Moving to DISPUTED may carry a corrected result.
+    const disputed = await prisma.match.update({
+      where: { id: match.id },
+      data: { status: 'DISPUTED', winnerTeamId: match.teamBId, teamAScore: 1, teamBScore: 2 },
+    });
+    expect(disputed.winnerTeamId).toBe(match.teamBId);
+  });
+
+  it('winner must be a participant; SERVER results complete only when verified', async () => {
+    const match = await newMatch();
+    const outsider = await newTeam();
+    await expectDbError(
+      prisma.match.update({
+        where: { id: match.id },
+        data: { status: 'COMPLETED', resultSource: 'ADMIN_OVERRIDE', winnerTeamId: outsider.id },
+      }),
+      re(DB_CONSTRAINTS.matchWinnerIsParticipant),
+    );
+    await expectDbError(
+      prisma.match.update({
+        where: { id: match.id },
+        data: { status: 'COMPLETED', resultSource: 'SERVER', winnerTeamId: match.teamAId },
+      }),
+      re(DB_CONSTRAINTS.matchServerResultVerified),
+    );
+    // A running match may carry a provisional SERVER source without verification.
+    await prisma.match.update({
+      where: { id: match.id },
+      data: { status: 'LIVE', resultSource: 'SERVER' },
+    });
+  });
+
+  it('map_veto_actions are append-only for the owner (trigger)', async () => {
+    const match = await newMatch();
+    const v = await prisma.mapVetoAction.create({
+      data: { matchId: match.id, sequence: 1, action: 'BAN', mapName: 'de_vertigo' },
+    });
+    await expectDbError(
+      prisma.mapVetoAction.update({ where: { id: v.id }, data: { mapName: 'de_overpass' } }),
+      /append-only/,
+    );
+    await expectDbError(prisma.mapVetoAction.delete({ where: { id: v.id } }), /append-only/);
+    expect(await pgError('TRUNCATE map_veto_actions')).toMatch(/append-only/);
+    expect(await prisma.mapVetoAction.count({ where: { matchId: match.id } })).toBe(1);
   });
 });

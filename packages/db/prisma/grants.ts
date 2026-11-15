@@ -26,6 +26,7 @@ export const APPEND_ONLY_TABLES: readonly string[] = [
   'audit_logs',
   'match_events',
   'match_state_transitions',
+  'map_veto_actions',
 ];
 
 /** Tables the application must not access at all. */

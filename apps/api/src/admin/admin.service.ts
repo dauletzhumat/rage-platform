@@ -81,7 +81,7 @@ export class AdminService {
       where = /^\d{17}$/.test(q) ? { OR: [byNickname, { steamId64: q }] } : byNickname;
     }
     const db = this.prisma.client;
-    const [rows, total] = await db.$transaction([
+    const [rows, total] = await Promise.all([
       db.user.findMany({
         where,
         select: {
@@ -274,7 +274,7 @@ export class AdminService {
       ...(query.actorUserId ? { actorUserId: query.actorUserId } : {}),
     };
     const db = this.prisma.client;
-    const [rows, total] = await db.$transaction([
+    const [rows, total] = await Promise.all([
       db.auditLog.findMany({
         where,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],

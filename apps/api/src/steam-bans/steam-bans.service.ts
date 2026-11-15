@@ -41,7 +41,7 @@ export class SteamBansService {
     const where: Prisma.BannedSteamIdWhereInput =
       query.active === undefined ? {} : { liftedAt: query.active ? null : { not: null } };
     const db = this.prisma.client;
-    const [rows, total] = await db.$transaction([
+    const [rows, total] = await Promise.all([
       db.bannedSteamId.findMany({
         where,
         select: banSelect,

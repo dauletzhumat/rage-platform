@@ -264,3 +264,19 @@ validation, state machine table.
 11. Known limits: a team that withdrew or was rejected cannot register again for the same
     tournament (one registration per team); PENDING registrations left at bracket generation stay
     PENDING and can no longer be approved; the map pool is frozen once registration closes.
+
+## 17. Hardening after the M3 gates
+- DB (`20261115000000_m3_hardening`): roster entries can only be inserted into a DRAFT roster or
+  one created in the same transaction; roster `change_reason`/`supersedes_roster_id` frozen after
+  DRAFT; a COMPLETED match's teams, winner, scores, `result_source`, `result_verified_at` are
+  immutable and it can only move to DISPUTED; a SERVER result must be verified to be COMPLETED;
+  `map_veto_actions` is append-only.
+- Web: "Server-verified" only when `resultVerifiedAt` is set; otherwise "Awaiting server
+  verification".
+- API: conflict-of-interest rule (`CONFLICT_OF_INTEREST`, 403/409) — an operator of a team cannot
+  approve/reject its registration, enter its results or forfeits, or act for both teams in a veto
+  (SUPER_ADMIN may, audited as override); a tournament cannot hold two teams that share an
+  operator. Admin registration entries show `noLongerMember`. Datetimes need an explicit offset.
+  Bracket generation refuses non-ACTIVE approved teams (`TEAM_NOT_ACTIVE`).
+- Known: the sample `sample-cup` seed is REGISTRATION_OPEN without a map pool (sample data,
+  predates the rule); it cannot be re-seeded while real users exist and is labelled sample.

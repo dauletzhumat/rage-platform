@@ -22,7 +22,7 @@ export class MatchesService {
 
   async list(query: PaginationQueryDto): Promise<Page<MatchSummaryDto>> {
     const db = this.prisma.client;
-    const [rows, total] = await db.$transaction([
+    const [rows, total] = await Promise.all([
       db.match.findMany({
         where: publicMatchWhere,
         select: matchSummarySelect,

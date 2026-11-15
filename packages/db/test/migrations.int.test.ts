@@ -79,17 +79,21 @@ describe('migrations on a fresh database', () => {
       expect(EXPECTED_TABLES.filter((t) => !names.has(t))).toEqual([]);
 
       const triggers = await c.query<{ tgname: string }>(
-        "SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND (tgname LIKE '%append_only%' OR tgname LIKE '%immutable%') ORDER BY tgname",
+        "SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND (tgname LIKE '%append_only%' OR tgname LIKE '%immutable%' OR tgname LIKE '%guard%') ORDER BY tgname COLLATE \"C\"",
       );
       expect(triggers.rows.map((r) => r.tgname)).toEqual([
         'audit_logs_append_only',
         'audit_logs_append_only_truncate',
+        'map_veto_actions_append_only',
+        'map_veto_actions_append_only_truncate',
         'match_events_append_only',
         'match_events_append_only_truncate',
         'match_state_transitions_append_only',
         'match_state_transitions_append_only_truncate',
+        'matches_completed_result_immutable',
         'tournament_roster_entries_immutable',
         'tournament_roster_entries_immutable_truncate',
+        'tournament_roster_entries_insert_guard',
         'tournament_rosters_immutable',
       ]);
     });

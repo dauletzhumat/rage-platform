@@ -4,7 +4,9 @@ import { type AuditRequestContext, AuditService } from '../audit/audit.service.j
 import { PrismaService } from '../infra/prisma/prisma.service.js';
 import { type Page, pageOf, toSkipTake } from '../common/pagination/pagination.js';
 import { fieldError, forbiddenRole, sampleResource } from '../team-domain/team-errors.js';
+import { hasSuperAdminLocked } from '../team-domain/team-access.js';
 import { advanceWinner } from '../tournament-domain/advancement.js';
+import { conflictOfInterest, operatedTeamIds } from '../tournament-domain/conflict-of-interest.js';
 import { validateSeriesScore } from '../tournament-domain/series-score.js';
 import {
   isMatchAdminLocked,
@@ -38,6 +40,8 @@ type Tx = Prisma.TransactionClient;
 interface Prepared {
   tournament: LockedTournament | null;
   match: LockedMatch & { teamAId: string; teamBId: string };
+  /** SUPER_ADMIN acting despite operating a team of the match (L-3 b; audited). */
+  conflictOverride: boolean;
 }
 
 /**
@@ -77,7 +81,16 @@ export class MatchResultsService {
     if (tournament && tournament.status !== 'IN_PROGRESS') {
       throw matchNotReady('The tournament is not in progress');
     }
-    return { tournament, match: match as Prepared['match'] };
+    // L-3 (b): an official running either team must not decide the result.
+    const operated = await operatedTeamIds(tx, actorUserId, [match.teamAId, match.teamBId]);
+    let conflictOverride = false;
+    if (operated.size > 0) {
+      if (!(await hasSuperAdminLocked(tx, actorUserId))) {
+        throw conflictOfInterest('You operate a team of this match');
+      }
+      conflictOverride = true;
+    }
+    return { tournament, match: match as Prepared['match'], conflictOverride };
   }
 
   private async complete(
@@ -126,6 +139,7 @@ export class MatchResultsService {
           resultSource: result.source,
           reason: result.reason,
           ...(result.forfeitingTeamId ? { forfeitingTeamId: result.forfeitingTeamId } : {}),
+          ...(p.conflictOverride ? { override: true, conflictOfInterest: true } : {}),
         },
       },
       ctx,
@@ -229,7 +243,7 @@ export class MatchResultsService {
         query.status ? { status: query.status } : {},
       ],
     };
-    const [rows, total] = await db.$transaction([
+    const [rows, total] = await Promise.all([
       db.match.findMany({
         where,
         select: matchSummarySelect,

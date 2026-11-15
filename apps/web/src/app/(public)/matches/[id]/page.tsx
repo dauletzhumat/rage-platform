@@ -205,7 +205,10 @@ export default async function MatchPage({ params }: Props) {
             <span className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-xs">
               {match.format}
             </span>
-            <ResultSourceBadge source={match.resultSource ?? null} />
+            <ResultSourceBadge
+              source={match.resultSource ?? null}
+              verifiedAt={match.resultVerifiedAt}
+            />
             {match.isSample ? <SampleDataBadge /> : null}
           </div>
           <div className="flex items-center gap-4">
