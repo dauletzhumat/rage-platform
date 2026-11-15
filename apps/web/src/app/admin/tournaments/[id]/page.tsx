@@ -362,8 +362,11 @@ async function RegistrationsSection({
                   key={registration.id}
                   tournamentId={tournament.id}
                   registration={registration}
-                  canReview={canReview && sampleActionsAllowed(registration.isSample, demoMode)}
-                  allowSample={demoMode}
+                  canReview={
+                    canReview &&
+                    sampleActionsAllowed(registration.isSample, demoMode && tournament.isSample)
+                  }
+                  allowSample={demoMode && tournament.isSample}
                   candidates={canSubstitute ? (candidatesByReg.get(registration.id) ?? []) : null}
                 />
               ))}

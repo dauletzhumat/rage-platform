@@ -459,6 +459,14 @@ describe('dev-only sample mutation mode (ALLOW_SAMPLE_MUTATIONS)', () => {
         expect.objectContaining({ key: 'ALLOW_SAMPLE_MUTATIONS' }),
       ]);
     }
+    // NODE_ENV must be explicit (demo-mode review L-1): unset NODE_ENV + flag is refused.
+    const { NODE_ENV: _omit, ...noNodeEnv } = dev;
+    expect(() => parseEnv({ ...noNodeEnv, ALLOW_SAMPLE_MUTATIONS: 'true' })).toThrow(
+      EnvValidationError,
+    );
+    expect(
+      parseEnv({ ...dev, NODE_ENV: 'test', ALLOW_SAMPLE_MUTATIONS: 'true' }).ALLOW_SAMPLE_MUTATIONS,
+    ).toBe(true);
   });
 
   it('policy: off blocks every sample resource; on allows sample data inside sample tournaments only', async () => {
@@ -478,11 +486,14 @@ describe('dev-only sample mutation mode (ALLOW_SAMPLE_MUTATIONS)', () => {
     expect(code(() => off.assertTournamentMutable(sample))).toBe('SAMPLE_RESOURCE');
     expect(code(() => off.assertTournamentMutable(real))).toBeNull();
     expect(code(() => on.assertTournamentMutable(sample))).toBeNull();
-    // Sample teams: only inside sample tournaments, only when on. Real teams: anywhere.
+    // Sample teams only inside sample tournaments (only when on); real teams never in sample
+    // tournaments (symmetric isolation, demo-mode review M-1).
     expect(code(() => on.assertTeamAllowedIn(sample, sample))).toBeNull();
     expect(code(() => on.assertTeamAllowedIn(sample, real))).toBe('SAMPLE_RESOURCE');
     expect(code(() => off.assertTeamAllowedIn(sample, sample))).toBe('SAMPLE_RESOURCE');
-    expect(code(() => on.assertTeamAllowedIn(real, sample))).toBeNull();
+    expect(code(() => on.assertTeamAllowedIn(real, sample))).toBe('SAMPLE_RESOURCE');
+    expect(code(() => on.assertTeamAllowedIn(real, real))).toBeNull();
+    expect(code(() => off.assertTeamAllowedIn(real, real))).toBeNull();
     // Sample matches: only inside sample tournaments, only when on.
     expect(code(() => on.assertMatchMutable(sample, sample))).toBeNull();
     expect(code(() => on.assertMatchMutable(sample, real))).toBe('SAMPLE_RESOURCE');

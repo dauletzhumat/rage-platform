@@ -60,8 +60,12 @@ export interface DemoSeedSummary {
 }
 
 export function assertDemoSeedAllowed(env: NodeJS.ProcessEnv = process.env): void {
-  if (env.NODE_ENV === 'production') {
-    throw new Error('db:seed:demo refuses to run with NODE_ENV=production (development only)');
+  // Normalised and allowlisted (demo-mode review L-2): unset, development or test only.
+  const nodeEnv = (env.NODE_ENV ?? '').trim().toLowerCase();
+  if (nodeEnv !== '' && nodeEnv !== 'development' && nodeEnv !== 'test') {
+    throw new Error(
+      `db:seed:demo refuses to run with NODE_ENV=${env.NODE_ENV} (development or test only)`,
+    );
   }
   if (env.ALLOW_DEMO_SEED !== 'true') {
     throw new Error('db:seed:demo refuses to run unless ALLOW_DEMO_SEED=true');

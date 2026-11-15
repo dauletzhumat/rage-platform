@@ -14,7 +14,8 @@ import { sampleResource } from '../team-domain/team-errors.js';
  *   - tournament admin actions, registrations, veto and admin results on sample tournaments;
  *   - sample teams / sample players may appear only on rosters of sample tournaments
  *     (a sample team or player can never enter a non-sample tournament);
- *   - real teams may register into a sample tournament.
+ *   - isolation is symmetric: a REAL team can never enter a sample tournament either (so a real
+ *     team never gets demo results or `team_achievements`; demo-mode security review M-1).
  * M1/M2 guards (roles for sample users, applications, invitations, sample team rosters) do not
  * consult this policy and stay blocked. Everything stays `is_sample = true`; results stay
  * ADMIN_OVERRIDE / FORFEIT and unverified. Audit rows of such mutations carry `sample: true`.
@@ -36,9 +37,13 @@ export class SamplePolicy {
     if (!this.tournamentMutable(tournament)) throw sampleResource();
   }
 
-  /** A sample team may only act within a sample tournament, and only in demo mode. */
+  /**
+   * Teams and tournaments never mix sample and real: a sample team only in a sample tournament
+   * (and only in demo mode); a real team never in a sample tournament.
+   */
   assertTeamAllowedIn(team: { isSample: boolean }, tournament: { isSample: boolean }): void {
-    if (team.isSample && !(this.mutationsEnabled && tournament.isSample)) throw sampleResource();
+    if (team.isSample !== tournament.isSample) throw sampleResource();
+    if (team.isSample && !this.mutationsEnabled) throw sampleResource();
   }
 
   /** A sample match may only be mutated inside a sample tournament, and only in demo mode. */

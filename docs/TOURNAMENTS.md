@@ -285,7 +285,9 @@ validation, state machine table.
 `ALLOW_SAMPLE_MUTATIONS=true` (refused when `NODE_ENV=production`) lets tournament admins run the M3
 flow on **sample tournaments** only: edit/status, approve/reject/substitute, seeds, bracket, veto
 (SUPER_ADMIN override), result override, forfeit; sample players are eligible only inside sample
-tournaments; a sample player/team can never enter a non-sample tournament; a sample match in a
+tournaments; sample and real never mix (a sample player/team can never enter a non-sample
+tournament, and a real team can never enter a sample tournament, so real teams never get demo
+results or achievements); the flag requires an explicit `NODE_ENV=development|test`; a sample match in a
 real tournament stays read-only; M1/M2 sample guards are unchanged. Audit rows carry
 `detail.sample: true`. `GET /meta` exposes `features.sampleMutations.status`. Seed:
 `pnpm db:seed:demo` with `ALLOW_DEMO_SEED=true` (RUNBOOK §11). Demo runs are not verification

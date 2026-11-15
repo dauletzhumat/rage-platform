@@ -248,12 +248,19 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
     if (raw.COOKIE_SECURE === false) {
       issues.push({ key: 'COOKIE_SECURE', message: 'must not be false in production' });
     }
-    if (raw.ALLOW_SAMPLE_MUTATIONS) {
-      issues.push({
-        key: 'ALLOW_SAMPLE_MUTATIONS',
-        message: 'must not be true in production (development-only demo mode)',
-      });
-    }
+  }
+  // Demo mode needs an EXPLICIT development/test NODE_ENV: a server that forgot NODE_ENV (which
+  // defaults to development) must not enable it (demo-mode review L-1).
+  if (
+    raw.ALLOW_SAMPLE_MUTATIONS &&
+    cleaned.NODE_ENV !== 'development' &&
+    cleaned.NODE_ENV !== 'test'
+  ) {
+    issues.push({
+      key: 'ALLOW_SAMPLE_MUTATIONS',
+      message:
+        'requires NODE_ENV=development or test to be set explicitly (development-only demo mode)',
+    });
   }
 
   let steamAuth: SteamAuthSettings | null = null;

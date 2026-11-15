@@ -42,8 +42,15 @@ describe('demo seed (db:seed:demo)', () => {
     expect(() => assertDemoSeedAllowed({ NODE_ENV: 'development' })).toThrow(/ALLOW_DEMO_SEED/);
     expect(() =>
       assertDemoSeedAllowed({ NODE_ENV: 'production', ALLOW_DEMO_SEED: 'true' }),
-    ).toThrow(/production/);
+    ).toThrow(/development or test only/);
     expect(() => assertDemoSeedAllowed({ NODE_ENV: 'test', ALLOW_DEMO_SEED: '1' })).toThrow();
+    // Normalised allowlist (demo-mode review L-2).
+    for (const nodeEnv of ['Production', ' production ', 'prod', 'staging']) {
+      expect(() => assertDemoSeedAllowed({ NODE_ENV: nodeEnv, ALLOW_DEMO_SEED: 'true' })).toThrow(
+        /development or test only/,
+      );
+    }
+    expect(() => assertDemoSeedAllowed({ ALLOW_DEMO_SEED: 'true' })).not.toThrow();
     expect(() =>
       assertDemoSeedAllowed({ NODE_ENV: 'development', ALLOW_DEMO_SEED: 'true' }),
     ).not.toThrow();

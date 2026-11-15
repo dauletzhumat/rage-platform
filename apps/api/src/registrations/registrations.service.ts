@@ -121,7 +121,6 @@ export class RegistrationsService {
               substitutes: dto.substitutes,
               ...(access.override ? { override: true } : {}),
               ...sampleAuditTag(tournament.isSample),
-              ...sampleAuditTag(tournament.isSample),
             },
           },
           ctx,

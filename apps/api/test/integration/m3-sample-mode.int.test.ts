@@ -187,14 +187,15 @@ describe('M3 demo mode: ALLOW_SAMPLE_MUTATIONS=true (real PostgreSQL + Redis)', 
     const regs = [];
     for (const team of teams) regs.push(await pendingRegistration(t.id, team));
 
-    // A real team may also register into a sample tournament; a SUPER_ADMIN can register a
-    // sample team (operator override).
+    // A REAL team can never enter a sample tournament (symmetric isolation, demo review M-1);
+    // a SUPER_ADMIN can register a sample team (operator override).
     const real = await realTeam();
     const realReg = await post(`/tournaments/${t.id}/registrations`, real.captain, {
       teamId: real.id,
       starters: real.members.slice(0, 5),
       substitutes: [],
-    }).expect(201);
+    }).expect(409);
+    expect(realReg.body.code).toBe('SAMPLE_RESOURCE');
     const extra = await sampleTeam();
     const extraReg = await post(`/tournaments/${t.id}/registrations`, admin, {
       teamId: extra.id,
@@ -202,11 +203,9 @@ describe('M3 demo mode: ALLOW_SAMPLE_MUTATIONS=true (real PostgreSQL + Redis)', 
       substitutes: [],
     }).expect(201);
     expect(extraReg.body.roster.status).toBe('DRAFT');
-    for (const id of [realReg.body.id, extraReg.body.id]) {
-      await post(`/admin/tournaments/${t.id}/registrations/${id}/reject`, admin, {
-        reason: 'demo: not needed',
-      }).expect(200);
-    }
+    await post(`/admin/tournaments/${t.id}/registrations/${extraReg.body.id}/reject`, admin, {
+      reason: 'demo: not needed',
+    }).expect(200);
 
     for (const r of regs) {
       const res = await post(`/admin/tournaments/${t.id}/registrations/${r.id}/approve`, admin);
