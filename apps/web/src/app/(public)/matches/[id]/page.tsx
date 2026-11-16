@@ -164,10 +164,11 @@ async function ResultNote({ match }: { match: MatchDetailM3 }) {
 
 export default async function MatchPage({ params }: Props) {
   const { id } = await params;
-  const [result, t, tv] = await Promise.all([
+  const [result, t, tv, tms] = await Promise.all([
     getMatch(id),
     getTranslations('matches'),
     getTranslations('veto'),
+    getTranslations('matchMapStatus'),
   ]);
 
   if (!result.ok) {
@@ -320,33 +321,74 @@ export default async function MatchPage({ params }: Props) {
         {maps.length === 0 ? (
           <EmptyState compact headingLevel="h3" icon={MapIcon} title={t('mapsEmpty')} />
         ) : (
-          <Table>
-            <TableCaption srOnly>{t('mapsCaption')}</TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">{t('mapNumber')}</TableHead>
-                <TableHead>{t('map')}</TableHead>
-                <TableHead className="text-right">{nameA}</TableHead>
-                <TableHead className="text-right">{nameB}</TableHead>
-                <TableHead>{t('mapStatus')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {maps.map((map) => (
-                <TableRow key={map.mapOrder}>
-                  <TableCell className="text-muted">{map.mapOrder}</TableCell>
-                  <TableCell className="font-mono font-medium">{map.mapName}</TableCell>
-                  <TableCell className="text-right font-semibold">
-                    <Score value={map.teamAScore} />
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    <Score value={map.teamBScore} />
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-muted">{map.status}</TableCell>
+          <>
+            {match.resultSource && match.resultSource !== 'SERVER' ? (
+              <div data-testid="maps-result-source">
+                <ResultSourceBadge
+                  source={match.resultSource}
+                  verifiedAt={match.resultVerifiedAt}
+                />
+              </div>
+            ) : null}
+            <Table>
+              <TableCaption srOnly>{t('mapsCaption')}</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">{t('mapNumber')}</TableHead>
+                  <TableHead>{t('map')}</TableHead>
+                  <TableHead className="text-right">{nameA}</TableHead>
+                  <TableHead className="text-right">{nameB}</TableHead>
+                  <TableHead>{t('mapWinner')}</TableHead>
+                  <TableHead>{t('mapStatus')}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {maps.map((map) => {
+                  const notPlayed = map.status === 'CANCELLED';
+                  const winner =
+                    map.winnerTeamId && match.teamA?.id === map.winnerTeamId
+                      ? match.teamA
+                      : map.winnerTeamId && match.teamB?.id === map.winnerTeamId
+                        ? match.teamB
+                        : null;
+                  return (
+                    <TableRow key={map.mapOrder} data-map-status={map.status}>
+                      <TableCell className="text-muted">{map.mapOrder}</TableCell>
+                      <TableCell className="font-mono font-medium">{map.mapName}</TableCell>
+                      {notPlayed ? (
+                        <TableCell colSpan={2} className="text-right text-xs text-muted">
+                          {t('mapNotPlayed')}
+                        </TableCell>
+                      ) : (
+                        <>
+                          <TableCell
+                            className={cn(
+                              'text-right font-semibold tabular-nums',
+                              winner && winner === match.teamA && 'text-accent-text',
+                            )}
+                          >
+                            <Score value={map.teamAScore} />
+                          </TableCell>
+                          <TableCell
+                            className={cn(
+                              'text-right font-semibold tabular-nums',
+                              winner && winner === match.teamB && 'text-accent-text',
+                            )}
+                          >
+                            <Score value={map.teamBScore} />
+                          </TableCell>
+                        </>
+                      )}
+                      <TableCell className="text-sm">
+                        {winner ? winner.name : <span className="text-muted">—</span>}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted">{tms(map.status)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </>
         )}
       </DetailSection>
 

@@ -10,6 +10,7 @@ import { banSteamId } from '@/lib/api/browser';
 import type { ApiFailure } from '@/lib/api/types';
 import { isValidReason, REASON_MAX } from '@/lib/auth/validation';
 import { isIndividualSteamId64 } from '@/lib/steam-id';
+import { ReasonPresetChips, useReasonPresets } from './reason-presets';
 
 /**
  * SUPER_ADMIN: ban a SteamID64 (docs/TOURNAMENTS.md §5). Blocks new registrations, approvals and
@@ -20,6 +21,7 @@ export function BanForm() {
   const ta = useTranslations('teamActions');
   const router = useRouter();
   const id = useId();
+  const presets = useReasonPresets('ban');
   const [steamId, setSteamId] = useState('');
   const [reason, setReason] = useState('');
   const [invalid, setInvalid] = useState<{ steamId?: boolean; reason?: boolean }>({});
@@ -78,6 +80,7 @@ export function BanForm() {
       </div>
       <div className="space-y-1.5">
         <Label htmlFor={`${id}-reason`}>{ta('reasonLabel')}</Label>
+        <ReasonPresetChips presets={presets.presets} current={reason} onPick={setReason} />
         <Textarea
           id={`${id}-reason`}
           value={reason}

@@ -289,7 +289,9 @@
     "seriesScoreLabel": "Счёт серии: {teamA} {scoreA}, {teamB} {scoreB}",
     "round": "Раунд",
     "roundNumber": "Раунд {round}",
-    "tournamentCancelledNote": "Отменён вместе с турниром."
+    "tournamentCancelledNote": "Отменён вместе с турниром.",
+    "mapWinner": "Победитель карты",
+    "mapNotPlayed": "Не сыграна"
   },
   "matchStatus": {
     "CREATED": "Создан",
@@ -956,7 +958,26 @@
     "statusFilter": "Фильтр по статусу матча",
     "allStatuses": "Все",
     "awaitingResult": "Ожидают результата",
-    "captionPaged": "Матчи — страница {page} из {totalPages}"
+    "captionPaged": "Матчи — страница {page} из {totalPages}",
+    "overrideMapsDescription": "Введите счёт раундов каждой карты в порядке вето ({format}: до {need} побед на картах). Счёт серии и победитель вычисляются автоматически.",
+    "mapScoresLegend": "Счёт раундов по картам",
+    "mapRowLabel": "Карта {n}",
+    "roundsFor": "Раунды {team} на карте {n}",
+    "mapWinner": "Победа: {team}",
+    "mapNotNeeded": "Не сыграна",
+    "derivedSeries": "Серия: {teamA} {scoreA} : {scoreB} {teamB}.",
+    "derivedWinner": "Победитель: {team}.",
+    "derivedUndecided": "Не определён — команде нужно {need} побед на картах.",
+    "mapScoresAfterVeto": "Счёт раундов по картам доступен после вето. До этого введите счёт серии (выигранные карты).",
+    "mapErrors": {
+      "mapScoreRange": "Целые числа от 0 до {max}.",
+      "mapDraw": "Карта не может закончиться вничью.",
+      "mapIncomplete": "Введите оба счёта.",
+      "mapGap": "Заполняйте карты по порядку, без пропусков.",
+      "mapAfterDecided": "Серия уже решена — оставьте эту карту пустой.",
+      "mapsRequired": "Введите счёт хотя бы одной карты.",
+      "seriesUndecided": "Ещё не решено: команде нужно {need} побед на картах."
+    }
   },
   "adminBans": {
     "superAdminOnly": "Управлять банами SteamID могут только суперадминистраторы.",
@@ -987,5 +1008,53 @@
   "demoMode": {
     "banner": "Демо-режим — действия с демо-данными (только для разработки).",
     "bannerDetail": "Изменения демо-турниров разрешены для проверки и никогда не считаются реальными результатами."
+  },
+  "matchMapStatus": {
+    "PENDING": "Ещё не сыграна",
+    "WARMUP": "Разминка",
+    "KNIFE": "Ножевой раунд",
+    "LIVE": "Идёт",
+    "PAUSED": "Пауза",
+    "FINISHED": "Завершена",
+    "CANCELLED": "Не сыграна"
+  },
+  "reasonPresets": {
+    "label": "Быстрые причины",
+    "demoTest": "Демо-тест",
+    "result": {
+      "screenshots": "Счёт по скриншотам капитанов",
+      "serverCrash": "Сервер упал — счёт от судьи",
+      "refereeDecision": "Решение судьи"
+    },
+    "forfeit": {
+      "noShow": "Команда не явилась",
+      "withdrew": "Команда снялась",
+      "rosterIncomplete": "Команда не смогла выставить 5 игроков"
+    },
+    "reject": {
+      "incompleteRoster": "Неполный состав",
+      "ineligiblePlayer": "Недопустимый игрок",
+      "duplicate": "Повторная заявка"
+    },
+    "cancel": {
+      "notEnoughTeams": "Недостаточно команд",
+      "scheduling": "Конфликт расписания",
+      "organizer": "Отменено организатором"
+    },
+    "substitute": {
+      "unavailable": "Игрок недоступен",
+      "technical": "Технические проблемы",
+      "teamRequest": "По просьбе капитана"
+    },
+    "ban": {
+      "cheating": "Читерство",
+      "accountSharing": "Передача аккаунта",
+      "ruleViolation": "Серьёзное нарушение правил"
+    },
+    "lift": {
+      "appealAccepted": "Апелляция удовлетворена",
+      "mistake": "Заблокирован по ошибке",
+      "expired": "Срок бана истёк"
+    }
   }
 }

@@ -13,6 +13,7 @@ import {
 import type { TournamentStatus } from '@/lib/api/types';
 import { isValidReason } from '@/lib/auth/validation';
 import { isValidOptionalNote } from '@/lib/teams/validation';
+import { useReasonPresets } from './reason-presets';
 
 /**
  * M3 confirmation buttons (docs/TOURNAMENTS.md §3–§6). Each confirmation is one user intent: the
@@ -82,13 +83,17 @@ export function RejectRegistrationButton({
   tournamentId,
   registrationId,
   teamName,
+  demoPrefill = false,
 }: {
   tournamentId: string;
   registrationId: string;
   teamName: string;
+  /** Demo mode on a sample tournament: start with the "Demo test" reason. */
+  demoPrefill?: boolean;
 }) {
   const t = useTranslations('adminTournaments');
   const ta = useTranslations('teamActions');
+  const presets = useReasonPresets('reject', demoPrefill);
   return (
     <ActionDialog
       triggerLabel={ta('reject')}
@@ -104,6 +109,8 @@ export function RejectRegistrationButton({
         hint: ta('reasonHint'),
         invalidMessage: ta('reasonInvalid'),
         validate: isValidReason,
+        presets: presets.presets,
+        initialValue: presets.initial,
       }}
       onConfirm={(reason) => rejectRegistration(tournamentId, registrationId, { reason })}
     />
@@ -115,15 +122,18 @@ export function TournamentStatusButton({
   tournamentId,
   tournamentName,
   to,
+  demoPrefill = false,
 }: {
   tournamentId: string;
   tournamentName: string;
   to: TournamentStatus;
+  demoPrefill?: boolean;
 }) {
   const t = useTranslations('adminTournaments');
   const ts = useTranslations('tournamentStatus');
   const ta = useTranslations('teamActions');
   const cancel = to === 'CANCELLED';
+  const presets = useReasonPresets('cancel', demoPrefill);
   return (
     <ActionDialog
       triggerLabel={t('moveTo', { status: ts(to) })}
@@ -140,6 +150,8 @@ export function TournamentStatusButton({
               hint: ta('reasonHint'),
               invalidMessage: ta('reasonInvalid'),
               validate: isValidReason,
+              presets: presets.presets,
+              initialValue: presets.initial,
             },
           }
         : {})}
@@ -176,6 +188,7 @@ export function GenerateBracketButton({
 export function LiftBanButton({ banId, steamId64 }: { banId: string; steamId64: string }) {
   const t = useTranslations('adminBans');
   const ta = useTranslations('teamActions');
+  const presets = useReasonPresets('lift');
   return (
     <ActionDialog
       triggerLabel={t('lift')}
@@ -190,6 +203,7 @@ export function LiftBanButton({ banId, steamId64 }: { banId: string; steamId64: 
         hint: ta('reasonHint'),
         invalidMessage: ta('reasonInvalid'),
         validate: isValidReason,
+        presets: presets.presets,
       }}
       onConfirm={(reason) => liftSteamBan(banId, { reason })}
     />

@@ -289,7 +289,9 @@
     "seriesScoreLabel": "Series score: {teamA} {scoreA}, {teamB} {scoreB}",
     "round": "Round",
     "roundNumber": "Round {round}",
-    "tournamentCancelledNote": "Cancelled together with the tournament."
+    "tournamentCancelledNote": "Cancelled together with the tournament.",
+    "mapWinner": "Map winner",
+    "mapNotPlayed": "Not played"
   },
   "matchStatus": {
     "CREATED": "Created",
@@ -956,7 +958,26 @@
     "statusFilter": "Filter by match status",
     "allStatuses": "All",
     "awaitingResult": "Awaiting result",
-    "captionPaged": "Matches — page {page} of {totalPages}"
+    "captionPaged": "Matches — page {page} of {totalPages}",
+    "overrideMapsDescription": "Enter the round score of each map in veto order ({format}: first to {need} map wins). The series score and winner are derived.",
+    "mapScoresLegend": "Round scores per map",
+    "mapRowLabel": "Map {n}",
+    "roundsFor": "Rounds won by {team} on map {n}",
+    "mapWinner": "{team} wins",
+    "mapNotNeeded": "Not played",
+    "derivedSeries": "Series: {teamA} {scoreA} : {scoreB} {teamB}.",
+    "derivedWinner": "Winner: {team}.",
+    "derivedUndecided": "Undecided — a team needs {need} map wins.",
+    "mapScoresAfterVeto": "Map round scores are available after the veto. Until then, enter the series score (maps won).",
+    "mapErrors": {
+      "mapScoreRange": "Use whole numbers from 0 to {max}.",
+      "mapDraw": "A map cannot end in a draw.",
+      "mapIncomplete": "Enter both scores.",
+      "mapGap": "Fill the maps in order without gaps.",
+      "mapAfterDecided": "The series is already decided — leave this map empty.",
+      "mapsRequired": "Enter the score of at least one map.",
+      "seriesUndecided": "Not decided yet: a team needs {need} map wins."
+    }
   },
   "adminBans": {
     "superAdminOnly": "Only super administrators can manage SteamID bans.",
@@ -987,5 +1008,53 @@
   "demoMode": {
     "banner": "Demo mode — actions on sample data (development only).",
     "bannerDetail": "Changes to sample tournaments are allowed for testing; they never count as real results."
+  },
+  "matchMapStatus": {
+    "PENDING": "Not played yet",
+    "WARMUP": "Warmup",
+    "KNIFE": "Knife round",
+    "LIVE": "Live",
+    "PAUSED": "Paused",
+    "FINISHED": "Finished",
+    "CANCELLED": "Not played"
+  },
+  "reasonPresets": {
+    "label": "Quick reasons",
+    "demoTest": "Demo test",
+    "result": {
+      "screenshots": "Score from captains' screenshots",
+      "serverCrash": "Server crashed — score from referee",
+      "refereeDecision": "Referee decision"
+    },
+    "forfeit": {
+      "noShow": "Team did not show up",
+      "withdrew": "Team withdrew",
+      "rosterIncomplete": "Team could not field 5 players"
+    },
+    "reject": {
+      "incompleteRoster": "Incomplete roster",
+      "ineligiblePlayer": "Ineligible player",
+      "duplicate": "Duplicate registration"
+    },
+    "cancel": {
+      "notEnoughTeams": "Not enough teams",
+      "scheduling": "Scheduling conflict",
+      "organizer": "Cancelled by the organizer"
+    },
+    "substitute": {
+      "unavailable": "Player unavailable",
+      "technical": "Technical issues",
+      "teamRequest": "Captain's request"
+    },
+    "ban": {
+      "cheating": "Cheating",
+      "accountSharing": "Account sharing",
+      "ruleViolation": "Serious rule violation"
+    },
+    "lift": {
+      "appealAccepted": "Appeal accepted",
+      "mistake": "Banned by mistake",
+      "expired": "Ban period ended"
+    }
   }
 }

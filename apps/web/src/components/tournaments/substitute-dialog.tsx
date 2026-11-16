@@ -7,6 +7,7 @@ import { substituteRegistrationPlayer } from '@/lib/api/browser';
 import type { RosterEntryRole } from '@/lib/api/types';
 import { isValidReason, REASON_MAX } from '@/lib/auth/validation';
 import { FormDialog } from './form-dialog';
+import { ReasonPresetChips, useReasonPresets } from './reason-presets';
 
 export interface SubstitutePlayer {
   userId: string;
@@ -24,6 +25,7 @@ export function SubstituteDialog({
   teamName,
   roster,
   candidates,
+  demoPrefill = false,
 }: {
   tournamentId: string;
   registrationId: string;
@@ -31,11 +33,14 @@ export function SubstituteDialog({
   roster: Array<SubstitutePlayer & { role: RosterEntryRole }>;
   /** Current team members not on the locked roster. */
   candidates: SubstitutePlayer[];
+  /** Demo mode on a sample tournament: start with the "Demo test" reason. */
+  demoPrefill?: boolean;
 }) {
   const t = useTranslations('adminTournaments');
   const ta = useTranslations('teamActions');
   const tr = useTranslations('rosterEntryRole');
   const id = useId();
+  const presets = useReasonPresets('substitute', demoPrefill);
   const [outId, setOutId] = useState('');
   const [inId, setInId] = useState('');
   const [role, setRole] = useState<RosterEntryRole>('STARTER');
@@ -77,6 +82,7 @@ export function SubstituteDialog({
       triggerDisabled={candidates.length === 0}
       onSubmit={submit}
       onReset={reset}
+      onOpen={() => setReason(presets.initial)}
     >
       <div className="space-y-1.5">
         <Label htmlFor={`${id}-out`}>{t('playerOut')}</Label>
@@ -132,6 +138,7 @@ export function SubstituteDialog({
       </div>
       <div className="space-y-1.5">
         <Label htmlFor={`${id}-reason`}>{ta('reasonLabel')}</Label>
+        <ReasonPresetChips presets={presets.presets} current={reason} onPick={setReason} />
         <Textarea
           id={`${id}-reason`}
           value={reason}

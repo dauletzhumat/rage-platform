@@ -350,6 +350,7 @@ export type VetoActionDto = Schemas['VetoActionDto'];
 export type VetoStateDto = Schemas['VetoStateDto'];
 export type SubmitVetoDto = Schemas['SubmitVetoDto'];
 export type ResultOverrideDto = Schemas['ResultOverrideDto'];
+export type MapResultInputDto = Schemas['MapResultInputDto'];
 export type ForfeitDto = Schemas['ForfeitDto'];
 export type BannedSteamIdDto = Schemas['BannedSteamIdDto'];
 export type CreateSteamBanDto = Schemas['CreateSteamBanDto'];

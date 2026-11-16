@@ -6,7 +6,7 @@ import type * as BrowserApi from '@/lib/api/browser';
 import type { BracketDto, BracketMatchDto, MatchTeamRefM3, VetoStateDto } from '@/lib/api/types';
 import { MatchStatusPill } from '@/components/domain/status';
 import { BracketView } from './bracket-view';
-import { ResultOverrideDialog } from './match-admin-dialogs';
+import { ForfeitDialog, ResultOverrideDialog } from './match-admin-dialogs';
 import { RosterSelectionForm } from './roster-selection-form';
 import { ResultSourceBadge } from './status-badges';
 import { TournamentForm } from './tournament-form';
@@ -25,6 +25,7 @@ const api = vi.hoisted(() => ({
   submitVeto: vi.fn(),
   createTournament: vi.fn(),
   overrideMatchResult: vi.fn(),
+  forfeitMatch: vi.fn(),
 }));
 vi.mock('@/lib/api/browser', async (importOriginal) => ({
   ...(await importOriginal<typeof BrowserApi>()),
@@ -384,7 +385,10 @@ describe('ResultOverrideDialog', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Enter result for Alpha vs Beta' }));
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByRole('note')).toHaveTextContent('not server-verified');
+    expect(within(dialog).getByText(/not server-verified/)).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/Map round scores are available after the veto/),
+    ).toBeInTheDocument();
     await user.click(within(dialog).getByLabelText('Alpha'));
     await user.type(within(dialog).getByLabelText('Maps won — Alpha'), '3');
     await user.type(within(dialog).getByLabelText('Maps won — Beta'), '0');
@@ -402,6 +406,123 @@ describe('ResultOverrideDialog', () => {
         teamAScore: 2,
         teamBScore: 0,
         reason: 'server outage',
+      }),
+    );
+  });
+});
+
+describe('ResultOverrideDialog with per-map round scores', () => {
+  const maps = [
+    { mapOrder: 1, mapName: 'de_alpha' },
+    { mapOrder: 2, mapName: 'de_bravo' },
+    { mapOrder: 3, mapName: 'de_golf' },
+  ];
+
+  it('derives the series live, stops at the majority and sends only maps + reason', async () => {
+    const user = userEvent.setup();
+    api.overrideMatchResult.mockResolvedValue({ ok: true, data: {} });
+    renderWithIntl(
+      <ResultOverrideDialog matchId={id(5)} format="BO3" teamA={ALPHA} teamB={BETA} maps={maps} />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Enter result for Alpha vs Beta' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByTestId('map-scores')).toHaveTextContent('Map 1 · de_alpha');
+    await user.type(within(dialog).getByLabelText('Rounds won by Alpha on map 1'), '13');
+    await user.type(within(dialog).getByLabelText('Rounds won by Beta on map 1'), '9');
+    expect(within(dialog).getByTestId('derived-series')).toHaveTextContent(
+      'Series: Alpha 1 : 0 Beta.',
+    );
+    await user.type(within(dialog).getByLabelText('Rounds won by Alpha on map 2'), '16');
+    await user.type(within(dialog).getByLabelText('Rounds won by Beta on map 2'), '14');
+    expect(within(dialog).getByTestId('derived-series')).toHaveTextContent('Winner: Alpha.');
+    expect(within(dialog).getByLabelText('Rounds won by Alpha on map 3')).toBeDisabled();
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Server crashed — score from referee' }),
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Save admin result' }));
+    await waitFor(() =>
+      expect(api.overrideMatchResult).toHaveBeenCalledWith(id(5), {
+        maps: [
+          { mapOrder: 1, teamAScore: 13, teamBScore: 9 },
+          { mapOrder: 2, teamAScore: 16, teamBScore: 14 },
+        ],
+        reason: 'Server crashed — score from referee',
+      }),
+    );
+  });
+
+  it('blocks draws and sends nothing', async () => {
+    const user = userEvent.setup();
+    renderWithIntl(
+      <ResultOverrideDialog matchId={id(5)} format="BO3" teamA={ALPHA} teamB={BETA} maps={maps} />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Enter result for Alpha vs Beta' }));
+    const dialog = screen.getByRole('dialog');
+    await user.type(within(dialog).getByLabelText('Rounds won by Alpha on map 1'), '12');
+    await user.type(within(dialog).getByLabelText('Rounds won by Beta on map 1'), '12');
+    await user.type(within(dialog).getByLabelText('Reason'), 'checking');
+    await user.click(within(dialog).getByRole('button', { name: 'Save admin result' }));
+    expect(within(dialog).getByText('A map cannot end in a draw.')).toBeInTheDocument();
+    expect(api.overrideMatchResult).not.toHaveBeenCalled();
+  });
+});
+
+describe('reason presets', () => {
+  it('fill the reason field and stay editable', async () => {
+    const user = userEvent.setup();
+    api.forfeitMatch.mockResolvedValue({ ok: true, data: {} });
+    renderWithIntl(<ForfeitDialog matchId={id(5)} format="BO1" teamA={ALPHA} teamB={BETA} />);
+    await user.click(screen.getByRole('button', { name: /Record a forfeit/ }));
+    const dialog = screen.getByRole('dialog');
+    const reason = within(dialog).getByLabelText('Reason');
+    expect(reason).toHaveValue('');
+    const chips = within(within(dialog).getByRole('group', { name: 'Quick reasons' })).getAllByRole(
+      'button',
+    );
+    expect(chips.map((c) => c.textContent)).toEqual([
+      'Team did not show up',
+      'Team withdrew',
+      'Team could not field 5 players',
+      'Demo test',
+    ]);
+    await user.click(chips[0]!);
+    expect(reason).toHaveValue('Team did not show up');
+    expect(chips[0]).toHaveAttribute('aria-pressed', 'true');
+    await user.type(reason, ' again');
+    expect(reason).toHaveValue('Team did not show up again');
+    await user.click(within(dialog).getByLabelText('Beta'));
+    await user.click(within(dialog).getByRole('button', { name: 'Record forfeit' }));
+    await waitFor(() =>
+      expect(api.forfeitMatch).toHaveBeenCalledWith(id(5), {
+        forfeitingTeamId: BETA.id,
+        reason: 'Team did not show up again',
+      }),
+    );
+  });
+
+  it('demo prefill starts with "Demo test" so the dialog can be submitted immediately', async () => {
+    const user = userEvent.setup();
+    api.overrideMatchResult.mockResolvedValue({ ok: true, data: {} });
+    renderWithIntl(
+      <ResultOverrideDialog
+        matchId={id(5)}
+        format="BO1"
+        teamA={ALPHA}
+        teamB={BETA}
+        maps={[{ mapOrder: 1, mapName: 'de_alpha' }]}
+        demoPrefill
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Enter result for Alpha vs Beta' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByLabelText('Reason')).toHaveValue('Demo test');
+    await user.type(within(dialog).getByLabelText('Rounds won by Alpha on map 1'), '5');
+    await user.type(within(dialog).getByLabelText('Rounds won by Beta on map 1'), '13');
+    await user.click(within(dialog).getByRole('button', { name: 'Save admin result' }));
+    await waitFor(() =>
+      expect(api.overrideMatchResult).toHaveBeenCalledWith(id(5), {
+        maps: [{ mapOrder: 1, teamAScore: 5, teamBScore: 13 }],
+        reason: 'Demo test',
       }),
     );
   });

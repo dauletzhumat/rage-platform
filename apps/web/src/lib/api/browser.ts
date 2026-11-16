@@ -414,13 +414,19 @@ export function generateBracket(
   return sendIdempotent(`/admin/tournaments/${tournamentId}/generate-bracket`, undefined, options);
 }
 
-/** `POST /admin/matches/:id/result-override` → `MatchDetailDto` (ADMIN_OVERRIDE, not verified). */
+/**
+ * `POST /admin/matches/:id/result-override` → `MatchDetailDto` (ADMIN_OVERRIDE, not verified).
+ * Body: per-map round scores `{ maps, reason }` (the API derives the series) or, before the veto
+ * is complete, series-only `{ winnerTeamId, teamAScore, teamBScore, reason }`.
+ */
 export function overrideMatchResult(
   matchId: string,
   body: ResultOverrideDto,
   options?: MutationOptions,
 ): Promise<ApiResult<MatchDetailM3>> {
-  if (!UUID.test(matchId) || !UUID.test(body.winnerTeamId)) return invalidId();
+  if (!UUID.test(matchId) || (body.winnerTeamId !== undefined && !UUID.test(body.winnerTeamId))) {
+    return invalidId();
+  }
   return sendIdempotent(`/admin/matches/${matchId}/result-override`, body, options);
 }
 

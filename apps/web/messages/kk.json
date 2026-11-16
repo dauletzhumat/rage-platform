@@ -289,7 +289,9 @@
     "seriesScoreLabel": "Серия есебі: {teamA} {scoreA}, {teamB} {scoreB}",
     "round": "Раунд",
     "roundNumber": "{round}-раунд",
-    "tournamentCancelledNote": "Турнирмен бірге болдырылмады."
+    "tournamentCancelledNote": "Турнирмен бірге болдырылмады.",
+    "mapWinner": "Карта жеңімпазы",
+    "mapNotPlayed": "Ойналмады"
   },
   "matchStatus": {
     "CREATED": "Құрылды",
@@ -956,7 +958,26 @@
     "statusFilter": "Матч мәртебесі бойынша сүзу",
     "allStatuses": "Барлығы",
     "awaitingResult": "Нәтиже күтуде",
-    "captionPaged": "Матчтар — {page}/{totalPages} бет"
+    "captionPaged": "Матчтар — {page}/{totalPages} бет",
+    "overrideMapsDescription": "Әр картаның раунд есебін вето ретімен енгізіңіз ({format}: {need} картада жеңіске дейін). Серия есебі мен жеңімпаз автоматты түрде есептеледі.",
+    "mapScoresLegend": "Карталар бойынша раунд есебі",
+    "mapRowLabel": "{n}-карта",
+    "roundsFor": "{n}-картадағы {team} раундтары",
+    "mapWinner": "Жеңіс: {team}",
+    "mapNotNeeded": "Ойналмады",
+    "derivedSeries": "Серия: {teamA} {scoreA} : {scoreB} {teamB}.",
+    "derivedWinner": "Жеңімпаз: {team}.",
+    "derivedUndecided": "Анықталмады — командаға {need} картада жеңіс қажет.",
+    "mapScoresAfterVeto": "Карталар бойынша раунд есебі ветодан кейін қолжетімді. Оған дейін серия есебін (ұтылған карталар) енгізіңіз.",
+    "mapErrors": {
+      "mapScoreRange": "0-ден {max}-ге дейінгі бүтін сандар.",
+      "mapDraw": "Карта тең нәтижемен аяқтала алмайды.",
+      "mapIncomplete": "Екі есепті де енгізіңіз.",
+      "mapGap": "Карталарды ретімен, бос қалдырмай толтырыңыз.",
+      "mapAfterDecided": "Серия шешілді — бұл картаны бос қалдырыңыз.",
+      "mapsRequired": "Кемінде бір картаның есебін енгізіңіз.",
+      "seriesUndecided": "Әлі шешілмеді: командаға {need} картада жеңіс қажет."
+    }
   },
   "adminBans": {
     "superAdminOnly": "SteamID бандарын тек супер әкімшілер басқара алады.",
@@ -987,5 +1008,53 @@
   "demoMode": {
     "banner": "Демо-режим — демо-деректермен әрекеттер (тек әзірлеу үшін).",
     "bannerDetail": "Демо-турнирлерді өзгертуге тексеру үшін рұқсат етілген; олар ешқашан нақты нәтиже болып саналмайды."
+  },
+  "matchMapStatus": {
+    "PENDING": "Әлі ойналмаған",
+    "WARMUP": "Жаттығу",
+    "KNIFE": "Пышақ раунды",
+    "LIVE": "Жүріп жатыр",
+    "PAUSED": "Үзіліс",
+    "FINISHED": "Аяқталды",
+    "CANCELLED": "Ойналмады"
+  },
+  "reasonPresets": {
+    "label": "Жылдам себептер",
+    "demoTest": "Демо-тест",
+    "result": {
+      "screenshots": "Капитандардың скриншоттары бойынша есеп",
+      "serverCrash": "Сервер құлады — есепті төреші берді",
+      "refereeDecision": "Төреші шешімі"
+    },
+    "forfeit": {
+      "noShow": "Команда келмеді",
+      "withdrew": "Команда шықты",
+      "rosterIncomplete": "Команда 5 ойыншы шығара алмады"
+    },
+    "reject": {
+      "incompleteRoster": "Құрам толық емес",
+      "ineligiblePlayer": "Рұқсат етілмеген ойыншы",
+      "duplicate": "Қайталанған өтінім"
+    },
+    "cancel": {
+      "notEnoughTeams": "Командалар жеткіліксіз",
+      "scheduling": "Кесте қақтығысы",
+      "organizer": "Ұйымдастырушы болдырмады"
+    },
+    "substitute": {
+      "unavailable": "Ойыншы қолжетімсіз",
+      "technical": "Техникалық ақаулар",
+      "teamRequest": "Капитанның өтініші"
+    },
+    "ban": {
+      "cheating": "Чит қолдану",
+      "accountSharing": "Аккаунтты беру",
+      "ruleViolation": "Ережені өрескел бұзу"
+    },
+    "lift": {
+      "appealAccepted": "Апелляция қанағаттандырылды",
+      "mistake": "Қателесіп бұғатталған",
+      "expired": "Бан мерзімі аяқталды"
+    }
   }
 }

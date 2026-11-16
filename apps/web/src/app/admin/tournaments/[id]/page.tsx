@@ -181,6 +181,7 @@ export default async function AdminTournamentPage({ params, searchParams }: Prop
                 tournamentId={tournament.id}
                 tournamentName={tournament.name}
                 to={to}
+                demoPrefill={showDemoBanner}
               />
             ))}
             {hasBracket ? (
@@ -469,6 +470,7 @@ async function RegistrationRow({
                 tournamentId={tournamentId}
                 registrationId={registration.id}
                 teamName={registration.team.name}
+                demoPrefill={allowSample && registration.isSample}
               />
             </>
           ) : null}
@@ -485,6 +487,7 @@ async function RegistrationRow({
                 role: e.role,
               }))}
               candidates={candidates}
+              demoPrefill={allowSample && registration.isSample}
             />
           ) : null}
         </div>

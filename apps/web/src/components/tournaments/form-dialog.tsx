@@ -36,6 +36,8 @@ export interface FormDialogProps {
   onSubmit: () => Promise<ApiResult<unknown>> | null;
   /** Clear caller state when the dialog closes. */
   onReset?: () => void;
+  /** Initialise caller state when the dialog opens (e.g. demo-mode reason prefill). */
+  onOpen?: () => void;
   testId?: string;
 }
 
@@ -57,6 +59,7 @@ export function FormDialog({
   children,
   onSubmit,
   onReset,
+  onOpen,
   testId,
 }: FormDialogProps) {
   const t = useTranslations('teamActions');
@@ -68,6 +71,7 @@ export function FormDialog({
   function onOpenChange(next: boolean) {
     if (pending) return;
     setOpen(next);
+    if (next) onOpen?.();
     if (!next) {
       setFailure(null);
       onReset?.();

@@ -24,11 +24,13 @@ import {
 import {
   getAdminMatches,
   getDemoMode,
+  getMatch,
   getMe,
   getTournaments,
   UUID_PATTERN,
 } from '@/lib/api/server';
 import { sampleActionsAllowed } from '@/lib/demo-mode';
+import type { MapScoreSlot } from '@/lib/tournaments/map-scores';
 import type { MatchSummaryM3, SeriesMatchStatus } from '@/lib/api/types';
 import { listHref, parseListParams, totalPages, type RawSearchParams } from '@/lib/list-params';
 import { hasTournamentOrMatchRole } from '@/lib/tournaments/access';
@@ -213,6 +215,26 @@ async function MatchesTable({
     getTranslations('adminMatches'),
     getTranslations('matches'),
   ]);
+  // The list contains only matches the viewer may administer; the API re-authorises.
+  const isActionable = (match: MatchSummaryM3) =>
+    match.status === 'CREATED' &&
+    match.teamA !== null &&
+    match.teamB !== null &&
+    sampleActionsAllowed(match.isSample, demoMode);
+  // Map slots (veto order) for actionable matches: present once the veto is complete.
+  const slotsById = new Map<string, MapScoreSlot[]>();
+  await Promise.all(
+    matches.filter(isActionable).map(async (m) => {
+      const detail = await getMatch(m.id);
+      if (!detail.ok) return;
+      slotsById.set(
+        m.id,
+        detail.data.maps
+          .filter((x) => x.status === 'PENDING')
+          .map((x) => ({ mapOrder: x.mapOrder, mapName: x.mapName })),
+      );
+    }),
+  );
   return (
     <Table>
       <TableCaption>{caption}</TableCaption>
@@ -230,12 +252,8 @@ async function MatchesTable({
       <TableBody>
         {matches.map((match) => {
           const side = winnerSide(match);
-          // The list contains only matches the viewer may administer; the API re-authorises.
-          const actionable =
-            match.status === 'CREATED' &&
-            match.teamA !== null &&
-            match.teamB !== null &&
-            sampleActionsAllowed(match.isSample, demoMode);
+          const actionable = isActionable(match);
+          const demoPrefill = demoMode && match.isSample;
           return (
             <TableRow key={match.id}>
               <TableCell className="align-top">
@@ -292,12 +310,15 @@ async function MatchesTable({
                       format={match.format}
                       teamA={match.teamA}
                       teamB={match.teamB}
+                      maps={slotsById.get(match.id) ?? []}
+                      demoPrefill={demoPrefill}
                     />
                     <ForfeitDialog
                       matchId={match.id}
                       format={match.format}
                       teamA={match.teamA}
                       teamB={match.teamB}
+                      demoPrefill={demoPrefill}
                     />
                   </div>
                 ) : null}
