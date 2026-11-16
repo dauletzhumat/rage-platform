@@ -65,7 +65,7 @@ services:
   # S3 API listens on 8333 inside the container and is published on 127.0.0.1:9000 so
   # that S3_ENDPOINT in .env.example works unchanged. See docs/RUNBOOK.md for rationale.
   s3:
-    image: chrislusf/seaweedfs:4.52
+    image: chrislusf/seaweedfs:4.53
     profiles: ['storage']
     restart: unless-stopped
     command: ['mini', '-dir=/data']
