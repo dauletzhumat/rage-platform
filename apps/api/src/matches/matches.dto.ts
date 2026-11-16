@@ -1,8 +1,24 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Matches, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  Max,
+  Min,
+  ValidateIf,
+  ValidateNested,
+} from 'class-validator';
 import { TeamRefDto, TournamentRefDto } from '../common/http/dto.js';
 import { PageMetaDto, PaginationQueryDto } from '../common/pagination/pagination.js';
 import { ReasonField } from '../team-domain/team-input.dto.js';
+import { MAP_ROUND_SCORE_MAX } from '../tournament-domain/series-score.js';
 import { MAP_NAME_PATTERN } from '../tournament-domain/tournament-policy.js';
 import { SERIES_STATUSES, type SeriesStatus } from './state-machine.js';
 
@@ -106,6 +122,13 @@ export class MatchMapDto {
   status!: MatchMapStatusValue;
   @ApiProperty({ type: Number, nullable: true }) teamAScore!: number | null;
   @ApiProperty({ type: Number, nullable: true }) teamBScore!: number | null;
+  @ApiProperty({
+    type: String,
+    format: 'uuid',
+    nullable: true,
+    description: 'Winner of a FINISHED map (admin-entered or server-confirmed); null otherwise',
+  })
+  winnerTeamId!: string | null;
 }
 
 export class MatchDetailDto extends MatchSummaryDto {
@@ -173,22 +196,77 @@ export class SubmitVetoDto {
 // Admin results (§9)
 // ---------------------------------------------------------------------------------------------
 
-export class ResultOverrideDto {
-  @ApiProperty({ format: 'uuid', description: 'Team A or team B of the match' })
-  @IsUUID()
-  winnerTeamId!: string;
+export class MapResultInputDto {
+  @ApiProperty({ minimum: 1, description: 'Map order from the veto (1, 2, … without gaps)' })
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  mapOrder!: number;
 
-  @ApiProperty({ minimum: 0, maximum: 3, description: 'Maps won by team A' })
+  @ApiProperty({ minimum: 0, maximum: MAP_ROUND_SCORE_MAX, description: 'Rounds won by team A' })
   @IsInt()
   @Min(0)
-  @Max(3)
+  @Max(MAP_ROUND_SCORE_MAX)
   teamAScore!: number;
 
-  @ApiProperty({ minimum: 0, maximum: 3, description: 'Maps won by team B' })
+  @ApiProperty({ minimum: 0, maximum: MAP_ROUND_SCORE_MAX, description: 'Rounds won by team B' })
+  @IsInt()
+  @Min(0)
+  @Max(MAP_ROUND_SCORE_MAX)
+  teamBScore!: number;
+}
+
+/** Series fields are required unless `maps` is sent (then they are derived and optional). */
+const seriesFieldRequired = (o: { maps?: unknown }, v: unknown) =>
+  v !== undefined || o.maps === undefined || o.maps === null;
+
+export class ResultOverrideDto {
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Team A or team B. Required without `maps`; with `maps` it is derived and, if sent, must match',
+  })
+  @ValidateIf(seriesFieldRequired)
+  @IsUUID()
+  winnerTeamId?: string;
+
+  @ApiPropertyOptional({
+    minimum: 0,
+    maximum: 3,
+    description: 'Maps won by team A. Required without `maps`; derived (must match) with `maps`',
+  })
+  @ValidateIf(seriesFieldRequired)
   @IsInt()
   @Min(0)
   @Max(3)
-  teamBScore!: number;
+  teamAScore?: number;
+
+  @ApiPropertyOptional({
+    minimum: 0,
+    maximum: 3,
+    description: 'Maps won by team B. Required without `maps`; derived (must match) with `maps`',
+  })
+  @ValidateIf(seriesFieldRequired)
+  @IsInt()
+  @Min(0)
+  @Max(3)
+  teamBScore?: number;
+
+  @ApiPropertyOptional({
+    type: [MapResultInputDto],
+    description:
+      'Optional per-map round scores (e.g. 13–9). Only after a complete veto (else 409 ' +
+      'MATCH_NOT_READY). Listed 1..k in order, each with a winner, stopping when a team reaches ' +
+      'the majority (BO1: 1 map, BO3: 2–3, BO5: 3–5) else 400 SCORE_INVALID. Unplayed maps ' +
+      'become CANCELLED. Rounds 0–99, no MR12/overtime enforcement.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(5)
+  @ValidateNested({ each: true })
+  @Type(() => MapResultInputDto)
+  maps?: MapResultInputDto[];
 
   @ReasonField('Why the result is entered by an admin (audited; not server-verified)')
   reason!: string;

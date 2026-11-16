@@ -169,6 +169,13 @@ export class BracketAdminService {
           isSample: t.isSample,
           teamBySeed,
         });
+        // The tournament actually starts now: a planned `starts_at` in the future (or unset) is
+        // moved to the real start, so `ends_at >= starts_at` holds when the final completes.
+        const startedAt = new Date();
+        await tx.tournament.updateMany({
+          where: { id: tournamentId, OR: [{ startsAt: null }, { startsAt: { gt: startedAt } }] },
+          data: { startsAt: startedAt },
+        });
         await tx.tournament.update({
           where: { id: tournamentId },
           data: { status: 'IN_PROGRESS' },

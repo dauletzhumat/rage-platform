@@ -504,3 +504,67 @@ describe('dev-only sample mutation mode (ALLOW_SAMPLE_MUTATIONS)', () => {
     expect(off.samplePlayersAllowed(sample)).toBe(false);
   });
 });
+
+describe('per-map admin scores (deriveSeriesFromMaps)', () => {
+  const m = (mapOrder: number, a: number, b: number) => ({
+    mapOrder,
+    teamAScore: a,
+    teamBScore: b,
+  });
+  it('derives the series from valid map lists per format', async () => {
+    const { deriveSeriesFromMaps } = await import('../../src/tournament-domain/series-score.js');
+    expect(deriveSeriesFromMaps('BO1', [m(1, 13, 9)])).toEqual({
+      teamAScore: 1,
+      teamBScore: 0,
+      winner: 'A',
+      mapWinners: ['A'],
+    });
+    expect(deriveSeriesFromMaps('BO3', [m(1, 13, 9), m(2, 7, 13), m(3, 16, 14)])).toMatchObject({
+      teamAScore: 2,
+      teamBScore: 1,
+      winner: 'A',
+      mapWinners: ['A', 'B', 'A'],
+    });
+    expect(deriveSeriesFromMaps('BO3', [m(1, 3, 13), m(2, 11, 13)])).toMatchObject({
+      teamAScore: 0,
+      teamBScore: 2,
+      winner: 'B',
+    });
+    expect(
+      deriveSeriesFromMaps('BO5', [
+        m(1, 13, 0),
+        m(2, 0, 13),
+        m(3, 13, 1),
+        m(4, 2, 13),
+        m(5, 19, 17),
+      ]),
+    ).toMatchObject({ teamAScore: 3, teamBScore: 2, winner: 'A' });
+    expect(deriveSeriesFromMaps('BO5', [m(1, 13, 0), m(2, 13, 0), m(3, 99, 98)])).toMatchObject({
+      teamAScore: 3,
+      teamBScore: 0,
+    });
+  });
+
+  it('rejects draws, gaps, out-of-order, too few/many maps and implausible numbers', async () => {
+    const { deriveSeriesFromMaps } = await import('../../src/tournament-domain/series-score.js');
+    const bad: Array<[Parameters<typeof deriveSeriesFromMaps>[0], ReturnType<typeof m>[]]> = [
+      ['BO1', []],
+      ['BO1', [m(1, 13, 13)]],
+      ['BO1', [m(2, 13, 9)]],
+      ['BO1', [m(1, 13, 9), m(2, 13, 9)]], // already decided
+      ['BO3', [m(1, 13, 9)]], // not decided
+      ['BO3', [m(1, 13, 9), m(3, 13, 9)]], // gap
+      ['BO3', [m(2, 13, 9), m(1, 13, 9)]], // order
+      ['BO3', [m(1, 13, 9), m(2, 13, 9), m(3, 13, 9)]], // decided after 2
+      ['BO3', [m(1, 100, 9), m(2, 13, 9)]],
+      ['BO3', [m(1, -1, 9), m(2, 13, 9)]],
+      ['BO3', [m(1, 13.5, 9), m(2, 13, 9)]],
+      ['BO5', [m(1, 13, 9), m(2, 9, 13), m(3, 13, 9), m(4, 9, 13)]], // 2–2
+    ];
+    for (const [format, maps] of bad) {
+      expect(typeof deriveSeriesFromMaps(format, maps), JSON.stringify([format, maps])).toBe(
+        'string',
+      );
+    }
+  });
+});

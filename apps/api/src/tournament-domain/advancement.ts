@@ -46,6 +46,12 @@ export async function advanceWinner(
     if (input.tournamentStatus !== 'IN_PROGRESS') {
       throw new Error(`final completed while tournament is ${input.tournamentStatus}`);
     }
+    // `tournaments_schedule_chk` requires ends_at >= starts_at: a tournament whose planned start
+    // is still in the future (e.g. generated early) gets its real start time (= now) first.
+    await tx.tournament.updateMany({
+      where: { id: input.tournamentId, startsAt: { gt: input.now } },
+      data: { startsAt: input.now },
+    });
     await tx.tournament.update({
       where: { id: input.tournamentId },
       data: { status: 'COMPLETED', endsAt: input.now },

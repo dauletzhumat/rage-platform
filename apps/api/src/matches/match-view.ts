@@ -47,7 +47,14 @@ export const matchDetailSelect = {
   ...matchSummarySelect,
   maps: {
     orderBy: { mapOrder: 'asc' },
-    select: { mapOrder: true, mapName: true, status: true, teamAScore: true, teamBScore: true },
+    select: {
+      mapOrder: true,
+      mapName: true,
+      status: true,
+      teamAScore: true,
+      teamBScore: true,
+      winnerTeamId: true,
+    },
   },
 } satisfies Prisma.MatchSelect;
 
@@ -112,6 +119,7 @@ export function toMatchDetail(row: MatchDetailRow): MatchDetailDto {
         status: m.status,
         teamAScore: played ? m.teamAScore : null,
         teamBScore: played ? m.teamBScore : null,
+        winnerTeamId: m.status === 'FINISHED' ? m.winnerTeamId : null,
       };
     }),
   };

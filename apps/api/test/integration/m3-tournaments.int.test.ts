@@ -1086,6 +1086,25 @@ describe('M3 tournaments API (real PostgreSQL + Redis)', () => {
 
   // -------------------------------------------------------------------------------------------
   describe('results and advancement', () => {
+    it('final completes even when the planned start is in the future (live demo bug)', async () => {
+      const future = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
+      const { t, bracket, teams } = await setupBracket(2, { startsAt: future });
+      const afterGen = await db().tournament.findUniqueOrThrow({ where: { id: t.id } });
+      expect(afterGen.startsAt!.getTime()).toBeLessThanOrEqual(Date.now());
+      // Even if the planned start is pushed into the future again, completing works.
+      await db().tournament.update({ where: { id: t.id }, data: { startsAt: new Date(future) } });
+      const final = matchAt(bracket, 1, 1);
+      await post(`/admin/matches/${final.id}/result-override`, admin, {
+        winnerTeamId: teams[0]!.id,
+        teamAScore: 1,
+        teamBScore: 0,
+        reason: 'final result entered by admin',
+      }).expect(200);
+      const done = await db().tournament.findUniqueOrThrow({ where: { id: t.id } });
+      expect(done.status).toBe('COMPLETED');
+      expect(done.endsAt!.getTime()).toBeGreaterThanOrEqual(done.startsAt!.getTime());
+    });
+
     it('override validation, admin result never verified, winner published with source', async () => {
       const { bracket, teams } = await setupBracket(4, { defaultMatchFormat: 'BO3' });
       const m = matchAt(bracket, 1, 1);
@@ -1394,6 +1413,160 @@ describe('M3 tournaments API (real PostgreSQL + Redis)', () => {
           }).expect(409)
         ).body.code,
       ).toBe('SAMPLE_RESOURCE');
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------
+  describe('admin results with per-map round scores', () => {
+    /** Completes the veto with captains acting on their turns (first remaining map each time). */
+    async function completeVeto(matchId: string, teams: Team[]) {
+      const captainOf = new Map(teams.map((t) => [t.id, t.captain]));
+      for (;;) {
+        const state = (await get(`/matches/${matchId}/veto`).expect(200)).body as {
+          next: { teamId: string; action: string } | null;
+          remaining: string[];
+          complete: boolean;
+        };
+        if (state.complete || !state.next) return;
+        await post(`/matches/${matchId}/veto`, captainOf.get(state.next.teamId)!, {
+          action: state.next.action,
+          mapName: state.remaining[0],
+        }).expect(200);
+      }
+    }
+
+    it('BO1 13–9 → series 1–0, map FINISHED, winner advances; maps before veto → 409', async () => {
+      const { bracket, teams } = await setupBracket(4);
+      const [m1, m2] = [matchAt(bracket, 1, 1), matchAt(bracket, 1, 2)];
+      const early = await post(`/admin/matches/${m2.id}/result-override`, admin, {
+        maps: [{ mapOrder: 1, teamAScore: 13, teamBScore: 9 }],
+        reason: 'referee sheet',
+      }).expect(409);
+      expect(early.body.code).toBe('MATCH_NOT_READY');
+
+      await completeVeto(m1.id, teams);
+      const res = await post(`/admin/matches/${m1.id}/result-override`, admin, {
+        maps: [{ mapOrder: 1, teamAScore: 9, teamBScore: 13 }],
+        reason: 'referee sheet',
+      }).expect(200);
+      expect(res.body).toMatchObject({
+        status: 'COMPLETED',
+        resultSource: 'ADMIN_OVERRIDE',
+        resultVerifiedAt: null,
+        teamAScore: 0,
+        teamBScore: 1,
+        winnerTeamId: m1.teamB!.id,
+      });
+      expect(res.body.maps).toEqual([
+        expect.objectContaining({
+          mapOrder: 1,
+          status: 'FINISHED',
+          teamAScore: 9,
+          teamBScore: 13,
+          winnerTeamId: m1.teamB!.id,
+        }),
+      ]);
+      const final = await db().match.findUniqueOrThrow({
+        where: { id: matchAt(bracket, 2, 1).id },
+      });
+      expect(final.teamAId).toBe(m1.teamB!.id);
+      const audit = await db().auditLog.findFirstOrThrow({
+        where: { action: 'match.result_override', resourceId: m1.id },
+      });
+      expect(audit.detailJson).toMatchObject({
+        teamAScore: 0,
+        teamBScore: 1,
+        maps: [{ mapOrder: 1, status: 'FINISHED', teamAScore: 9, teamBScore: 13 }],
+      });
+    });
+
+    it('BO3 13–9, 7–13, 16–14 → 2–1; public detail shows map scores with ADMIN_OVERRIDE', async () => {
+      const { t, bracket, teams } = await setupBracket(2, { defaultMatchFormat: 'BO3' });
+      const m = matchAt(bracket, 1, 1);
+      await completeVeto(m.id, teams);
+      await post(`/admin/matches/${m.id}/result-override`, admin, {
+        winnerTeamId: m.teamA!.id, // optional; must match when sent
+        teamAScore: 2,
+        teamBScore: 1,
+        maps: [
+          { mapOrder: 1, teamAScore: 13, teamBScore: 9 },
+          { mapOrder: 2, teamAScore: 7, teamBScore: 13 },
+          { mapOrder: 3, teamAScore: 16, teamBScore: 14 },
+        ],
+        reason: 'LAN referee sheet',
+      }).expect(200);
+      const pub = (await get(`/matches/${m.id}`).expect(200)).body;
+      expect(pub).toMatchObject({
+        resultSource: 'ADMIN_OVERRIDE',
+        resultVerifiedAt: null,
+        teamAScore: 2,
+        teamBScore: 1,
+        winnerTeamId: m.teamA!.id,
+      });
+      expect(
+        pub.maps.map(
+          (x: {
+            mapOrder: number;
+            status: string;
+            teamAScore: number;
+            teamBScore: number;
+            winnerTeamId: string;
+          }) => [x.mapOrder, x.status, x.teamAScore, x.teamBScore, x.winnerTeamId],
+        ),
+      ).toEqual([
+        [1, 'FINISHED', 13, 9, m.teamA!.id],
+        [2, 'FINISHED', 7, 13, m.teamB!.id],
+        [3, 'FINISHED', 16, 14, m.teamA!.id],
+      ]);
+      expect((await get(`/tournaments/${t.slug}`).expect(200)).body.status).toBe('COMPLETED');
+    });
+
+    it('BO3 2–0: unplayed third map CANCELLED without scores; mismatches and bad lists → 400', async () => {
+      const { bracket, teams } = await setupBracket(2, { defaultMatchFormat: 'BO3' });
+      const m = matchAt(bracket, 1, 1);
+      await completeVeto(m.id, teams);
+      const path = `/admin/matches/${m.id}/result-override`;
+      const twoNil = [
+        { mapOrder: 1, teamAScore: 13, teamBScore: 5 },
+        { mapOrder: 2, teamAScore: 13, teamBScore: 11 },
+      ];
+      const scoreInvalidBodies = [
+        { maps: twoNil, winnerTeamId: m.teamB!.id },
+        { maps: twoNil, teamAScore: 2, teamBScore: 1 },
+        { maps: [...twoNil, { mapOrder: 3, teamAScore: 13, teamBScore: 2 }] },
+        { maps: [{ mapOrder: 1, teamAScore: 13, teamBScore: 13 }, twoNil[1]] },
+        { maps: [twoNil[0], { mapOrder: 3, teamAScore: 13, teamBScore: 2 }] },
+        { maps: [twoNil[0]] },
+      ];
+      for (const body of scoreInvalidBodies) {
+        const r = await post(path, admin, { ...body, reason: 'referee sheet' }).expect(400);
+        expect(r.body.code, JSON.stringify(body)).toBe('SCORE_INVALID');
+      }
+      for (const body of [
+        { maps: [{ mapOrder: 1, teamAScore: 100, teamBScore: 5 }, twoNil[1]] },
+        { maps: [] },
+        {}, // neither maps nor series fields
+      ]) {
+        const r = await post(path, admin, { ...body, reason: 'referee sheet' }).expect(400);
+        expect(r.body.code).toBe('VALIDATION_FAILED');
+      }
+      expect((await db().match.findUniqueOrThrow({ where: { id: m.id } })).status).toBe('CREATED');
+
+      await post(path, admin, { maps: twoNil, reason: 'referee sheet' }).expect(200);
+      const maps = await db().matchMap.findMany({
+        where: { matchId: m.id },
+        orderBy: { mapOrder: 'asc' },
+      });
+      expect(maps.map((x) => x.status)).toEqual(['FINISHED', 'FINISHED', 'CANCELLED']);
+      expect(maps[2]!.winnerTeamId).toBeNull();
+      const pub = (await get(`/matches/${m.id}`).expect(200)).body;
+      expect(pub).toMatchObject({ teamAScore: 2, teamBScore: 0 });
+      expect(pub.maps[2]).toMatchObject({
+        status: 'CANCELLED',
+        teamAScore: null,
+        teamBScore: null,
+        winnerTeamId: null,
+      });
     });
   });
 

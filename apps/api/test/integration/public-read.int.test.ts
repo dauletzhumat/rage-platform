@@ -232,13 +232,21 @@ describe('public read API', () => {
     it('unplayed maps have null scores (no fabricated 0–0)', async () => {
       const res = await get(`/matches/${ids.match}`).expect(200);
       expect(res.body.maps).toEqual([
-        { mapOrder: 1, mapName: 'de_mirage', status: 'LIVE', teamAScore: 7, teamBScore: 5 },
+        {
+          mapOrder: 1,
+          mapName: 'de_mirage',
+          status: 'LIVE',
+          teamAScore: 7,
+          teamBScore: 5,
+          winnerTeamId: null,
+        },
         {
           mapOrder: 2,
           mapName: 'de_inferno',
           status: 'PENDING',
           teamAScore: null,
           teamBScore: null,
+          winnerTeamId: null,
         },
       ]);
     });

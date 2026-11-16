@@ -8,7 +8,7 @@ import { hasSuperAdminLocked } from '../team-domain/team-access.js';
 import { advanceWinner } from '../tournament-domain/advancement.js';
 import { SamplePolicy, sampleAuditTag } from '../tournament-domain/sample-policy.js';
 import { conflictOfInterest, operatedTeamIds } from '../tournament-domain/conflict-of-interest.js';
-import { validateSeriesScore } from '../tournament-domain/series-score.js';
+import { deriveSeriesFromMaps, validateSeriesScore } from '../tournament-domain/series-score.js';
 import {
   isMatchAdminLocked,
   type LockedTournament,
@@ -37,6 +37,17 @@ import type {
 import { type LockedMatch, lockMatch, transitionMatch } from './transitions.js';
 
 type Tx = Prisma.TransactionClient;
+
+type MapOutcome =
+  | {
+      id: string;
+      mapOrder: number;
+      mapName: string;
+      teamAScore: number;
+      teamBScore: number;
+      winnerTeamId: string;
+    }
+  | { id: string; mapOrder: number; mapName: string; played: false };
 
 interface Prepared {
   tournament: LockedTournament | null;
@@ -95,6 +106,56 @@ export class MatchResultsService {
     return { tournament, match: match as Prepared['match'], conflictOverride };
   }
 
+  /**
+   * Per-map admin result: needs the veto's match maps (else 409 MATCH_NOT_READY); the series
+   * score and winner are DERIVED from the map scores; series fields sent alongside must match
+   * (else 400 SCORE_INVALID).
+   */
+  private async mapResult(tx: Tx, p: Prepared, dto: ResultOverrideDto) {
+    const rows = await tx.matchMap.findMany({
+      where: { matchId: p.match.id },
+      orderBy: { mapOrder: 'asc' },
+      select: { id: true, mapOrder: true, mapName: true, status: true },
+    });
+    if (rows.length === 0) {
+      throw matchNotReady('Map scores can be entered only after the map veto is complete');
+    }
+    const inputs = dto.maps!;
+    if (inputs.length > rows.length) {
+      throw scoreInvalid(`this match has only ${rows.length} map(s)`);
+    }
+    const derived = deriveSeriesFromMaps(p.match.format, inputs);
+    if (typeof derived === 'string') throw scoreInvalid(derived);
+    const winnerTeamId = derived.winner === 'A' ? p.match.teamAId : p.match.teamBId;
+    if (dto.winnerTeamId !== undefined && dto.winnerTeamId !== winnerTeamId) {
+      throw scoreInvalid('winnerTeamId does not match the map scores');
+    }
+    if (
+      (dto.teamAScore !== undefined && dto.teamAScore !== derived.teamAScore) ||
+      (dto.teamBScore !== undefined && dto.teamBScore !== derived.teamBScore)
+    ) {
+      throw scoreInvalid('series score does not match the map scores');
+    }
+    return {
+      winnerTeamId,
+      teamAScore: derived.teamAScore,
+      teamBScore: derived.teamBScore,
+      maps: rows.map((row, i) => {
+        const input = inputs[i];
+        return input
+          ? {
+              id: row.id,
+              mapOrder: row.mapOrder,
+              mapName: row.mapName,
+              teamAScore: input.teamAScore,
+              teamBScore: input.teamBScore,
+              winnerTeamId: derived.mapWinners[i] === 'A' ? p.match.teamAId : p.match.teamBId,
+            }
+          : { id: row.id, mapOrder: row.mapOrder, mapName: row.mapName, played: false as const };
+      }),
+    };
+  }
+
   private async complete(
     tx: Tx,
     ctx: AuditRequestContext,
@@ -107,9 +168,28 @@ export class MatchResultsService {
       source: 'ADMIN_OVERRIDE' | 'FORFEIT';
       reason: string;
       forfeitingTeamId?: string;
+      maps?: MapOutcome[];
     },
   ): Promise<void> {
     const now = new Date();
+    // Map rows first (the hardening trigger freezes only the `matches` result columns once
+    // COMPLETED; match_maps are written in the same transaction, before the series completes).
+    for (const m of result.maps ?? []) {
+      const updated = await tx.matchMap.updateMany({
+        where: { id: m.id, matchId: p.match.id, status: 'PENDING' },
+        data:
+          'played' in m
+            ? { status: 'CANCELLED' }
+            : {
+                status: 'FINISHED',
+                teamAScore: m.teamAScore,
+                teamBScore: m.teamBScore,
+                winnerTeamId: m.winnerTeamId,
+                completedAt: now,
+              },
+      });
+      if (updated.count !== 1) throw matchNotReady(`Map ${m.mapOrder} is no longer pending`);
+    }
     const loserTeamId = result.winnerTeamId === p.match.teamAId ? p.match.teamBId : p.match.teamAId;
     // COMPLETED, result_source and winner in ONE update (matches_completed_result_chk).
     await transitionMatch(tx, p.match, 'COMPLETED', {
@@ -141,6 +221,22 @@ export class MatchResultsService {
           resultSource: result.source,
           reason: result.reason,
           ...(result.forfeitingTeamId ? { forfeitingTeamId: result.forfeitingTeamId } : {}),
+          ...(result.maps
+            ? {
+                maps: result.maps.map((m) =>
+                  'played' in m
+                    ? { mapOrder: m.mapOrder, mapName: m.mapName, status: 'CANCELLED' }
+                    : {
+                        mapOrder: m.mapOrder,
+                        mapName: m.mapName,
+                        status: 'FINISHED',
+                        teamAScore: m.teamAScore,
+                        teamBScore: m.teamBScore,
+                        winnerTeamId: m.winnerTeamId,
+                      },
+                ),
+              }
+            : {}),
           ...(p.conflictOverride ? { override: true, conflictOfInterest: true } : {}),
           ...sampleAuditTag(p.tournament?.isSample === true),
         },
@@ -170,6 +266,18 @@ export class MatchResultsService {
   ): Promise<MatchDetailDto> {
     await this.prisma.client.$transaction(async (tx) => {
       const p = await this.prepare(tx, actorUserId, matchId);
+      if (dto.maps) {
+        const mapResult = await this.mapResult(tx, p, dto);
+        await this.complete(tx, ctx, p, actorUserId, {
+          winnerTeamId: mapResult.winnerTeamId,
+          teamAScore: mapResult.teamAScore,
+          teamBScore: mapResult.teamBScore,
+          source: 'ADMIN_OVERRIDE',
+          reason: dto.reason,
+          maps: mapResult.maps,
+        });
+        return;
+      }
       const side =
         dto.winnerTeamId === p.match.teamAId
           ? 'A'
@@ -177,12 +285,14 @@ export class MatchResultsService {
             ? 'B'
             : null;
       if (!side) throw fieldError('winnerTeamId', 'winnerTeamId must be team A or team B');
-      const problem = validateSeriesScore(p.match.format, dto.teamAScore, dto.teamBScore, side);
+      const a = dto.teamAScore!;
+      const b = dto.teamBScore!;
+      const problem = validateSeriesScore(p.match.format, a, b, side);
       if (problem) throw scoreInvalid(problem);
       await this.complete(tx, ctx, p, actorUserId, {
-        winnerTeamId: dto.winnerTeamId,
-        teamAScore: dto.teamAScore,
-        teamBScore: dto.teamBScore,
+        winnerTeamId: dto.winnerTeamId!,
+        teamAScore: a,
+        teamBScore: b,
         source: 'ADMIN_OVERRIDE',
         reason: dto.reason,
       });

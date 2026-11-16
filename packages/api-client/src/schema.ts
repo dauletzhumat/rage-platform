@@ -1467,6 +1467,14 @@ export interface components {
       /** @enum {string} */
       status: 'ok';
     };
+    MapResultInputDto: {
+      /** @description Map order from the veto (1, 2, … without gaps) */
+      mapOrder: number;
+      /** @description Rounds won by team A */
+      teamAScore: number;
+      /** @description Rounds won by team B */
+      teamBScore: number;
+    };
     MatchDetailDto: {
       format: components['schemas']['MatchFormat'];
       /** Format: uuid */
@@ -1508,6 +1516,11 @@ export interface components {
       status: components['schemas']['MatchMapStatus'];
       teamAScore: number | null;
       teamBScore: number | null;
+      /**
+       * Format: uuid
+       * @description Winner of a FINISHED map (admin-entered or server-confirmed); null otherwise
+       */
+      winnerTeamId: string | null;
     };
     /** @enum {string} */
     MatchMapStatus: 'PENDING' | 'WARMUP' | 'KNIFE' | 'LIVE' | 'PAUSED' | 'FINISHED' | 'CANCELLED';
@@ -1791,17 +1804,19 @@ export interface components {
       reason: string;
     };
     ResultOverrideDto: {
+      /** @description Optional per-map round scores (e.g. 13–9). Only after a complete veto (else 409 MATCH_NOT_READY). Listed 1..k in order, each with a winner, stopping when a team reaches the majority (BO1: 1 map, BO3: 2–3, BO5: 3–5) else 400 SCORE_INVALID. Unplayed maps become CANCELLED. Rounds 0–99, no MR12/overtime enforcement. */
+      maps?: components['schemas']['MapResultInputDto'][];
       /** @description Why the result is entered by an admin (audited; not server-verified) */
       reason: string;
-      /** @description Maps won by team A */
-      teamAScore: number;
-      /** @description Maps won by team B */
-      teamBScore: number;
+      /** @description Maps won by team A. Required without `maps`; derived (must match) with `maps` */
+      teamAScore?: number;
+      /** @description Maps won by team B. Required without `maps`; derived (must match) with `maps` */
+      teamBScore?: number;
       /**
        * Format: uuid
-       * @description Team A or team B of the match
+       * @description Team A or team B. Required without `maps`; with `maps` it is derived and, if sent, must match
        */
-      winnerTeamId: string;
+      winnerTeamId?: string;
     };
     RevokeInvitationDto: {
       /** @description Optional reason (audit only, never public) */
