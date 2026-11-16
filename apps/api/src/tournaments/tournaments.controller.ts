@@ -9,6 +9,8 @@ import {
 import { ApiErrorDto } from '../common/errors/api-error.js';
 import { SlugParamPipe } from '../common/http/params.js';
 import {
+  BracketDto,
+  PublicTournamentTeamDto,
   TournamentDetailDto,
   TournamentListQueryDto,
   TournamentPageDto,
@@ -34,5 +36,27 @@ export class TournamentsController {
   @ApiNotFoundResponse({ type: ApiErrorDto })
   get(@Param('slug', new SlugParamPipe('Tournament')) slug: string): Promise<TournamentDetailDto> {
     return this.tournaments.getBySlug(slug);
+  }
+
+  @Get(':slug/teams')
+  @ApiOperation({
+    summary: 'Approved teams with seed and locked roster snapshot (no SteamIDs)',
+  })
+  @ApiOkResponse({ type: [PublicTournamentTeamDto] })
+  @ApiNotFoundResponse({ type: ApiErrorDto })
+  teams(
+    @Param('slug', new SlugParamPipe('Tournament')) slug: string,
+  ): Promise<PublicTournamentTeamDto[]> {
+    return this.tournaments.teams(slug);
+  }
+
+  @Get(':slug/bracket')
+  @ApiOperation({
+    summary: 'Single-elimination bracket by round (rounds: [] before generation)',
+  })
+  @ApiOkResponse({ type: BracketDto })
+  @ApiNotFoundResponse({ type: ApiErrorDto })
+  bracket(@Param('slug', new SlugParamPipe('Tournament')) slug: string): Promise<BracketDto> {
+    return this.tournaments.bracket(slug);
   }
 }

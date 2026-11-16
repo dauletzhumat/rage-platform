@@ -1,5 +1,6 @@
 import { cookies, headers } from 'next/headers';
 import { getRequestConfig } from 'next-intl/server';
+import { DISPLAY_TIMEZONE } from '@/lib/display-time';
 import { LOCALE_COOKIE, resolveLocale } from './config';
 
 export default getRequestConfig(async () => {
@@ -11,9 +12,9 @@ export default getRequestConfig(async () => {
 
   return {
     locale,
-    // All timestamps are rendered in UTC (and labelled as such) so server and
-    // client output always agree.
-    timeZone: 'UTC',
+    // All timestamps are rendered in the platform display zone (UTC+5 by default, labelled).
+    // It is a build-time NEXT_PUBLIC_ value, so server and client output always agree.
+    timeZone: DISPLAY_TIMEZONE,
     messages: (await import(`../../messages/${locale}.json`)).default,
   };
 });

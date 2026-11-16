@@ -39,7 +39,7 @@ export class PlayersService {
       ...(query.q ? { nickname: { contains: escapeLike(query.q), mode: 'insensitive' } } : {}),
     };
     const db = this.prisma.client;
-    const [rows, total] = await db.$transaction([
+    const [rows, total] = await Promise.all([
       db.playerProfile.findMany({
         where,
         select: summarySelect,

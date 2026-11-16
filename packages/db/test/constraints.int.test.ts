@@ -339,8 +339,10 @@ describe('tournament roster constraints', () => {
     const reg = await prisma.tournamentRegistration.create({
       data: { tournamentId: tournament.id, teamId: team.id, requestedById: captain.id },
     });
+    // Entries are written while the roster is DRAFT (M3 hardening: no inserts into a LOCKED
+    // roster created by an earlier transaction), then the roster is locked.
     const roster = await prisma.tournamentRoster.create({
-      data: { registrationId: reg.id, version: 1, status: 'LOCKED', lockedAt: new Date() },
+      data: { registrationId: reg.id, version: 1 },
     });
     const [p1, p2] = [await newUser(), await newUser()];
     await prisma.tournamentRosterEntry.create({
@@ -364,6 +366,10 @@ describe('tournament roster constraints', () => {
       }),
       new RegExp(DB_CONSTRAINTS.rosterEntrySteamIdUnique),
     );
+    await prisma.tournamentRoster.update({
+      where: { id: roster.id },
+      data: { status: 'LOCKED', lockedAt: new Date() },
+    });
     await expectDbError(
       prisma.tournamentRoster.create({
         data: { registrationId: reg.id, version: 2, status: 'LOCKED', lockedAt: new Date() },

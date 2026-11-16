@@ -21,6 +21,95 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/banned-steam-ids': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** SteamID64 bans, newest first (SUPER_ADMIN) */
+    get: operations['AdminSteamBans_list'];
+    put?: never;
+    /** Ban a SteamID64 from tournament rosters (SUPER_ADMIN; audited) */
+    post: operations['AdminSteamBans_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/banned-steam-ids/{id}/lift': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Lift an active ban (SUPER_ADMIN; audited) */
+    post: operations['AdminSteamBans_lift'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/matches': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Matches for result administration (match / tournament admins; scoped grants see theirs) */
+    get: operations['AdminMatches_list'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/matches/{id}/forfeit': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Record a forfeit (match admin; audited): the other team wins, scores stay null */
+    post: operations['AdminMatches_forfeit'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/matches/{id}/result-override': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Enter a series result as an admin (match admin; audited; NOT server-verified)
+     * @description Scores are maps won (BO1 1-0; BO3 2-0/2-1; BO5 3-0/3-1/3-2). Sets COMPLETED with result_source ADMIN_OVERRIDE and advances the winner in the same transaction.
+     */
+    post: operations['AdminMatches_override'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/admin/team-applications': {
     parameters: {
       query?: never;
@@ -66,6 +155,161 @@ export interface paths {
     put?: never;
     /** Reject with a reason visible to the applicant (audited) */
     post: operations['AdminTeamApplications_reject'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/tournaments': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** All tournaments incl. DRAFT (SUPER_ADMIN / global TOURNAMENT_ADMIN; scoped admins see theirs) */
+    get: operations['AdminTournaments_list'];
+    put?: never;
+    /** Create a DRAFT tournament (SUPER_ADMIN or global TOURNAMENT_ADMIN) */
+    post: operations['AdminTournaments_create'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/tournaments/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One tournament incl. DRAFT (tournament admin) */
+    get: operations['AdminTournaments_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Edit settings while DRAFT or REGISTRATION_OPEN (tournament admin) */
+    patch: operations['AdminTournaments_update'];
+    trace?: never;
+  };
+  '/api/v1/admin/tournaments/{id}/generate-bracket': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Generate the single-elimination bracket; tournament → IN_PROGRESS (audited) */
+    post: operations['AdminTournaments_generate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/tournaments/{id}/registrations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Registrations of a tournament, oldest first (tournament admin) */
+    get: operations['AdminTournaments_registrations'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/tournaments/{id}/registrations/{registrationId}/approve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Approve: re-validates the snapshot, locks the roster (tournament admin; audited) */
+    post: operations['AdminTournaments_approve'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/tournaments/{id}/registrations/{registrationId}/reject': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reject with a reason visible to the team (tournament admin; audited) */
+    post: operations['AdminTournaments_reject'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/tournaments/{id}/registrations/{registrationId}/substitute': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Substitute a player in a LOCKED roster (new version; tournament admin; audited) */
+    post: operations['AdminTournaments_substitute'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/tournaments/{id}/seeds': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Set seeds 1..N for every APPROVED registration (REGISTRATION_CLOSED; audited) */
+    put: operations['AdminTournaments_seeds'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/tournaments/{id}/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Lifecycle transition { to, reason? } (reason required for CANCELLED; audited) */
+    post: operations['AdminTournaments_changeStatus'];
     delete?: never;
     options?: never;
     head?: never;
@@ -292,10 +536,31 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Public match (series) detail with per-map scores */
+    /** Public match (series) detail with result source and per-map scores */
     get: operations['Matches_get'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/matches/{id}/veto': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Public map veto state (pool, actions, whose turn, remaining maps) */
+    get: operations['Matches_getVeto'];
+    put?: never;
+    /**
+     * Ban / pick a map (operator of the team whose turn it is; audited)
+     * @description Fixed sequences per BO1/BO3/BO5, team A starts (docs/TOURNAMENTS.md §8). When only the decider remains, the server records DECIDER and creates the match maps.
+     */
+    post: operations['Matches_submitVeto'];
     delete?: never;
     options?: never;
     head?: never;
@@ -351,6 +616,23 @@ export interface paths {
     head?: never;
     /** Update own nickname / country / biography (audited) */
     patch: operations['Me_update'];
+    trace?: never;
+  };
+  '/api/v1/me/registrations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Tournament registrations of teams you operate (captain / TEAM_MANAGER), max 50 */
+    get: operations['MyRegistrations_list'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   '/api/v1/me/team-applications': {
@@ -631,6 +913,60 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/tournaments/{id}/registrations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Register a team with a roster snapshot (team operator; audited)
+     * @description Creates a PENDING registration and roster version 1 (DRAFT) snapshotting SteamID64 and nickname of 5 starters and up to 2 substitutes (docs/TOURNAMENTS.md §4).
+     */
+    post: operations['Registrations_register'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tournaments/{id}/registrations/{registrationId}/roster': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Replace the roster of a PENDING registration (new DRAFT version; audited) */
+    put: operations['Registrations_updateRoster'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tournaments/{id}/registrations/{registrationId}/withdraw': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Withdraw a PENDING/APPROVED registration before the tournament starts (audited) */
+    post: operations['Registrations_withdraw'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/tournaments/{slug}': {
     parameters: {
       query?: never;
@@ -648,10 +984,71 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/tournaments/{slug}/bracket': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Single-elimination bracket by round (rounds: [] before generation) */
+    get: operations['Tournaments_bracket'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/tournaments/{slug}/teams': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Approved teams with seed and locked roster snapshot (no SteamIDs) */
+    get: operations['Tournaments_teams'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    AdminRegistrationDto: {
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: uuid */
+      id: string;
+      /** @description Sample team (never mutated) */
+      isSample: boolean;
+      /** Format: date-time */
+      reviewedAt: string | null;
+      /** @description Approval note or rejection reason (visible to the team operators) */
+      reviewReason: string | null;
+      /** @description Current (latest) roster version */
+      roster: components['schemas']['AdminTournamentRosterDto'];
+      seed: number | null;
+      status: components['schemas']['RegistrationStatus'];
+      team: components['schemas']['RegistrationTeamRefDto'];
+      tournament: components['schemas']['RegistrationTournamentRefDto'];
+    };
+    AdminRegistrationPageDto: {
+      items: components['schemas']['AdminRegistrationDto'][];
+      /** @example 1 */
+      page: number;
+      /** @example 20 */
+      pageSize: number;
+      /** @example 0 */
+      total: number;
+    };
     AdminTeamApplicationDto: {
       applicant: components['schemas']['TeamApplicantDto'];
       countryCode: string | null;
@@ -683,6 +1080,67 @@ export interface components {
       pageSize: number;
       /** @example 0 */
       total: number;
+    };
+    AdminTournamentDto: {
+      approvedTeamCount: number;
+      /** @description True once generate-bracket has run */
+      bracketGenerated: boolean;
+      /** Format: date-time */
+      createdAt: string;
+      defaultMatchFormat: components['schemas']['MatchFormat'];
+      description: string | null;
+      finalMatchFormat: components['schemas']['MatchFormat'] | null;
+      format: components['schemas']['BracketFormat'];
+      /** Format: uuid */
+      id: string;
+      isSample: boolean;
+      mapPool: string[];
+      maxTeams: number | null;
+      name: string;
+      pendingRegistrationCount: number;
+      /** Format: date-time */
+      registrationCloseAt: string | null;
+      /** Format: date-time */
+      registrationOpenAt: string | null;
+      slug: string;
+      /** Format: date-time */
+      startsAt: string | null;
+      status: components['schemas']['TournamentStatus'];
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    AdminTournamentPageDto: {
+      items: components['schemas']['AdminTournamentDto'][];
+      /** @example 1 */
+      page: number;
+      /** @example 20 */
+      pageSize: number;
+      /** @example 0 */
+      total: number;
+    };
+    AdminTournamentRosterDto: {
+      entries: components['schemas']['AdminTournamentRosterEntryDto'][];
+      /** Format: uuid */
+      id: string;
+      /** Format: date-time */
+      lockedAt: string | null;
+      status: components['schemas']['RosterStatus'];
+      version: number;
+    };
+    AdminTournamentRosterEntryDto: {
+      /** @description Nickname snapshot taken when this roster version was created */
+      nickname: string;
+      /** @description True when the player is no longer an active member of the registering team (the snapshot is unchanged; an admin substitution may be needed) */
+      noLongerMember: boolean;
+      playerSlug: string;
+      role: components['schemas']['RosterEntryRole'];
+      /**
+       * @description SteamID64 snapshot (operator / admin views only)
+       * @example 76561198000000000
+       */
+      steamId64: string;
+      /** Format: uuid */
+      userId: string;
     };
     AdminUserDto: {
       /** Format: date-time */
@@ -721,7 +1179,7 @@ export interface components {
     };
     ApiErrorDto: {
       /**
-       * @description Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED, SAMPLE_RESOURCE, APPLICATION_ALREADY_PENDING, APPLICATION_NOT_PENDING, APPLICANT_IN_TEAM, APPLICANT_INELIGIBLE, TEAM_NAME_TAKEN, TEAM_TAG_TAKEN, TEAM_NOT_ACTIVE, PLAYER_NOT_FOUND, ALREADY_MEMBER, INVITATION_ALREADY_PENDING, INVITATION_LIMIT, INVITATION_NOT_PENDING, INVITATION_EXPIRED, ALREADY_IN_TEAM, ROSTER_FULL, NOT_TEAM_MEMBER, CAPTAIN_MUST_TRANSFER, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS, MEMBER_INELIGIBLE, APPLICATION_LIMIT, INVITATION_COOLDOWN. New codes may be added.
+       * @description Stable machine-readable code (branch on this, never on `message`). Known values: UNAUTHENTICATED, CSRF_FAILED, FORBIDDEN_ROLE, ROLE_ALREADY_GRANTED, LAST_SUPER_ADMIN, VALIDATION_FAILED, RATE_LIMITED, SAMPLE_RESOURCE, APPLICATION_ALREADY_PENDING, APPLICATION_NOT_PENDING, APPLICANT_IN_TEAM, APPLICANT_INELIGIBLE, TEAM_NAME_TAKEN, TEAM_TAG_TAKEN, TEAM_NOT_ACTIVE, PLAYER_NOT_FOUND, ALREADY_MEMBER, INVITATION_ALREADY_PENDING, INVITATION_LIMIT, INVITATION_NOT_PENDING, INVITATION_EXPIRED, ALREADY_IN_TEAM, ROSTER_FULL, NOT_TEAM_MEMBER, CAPTAIN_MUST_TRANSFER, IDEMPOTENCY_KEY_REUSED, IDEMPOTENCY_IN_PROGRESS, MEMBER_INELIGIBLE, APPLICATION_LIMIT, INVITATION_COOLDOWN, INVALID_STATE_TRANSITION, FORMAT_NOT_SUPPORTED, TOURNAMENT_NAME_TAKEN, REGISTRATION_CLOSED, ALREADY_REGISTERED, ROSTER_INVALID, PLAYER_INELIGIBLE, TOURNAMENT_FULL, REGISTRATION_NOT_PENDING, SEEDS_INVALID, NOT_ENOUGH_TEAMS, BRACKET_EXISTS, MATCH_NOT_READY, MATCH_ALREADY_COMPLETED, SCORE_INVALID, VETO_NOT_YOUR_TURN, VETO_INVALID_MAP, VETO_COMPLETE, SUBSTITUTION_NOT_ALLOWED, STEAM_ID_ALREADY_BANNED, CONFLICT_OF_INTEREST. New codes may be added.
        * @example CSRF_FAILED
        */
       code?: string;
@@ -737,6 +1195,10 @@ export interface components {
       requestId: string;
       /** @example 404 */
       statusCode: number;
+    };
+    ApproveRegistrationDto: {
+      /** @description Optional note (stored as review reason, visible to the team) */
+      note?: string | null;
     };
     ApproveTeamApplicationDto: {
       /** @description Optional note to the applicant (stored as reviewReason, audited) */
@@ -769,10 +1231,121 @@ export interface components {
       /** @example 0 */
       total: number;
     };
+    BanActorDto: {
+      /** Format: uuid */
+      id: string;
+      nickname: string;
+    };
+    BannedSteamIdDto: {
+      /** @description True while not lifted */
+      active: boolean;
+      /** Format: date-time */
+      createdAt: string;
+      createdBy: components['schemas']['BanActorDto'] | null;
+      /** Format: uuid */
+      id: string;
+      /** Format: date-time */
+      liftedAt: string | null;
+      liftedBy: components['schemas']['BanActorDto'] | null;
+      liftReason: string | null;
+      reason: string;
+      /** @example 76561198000000000 */
+      steamId64: string;
+      /**
+       * Format: uuid
+       * @description Registered user with this SteamID64, if any
+       */
+      userId: string | null;
+    };
+    BannedSteamIdPageDto: {
+      items: components['schemas']['BannedSteamIdDto'][];
+      /** @example 1 */
+      page: number;
+      /** @example 20 */
+      pageSize: number;
+      /** @example 0 */
+      total: number;
+    };
+    BracketDto: {
+      /** @example SINGLE_ELIMINATION */
+      format: string;
+      rounds: components['schemas']['BracketRoundDto'][];
+      /** @description Bracket size (power of two) */
+      size: number;
+    };
+    /** @enum {string} */
+    BracketFormat: 'SINGLE_ELIMINATION' | 'DOUBLE_ELIMINATION' | 'ROUND_ROBIN' | 'SWISS';
+    BracketMatchDto: {
+      format: components['schemas']['MatchFormat'];
+      /** Format: uuid */
+      id: string;
+      /** @description Round-1 slot with a bye (CANCELLED, statusReason "bye") */
+      isBye: boolean;
+      isSample: boolean;
+      /**
+       * Format: uuid
+       * @description Winner goes here
+       */
+      nextMatchId: string | null;
+      /** @description SERVER = server-confirmed; ADMIN_OVERRIDE / FORFEIT = audited admin action, never server-verified ("Admin result") */
+      resultSource: components['schemas']['MatchResultSource'] | null;
+      /**
+       * Format: date-time
+       * @description Set only for server-verified results (always null for admin results)
+       */
+      resultVerifiedAt: string | null;
+      /** @description Bracket round of the match (null outside a bracket) */
+      round: components['schemas']['MatchRoundDto'] | null;
+      /** Format: date-time */
+      scheduledAt: string | null;
+      slotNumber: number;
+      status: components['schemas']['MatchStatus'];
+      /** @description `bye` for a round-1 bye slot; `tournament_cancelled`; otherwise null */
+      statusReason: string | null;
+      /** @description Null while a bracket slot is TBD */
+      teamA: components['schemas']['MatchTeamRefDto'] | null;
+      /** @description Series score = maps won (not rounds). Null until a result exists; always null for FORFEIT */
+      teamAScore: number | null;
+      teamASeed: number | null;
+      teamB: components['schemas']['MatchTeamRefDto'] | null;
+      teamBScore: number | null;
+      teamBSeed: number | null;
+      tournament: components['schemas']['TournamentRefDto'] | null;
+      /** Format: uuid */
+      winnerTeamId: string | null;
+      /** @description Published winner: a COMPLETED match with an admin result (ADMIN_OVERRIDE / FORFEIT, labelled by `resultSource`) or a verified server result */
+      winnerTeamSlug: string | null;
+    };
+    BracketRoundDto: {
+      matches: components['schemas']['BracketMatchDto'][];
+      /** @example Final */
+      name: string;
+      roundNumber: number;
+    };
     CreateInvitationDto: {
       role: components['schemas']['InvitationRole'];
       /**
        * @description SteamID64 of a registered player (must have signed in once)
+       * @example 76561198000000000
+       */
+      steamId64: string;
+    };
+    CreateRegistrationDto: {
+      /** @description Exactly 5 distinct user ids (current active members of the team) */
+      starters: string[];
+      /** @description 0-2 distinct user ids, none of them a starter */
+      substitutes: string[];
+      /**
+       * Format: uuid
+       * @description Team being registered (you must operate it)
+       */
+      teamId: string;
+    };
+    CreateSteamBanDto: {
+      /** @description Ban reason (audited; admin-only) */
+      reason: string;
+      /**
+       * @description SteamID64 (17 digits)
        * @example 76561198000000000
        */
       steamId64: string;
@@ -792,6 +1365,47 @@ export interface components {
       /** @example SWLV */
       tag: string;
     };
+    CreateTournamentDto: {
+      defaultMatchFormat: components['schemas']['MatchFormat'];
+      description?: string | null;
+      /** @description Format of the final (defaults to defaultMatchFormat) */
+      finalMatchFormat?: components['schemas']['MatchFormat'] | null;
+      /** @description Only SINGLE_ELIMINATION in M3 (others → 409 FORMAT_NOT_SUPPORTED) */
+      format: components['schemas']['BracketFormat'];
+      /**
+       * @description Exactly 7 distinct map names ^de_[a-z0-9_]{2,30}$ (admin-supplied; no default pool)
+       * @example [
+       *       "de_map_one",
+       *       "de_map_two",
+       *       "…"
+       *     ]
+       */
+      mapPool: string[];
+      maxTeams: number;
+      /**
+       * @description NFC, trimmed; team-name character rules; unique case-insensitively
+       * @example RAGE Autumn Cup
+       */
+      name: string;
+      /**
+       * Format: date-time
+       * @description Optional end of the registration window (must be after registrationOpenAt). Must carry an offset (Z or ±hh:mm)
+       * @example 2026-12-01T18:00:00Z
+       */
+      registrationCloseAt?: string | null;
+      /**
+       * Format: date-time
+       * @description Optional start of the registration window. Must carry an offset (Z or ±hh:mm)
+       * @example 2026-12-01T18:00:00Z
+       */
+      registrationOpenAt?: string | null;
+      /**
+       * Format: date-time
+       * @description Optional scheduled start. Must carry an offset (Z or ±hh:mm)
+       * @example 2026-12-01T18:00:00Z
+       */
+      startsAt?: string | null;
+    };
     Cs2IntegrationFeatureDto: {
       /** @enum {string} */
       status: 'not_implemented';
@@ -806,7 +1420,17 @@ export interface components {
     };
     FeaturesDto: {
       cs2Integration: components['schemas']['Cs2IntegrationFeatureDto'];
+      sampleMutations: components['schemas']['SampleMutationsFeatureDto'];
       steamAuth: components['schemas']['SteamAuthFeatureDto'];
+    };
+    ForfeitDto: {
+      /**
+       * Format: uuid
+       * @description Team that forfeits; the other team wins
+       */
+      forfeitingTeamId: string;
+      /** @description Forfeit reason (audited) */
+      reason: string;
     };
     GrantRoleDto: {
       reason: string;
@@ -835,9 +1459,21 @@ export interface components {
     InvitationRole: 'PLAYER' | 'SUBSTITUTE';
     /** @enum {string} */
     InvitationStatus: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'REVOKED' | 'EXPIRED';
+    LiftSteamBanDto: {
+      /** @description Why the ban is lifted (audited) */
+      reason: string;
+    };
     LivenessDto: {
       /** @enum {string} */
       status: 'ok';
+    };
+    MapResultInputDto: {
+      /** @description Map order from the veto (1, 2, … without gaps) */
+      mapOrder: number;
+      /** @description Rounds won by team A */
+      teamAScore: number;
+      /** @description Rounds won by team B */
+      teamBScore: number;
     };
     MatchDetailDto: {
       format: components['schemas']['MatchFormat'];
@@ -845,14 +1481,30 @@ export interface components {
       id: string;
       isSample: boolean;
       maps: components['schemas']['MatchMapDto'][];
+      /** @description SERVER = server-confirmed; ADMIN_OVERRIDE / FORFEIT = audited admin action, never server-verified ("Admin result") */
+      resultSource: components['schemas']['MatchResultSource'] | null;
+      /**
+       * Format: date-time
+       * @description Set only for server-verified results (always null for admin results)
+       */
+      resultVerifiedAt: string | null;
+      /** @description Bracket round of the match (null outside a bracket) */
+      round: components['schemas']['MatchRoundDto'] | null;
       /** Format: date-time */
       scheduledAt: string | null;
       status: components['schemas']['MatchStatus'];
+      /** @description `bye` for a round-1 bye slot; `tournament_cancelled`; otherwise null */
+      statusReason: string | null;
       /** @description Null while a bracket slot is TBD */
-      teamA: components['schemas']['TeamRefDto'] | null;
-      teamB: components['schemas']['TeamRefDto'] | null;
+      teamA: components['schemas']['MatchTeamRefDto'] | null;
+      /** @description Series score = maps won (not rounds). Null until a result exists; always null for FORFEIT */
+      teamAScore: number | null;
+      teamB: components['schemas']['MatchTeamRefDto'] | null;
+      teamBScore: number | null;
       tournament: components['schemas']['TournamentRefDto'] | null;
-      /** @description Only set once the result is server-confirmed and verified */
+      /** Format: uuid */
+      winnerTeamId: string | null;
+      /** @description Published winner: a COMPLETED match with an admin result (ADMIN_OVERRIDE / FORFEIT, labelled by `resultSource`) or a verified server result */
       winnerTeamSlug: string | null;
     };
     /** @enum {string} */
@@ -864,6 +1516,11 @@ export interface components {
       status: components['schemas']['MatchMapStatus'];
       teamAScore: number | null;
       teamBScore: number | null;
+      /**
+       * Format: uuid
+       * @description Winner of a FINISHED map (admin-entered or server-confirmed); null otherwise
+       */
+      winnerTeamId: string | null;
     };
     /** @enum {string} */
     MatchMapStatus: 'PENDING' | 'WARMUP' | 'KNIFE' | 'LIVE' | 'PAUSED' | 'FINISHED' | 'CANCELLED';
@@ -876,6 +1533,16 @@ export interface components {
       /** @example 0 */
       total: number;
     };
+    /**
+     * @description SERVER = server-confirmed; ADMIN_OVERRIDE / FORFEIT = audited admin action, never server-verified ("Admin result")
+     * @enum {string}
+     */
+    MatchResultSource: 'SERVER' | 'ADMIN_OVERRIDE' | 'FORFEIT';
+    MatchRoundDto: {
+      /** @example Semifinals */
+      name: string;
+      roundNumber: number;
+    };
     /** @enum {string} */
     MatchStatus:
       | 'CREATED'
@@ -883,10 +1550,8 @@ export interface components {
       | 'PREPARING'
       | 'WARMUP'
       | 'READY_CHECK'
-      | 'KNIFE'
       | 'LIVE'
       | 'PAUSED'
-      | 'MAP_FINISHED'
       | 'COMPLETED'
       | 'CANCELLED'
       | 'FAILED'
@@ -896,15 +1561,38 @@ export interface components {
       /** Format: uuid */
       id: string;
       isSample: boolean;
+      /** @description SERVER = server-confirmed; ADMIN_OVERRIDE / FORFEIT = audited admin action, never server-verified ("Admin result") */
+      resultSource: components['schemas']['MatchResultSource'] | null;
+      /**
+       * Format: date-time
+       * @description Set only for server-verified results (always null for admin results)
+       */
+      resultVerifiedAt: string | null;
+      /** @description Bracket round of the match (null outside a bracket) */
+      round: components['schemas']['MatchRoundDto'] | null;
       /** Format: date-time */
       scheduledAt: string | null;
       status: components['schemas']['MatchStatus'];
+      /** @description `bye` for a round-1 bye slot; `tournament_cancelled`; otherwise null */
+      statusReason: string | null;
       /** @description Null while a bracket slot is TBD */
-      teamA: components['schemas']['TeamRefDto'] | null;
-      teamB: components['schemas']['TeamRefDto'] | null;
+      teamA: components['schemas']['MatchTeamRefDto'] | null;
+      /** @description Series score = maps won (not rounds). Null until a result exists; always null for FORFEIT */
+      teamAScore: number | null;
+      teamB: components['schemas']['MatchTeamRefDto'] | null;
+      teamBScore: number | null;
       tournament: components['schemas']['TournamentRefDto'] | null;
-      /** @description Only set once the result is server-confirmed and verified */
+      /** Format: uuid */
+      winnerTeamId: string | null;
+      /** @description Published winner: a COMPLETED match with an admin result (ADMIN_OVERRIDE / FORFEIT, labelled by `resultSource`) or a verified server result */
       winnerTeamSlug: string | null;
+    };
+    MatchTeamRefDto: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      slug: string;
+      tag: string;
     };
     MeDto: {
       /** @description Active team membership (one per user, ADR-019) or null */
@@ -941,6 +1629,8 @@ export interface components {
       role: components['schemas']['RoleType'];
       /** Format: uuid */
       scopeId: string | null;
+      /** @description Team slug (TEAM scope) or tournament slug (TOURNAMENT scope); otherwise null */
+      scopeSlug: string | null;
       scopeType: components['schemas']['RoleScopeType'];
     };
     MeSteamProfileDto: {
@@ -1043,6 +1733,26 @@ export interface components {
        */
       steamId64: string;
     };
+    PublicRosterEntryDto: {
+      /** @description Nickname snapshot at registration / substitution */
+      nicknameSnapshot: string;
+      playerSlug: string;
+      role: components['schemas']['RosterEntryRole'];
+    };
+    PublicTournamentRosterDto: {
+      entries: components['schemas']['PublicRosterEntryDto'][];
+      /** Format: date-time */
+      lockedAt: string | null;
+      version: number;
+    };
+    PublicTournamentTeamDto: {
+      isSample: boolean;
+      /** Format: uuid */
+      registrationId: string;
+      roster: components['schemas']['PublicTournamentRosterDto'];
+      seed: number | null;
+      team: components['schemas']['MatchTeamRefDto'];
+    };
     ReadinessChecksDto: {
       database: components['schemas']['DependencyStatusDto'];
       redis: components['schemas']['DependencyStatusDto'];
@@ -1052,6 +1762,39 @@ export interface components {
       /** @enum {string} */
       status: 'ok' | 'error';
     };
+    RegistrationDto: {
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: uuid */
+      id: string;
+      /** @description Approval note or rejection reason (visible to the team operators) */
+      reviewReason: string | null;
+      /** @description Current (latest) roster version */
+      roster: components['schemas']['TournamentRosterDto'];
+      seed: number | null;
+      status: components['schemas']['RegistrationStatus'];
+      team: components['schemas']['RegistrationTeamRefDto'];
+      tournament: components['schemas']['RegistrationTournamentRefDto'];
+    };
+    /** @enum {string} */
+    RegistrationStatus: 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
+    RegistrationTeamRefDto: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      slug: string;
+      tag: string;
+    };
+    RegistrationTournamentRefDto: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      slug: string;
+    };
+    RejectRegistrationDto: {
+      /** @description Visible to the team operators */
+      reason: string;
+    };
     RejectTeamApplicationDto: {
       /** @description Shown to the applicant; audited */
       reason: string;
@@ -1059,6 +1802,21 @@ export interface components {
     RemoveMemberDto: {
       /** @description Audit only, never shown publicly */
       reason: string;
+    };
+    ResultOverrideDto: {
+      /** @description Optional per-map round scores (e.g. 13–9). Only after a complete veto (else 409 MATCH_NOT_READY). Listed 1..k in order, each with a winner, stopping when a team reaches the majority (BO1: 1 map, BO3: 2–3, BO5: 3–5) else 400 SCORE_INVALID. Unplayed maps become CANCELLED. Rounds 0–99, no MR12/overtime enforcement. */
+      maps?: components['schemas']['MapResultInputDto'][];
+      /** @description Why the result is entered by an admin (audited; not server-verified) */
+      reason: string;
+      /** @description Maps won by team A. Required without `maps`; derived (must match) with `maps` */
+      teamAScore?: number;
+      /** @description Maps won by team B. Required without `maps`; derived (must match) with `maps` */
+      teamBScore?: number;
+      /**
+       * Format: uuid
+       * @description Team A or team B. Required without `maps`; with `maps` it is derived and, if sent, must match
+       */
+      winnerTeamId?: string;
     };
     RevokeInvitationDto: {
       /** @description Optional reason (audit only, never public) */
@@ -1089,6 +1847,8 @@ export interface components {
     RoleScopeType: 'GLOBAL' | 'TEAM' | 'TOURNAMENT' | 'MATCH';
     /** @enum {string} */
     RoleType: 'SUPER_ADMIN' | 'TOURNAMENT_ADMIN' | 'MATCH_ADMIN' | 'OBSERVER' | 'TEAM_MANAGER';
+    /** @enum {string} */
+    RosterEntryRole: 'STARTER' | 'SUBSTITUTE';
     RosterHistoryEntryDto: {
       /** Format: date-time */
       joinedAt: string;
@@ -1114,12 +1874,51 @@ export interface components {
      * @enum {string}
      */
     RosterLeftReason: 'left' | 'removed' | 'role_change' | 'captain_transfer' | 'admin';
+    /** @enum {string} */
+    RosterStatus: 'DRAFT' | 'LOCKED' | 'SUPERSEDED';
+    SampleMutationsFeatureDto: {
+      /**
+       * @description DEV-ONLY demo mode (ALLOW_SAMPLE_MUTATIONS): when "enabled", the M3 tournament flow may mutate SAMPLE tournaments/teams/matches (inside sample tournaments only). Always "disabled" in production.
+       * @enum {string}
+       */
+      status: 'enabled' | 'disabled';
+    };
+    SeedEntryDto: {
+      /** Format: uuid */
+      registrationId: string;
+      seed: number;
+    };
+    SeedsDto: {
+      /** @description Every APPROVED registration, seeds 1..N */
+      seeds: components['schemas']['SeedEntryDto'][];
+    };
     SteamAuthFeatureDto: {
       /**
        * @description "configured" when realm, return URL, web URL and SESSION_SECRET are valid (Steam sign-in routes work); "unconfigured" otherwise (auth routes answer 503). Says nothing about whether a real Steam login has been verified manually.
        * @enum {string}
        */
       status: 'unconfigured' | 'configured';
+    };
+    SubmitVetoDto: {
+      action: components['schemas']['VetoTurnAction'];
+      /** @example de_mirage */
+      mapName: string;
+    };
+    SubstituteRegistrationDto: {
+      /**
+       * Format: uuid
+       * @description Eligible current team member joining
+       */
+      inUserId: string;
+      /**
+       * Format: uuid
+       * @description Player leaving the locked roster
+       */
+      outUserId: string;
+      /** @description Substitution reason (stored as change_reason; audited) */
+      reason: string;
+      /** @description Role of the incoming player (must keep 5 starters / ≤ 2 substitutes) */
+      role: components['schemas']['RosterEntryRole'];
     };
     TeamApplicantDto: {
       nickname: string;
@@ -1253,17 +2052,26 @@ export interface components {
       tag: string;
     };
     TournamentDetailDto: {
+      /** @description Same as registeredTeamCount (M3 name) */
+      approvedTeamCount: number;
+      defaultMatchFormat: components['schemas']['MatchFormat'];
       description: string | null;
+      finalMatchFormat: components['schemas']['MatchFormat'] | null;
       /** @example SINGLE_ELIMINATION */
       format: string;
       /** Format: uuid */
       id: string;
       isSample: boolean;
+      /** @description Admin-supplied map pool (7 maps; empty if unset) */
+      mapPool: string[];
+      maxTeams: number | null;
       name: string;
       /** @description Registrations approved by a tournament admin */
       registeredTeamCount: number;
       /** Format: date-time */
       registrationCloseAt: string | null;
+      /** @description REGISTRATION_OPEN and now inside the optional registration window */
+      registrationOpen: boolean;
       /** Format: date-time */
       registrationOpenAt: string | null;
       slug: string;
@@ -1284,6 +2092,28 @@ export interface components {
       name: string;
       slug: string;
     };
+    TournamentRosterDto: {
+      entries: components['schemas']['TournamentRosterEntryDto'][];
+      /** Format: uuid */
+      id: string;
+      /** Format: date-time */
+      lockedAt: string | null;
+      status: components['schemas']['RosterStatus'];
+      version: number;
+    };
+    TournamentRosterEntryDto: {
+      /** @description Nickname snapshot taken when this roster version was created */
+      nickname: string;
+      playerSlug: string;
+      role: components['schemas']['RosterEntryRole'];
+      /**
+       * @description SteamID64 snapshot (operator / admin views only)
+       * @example 76561198000000000
+       */
+      steamId64: string;
+      /** Format: uuid */
+      userId: string;
+    };
     /** @enum {string} */
     TournamentStatus:
       | 'DRAFT'
@@ -1292,6 +2122,11 @@ export interface components {
       | 'IN_PROGRESS'
       | 'COMPLETED'
       | 'CANCELLED';
+    TournamentStatusChangeDto: {
+      /** @description Required when cancelling (3-500 chars); audited */
+      reason?: string | null;
+      to: components['schemas']['TournamentStatus'];
+    };
     TournamentSummaryDto: {
       /** @example SINGLE_ELIMINATION */
       format: string;
@@ -1325,8 +2160,74 @@ export interface components {
       /** @example player_one */
       nickname?: string;
     };
+    UpdateTournamentDto: {
+      defaultMatchFormat?: components['schemas']['MatchFormat'];
+      description?: string | null;
+      finalMatchFormat?: components['schemas']['MatchFormat'] | null;
+      format?: components['schemas']['BracketFormat'];
+      /**
+       * @description Exactly 7 distinct map names ^de_[a-z0-9_]{2,30}$ (admin-supplied; no default pool)
+       * @example [
+       *       "de_map_one",
+       *       "de_map_two",
+       *       "…"
+       *     ]
+       */
+      mapPool?: string[];
+      maxTeams?: number;
+      name?: string;
+      /**
+       * Format: date-time
+       * @description End of the registration window; null clears. Must carry an offset (Z or ±hh:mm)
+       * @example 2026-12-01T18:00:00Z
+       */
+      registrationCloseAt?: string | null;
+      /**
+       * Format: date-time
+       * @description Start of the registration window; null clears. Must carry an offset (Z or ±hh:mm)
+       * @example 2026-12-01T18:00:00Z
+       */
+      registrationOpenAt?: string | null;
+      /**
+       * Format: date-time
+       * @description Scheduled start; null clears. Must carry an offset (Z or ±hh:mm)
+       * @example 2026-12-01T18:00:00Z
+       */
+      startsAt?: string | null;
+    };
     /** @enum {string} */
     UserStatus: 'ACTIVE' | 'SUSPENDED' | 'BANNED';
+    /** @enum {string} */
+    VetoAction: 'BAN' | 'PICK' | 'DECIDER';
+    VetoActionDto: {
+      action: components['schemas']['VetoAction'];
+      /** Format: date-time */
+      createdAt: string;
+      /** @example de_mirage */
+      mapName: string;
+      sequence: number;
+      /**
+       * Format: uuid
+       * @description Acting team; null for the server-inserted DECIDER
+       */
+      teamId: string | null;
+    };
+    VetoNextDto: {
+      action: components['schemas']['VetoTurnAction'];
+      /** Format: uuid */
+      teamId: string;
+    };
+    VetoStateDto: {
+      actions: components['schemas']['VetoActionDto'][];
+      complete: boolean;
+      /** @description Whose turn it is; null when complete or not possible (teams TBD) */
+      next: components['schemas']['VetoNextDto'] | null;
+      /** @description Tournament map pool (7 maps) */
+      pool: string[];
+      remaining: string[];
+    };
+    /** @enum {string} */
+    VetoTurnAction: 'BAN' | 'PICK';
   };
   responses: never;
   parameters: never;
@@ -1377,6 +2278,389 @@ export interface operations {
       };
       /** @description Missing role */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminSteamBans_list: {
+    parameters: {
+      query?: {
+        /** @description true = only active bans, false = only lifted bans */
+        active?: boolean;
+        page?: number;
+        pageSize?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BannedSteamIdPageDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Missing role */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminSteamBans_create: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateSteamBanDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BannedSteamIdDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Missing role or CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description STEAM_ID_ALREADY_BANNED */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminSteamBans_lift: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['LiftSteamBanDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BannedSteamIdDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Missing role or CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description INVALID_STATE_TRANSITION (already lifted) */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminMatches_list: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+        status?: components['schemas']['MatchStatus'];
+        tournamentId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MatchPageDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description FORBIDDEN_ROLE */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminMatches_forfeit: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ForfeitDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MatchDetailDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /**
+       * @description FORBIDDEN_ROLE | CSRF_FAILED
+       *
+       *     CSRF validation failed
+       */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description MATCH_NOT_READY | MATCH_ALREADY_COMPLETED | SAMPLE_RESOURCE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminMatches_override: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ResultOverrideDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MatchDetailDto'];
+        };
+      };
+      /** @description VALIDATION_FAILED | SCORE_INVALID */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /**
+       * @description FORBIDDEN_ROLE | CSRF_FAILED
+       *
+       *     CSRF validation failed
+       */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description MATCH_NOT_READY | MATCH_ALREADY_COMPLETED | SAMPLE_RESOURCE */
+      409: {
         headers: {
           [name: string]: unknown;
         };
@@ -1567,6 +2851,750 @@ export interface operations {
         };
       };
       /** @description APPLICATION_NOT_PENDING */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminTournaments_list: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+        /** @description Case-insensitive search text */
+        q?: string;
+        status?: components['schemas']['TournamentStatus'];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminTournamentPageDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description FORBIDDEN_ROLE */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminTournaments_create: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateTournamentDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminTournamentDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Missing role or CSRF validation failed */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description TOURNAMENT_NAME_TAKEN | FORMAT_NOT_SUPPORTED */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminTournaments_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminTournamentDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description FORBIDDEN_ROLE */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminTournaments_update: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateTournamentDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminTournamentDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /**
+       * @description FORBIDDEN_ROLE (not a tournament admin of this tournament) | CSRF_FAILED
+       *
+       *     CSRF validation failed
+       */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description INVALID_STATE_TRANSITION | TOURNAMENT_NAME_TAKEN | FORMAT_NOT_SUPPORTED | TOURNAMENT_FULL | SAMPLE_RESOURCE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminTournaments_generate: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BracketDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /**
+       * @description FORBIDDEN_ROLE (not a tournament admin of this tournament) | CSRF_FAILED
+       *
+       *     CSRF validation failed
+       */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description BRACKET_EXISTS | NOT_ENOUGH_TEAMS | INVALID_STATE_TRANSITION | SAMPLE_RESOURCE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminTournaments_registrations: {
+    parameters: {
+      query?: {
+        page?: number;
+        pageSize?: number;
+        status?: components['schemas']['RegistrationStatus'];
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminRegistrationPageDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description FORBIDDEN_ROLE */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminTournaments_approve: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+        registrationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ApproveRegistrationDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminRegistrationDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /**
+       * @description FORBIDDEN_ROLE (not a tournament admin of this tournament) | CSRF_FAILED
+       *
+       *     CSRF validation failed
+       */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REGISTRATION_NOT_PENDING | TOURNAMENT_FULL | PLAYER_INELIGIBLE | INVALID_STATE_TRANSITION | TEAM_NOT_ACTIVE | SAMPLE_RESOURCE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminTournaments_reject: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+        registrationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RejectRegistrationDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminRegistrationDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /**
+       * @description FORBIDDEN_ROLE (not a tournament admin of this tournament) | CSRF_FAILED
+       *
+       *     CSRF validation failed
+       */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REGISTRATION_NOT_PENDING | SAMPLE_RESOURCE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminTournaments_substitute: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+        registrationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SubstituteRegistrationDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminRegistrationDto'];
+        };
+      };
+      /** @description VALIDATION_FAILED | ROSTER_INVALID */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /**
+       * @description FORBIDDEN_ROLE (not a tournament admin of this tournament) | CSRF_FAILED
+       *
+       *     CSRF validation failed
+       */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description SUBSTITUTION_NOT_ALLOWED | PLAYER_INELIGIBLE | SAMPLE_RESOURCE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminTournaments_seeds: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SeedsDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminRegistrationDto'][];
+        };
+      };
+      /** @description VALIDATION_FAILED | SEEDS_INVALID */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /**
+       * @description FORBIDDEN_ROLE (not a tournament admin of this tournament) | CSRF_FAILED
+       *
+       *     CSRF validation failed
+       */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description INVALID_STATE_TRANSITION | SAMPLE_RESOURCE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  AdminTournaments_changeStatus: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TournamentStatusChangeDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminTournamentDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /**
+       * @description FORBIDDEN_ROLE (not a tournament admin of this tournament) | CSRF_FAILED
+       *
+       *     CSRF validation failed
+       */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description INVALID_STATE_TRANSITION | SAMPLE_RESOURCE */
       409: {
         headers: {
           [name: string]: unknown;
@@ -2147,6 +4175,118 @@ export interface operations {
       };
     };
   };
+  Matches_getVeto: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VetoStateDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  Matches_submitVeto: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SubmitVetoDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['VetoStateDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /**
+       * @description FORBIDDEN_ROLE | CSRF_FAILED
+       *
+       *     CSRF validation failed
+       */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description VETO_NOT_YOUR_TURN | VETO_INVALID_MAP | VETO_COMPLETE | MATCH_NOT_READY | SAMPLE_RESOURCE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   Me_get: {
     parameters: {
       query?: never;
@@ -2253,6 +4393,34 @@ export interface operations {
       };
       /** @description CSRF validation failed */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  MyRegistrations_list: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RegistrationDto'][];
+        };
+      };
+      /** @description No valid session */
+      401: {
         headers: {
           [name: string]: unknown;
         };
@@ -3040,6 +5208,231 @@ export interface operations {
       };
     };
   };
+  Registrations_register: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateRegistrationDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RegistrationDto'];
+        };
+      };
+      /** @description VALIDATION_FAILED | ROSTER_INVALID */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /**
+       * @description FORBIDDEN_ROLE | CSRF_FAILED
+       *
+       *     CSRF validation failed
+       */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REGISTRATION_CLOSED | ALREADY_REGISTERED | PLAYER_INELIGIBLE (details: [{ field: userId, message: NOT_TEAM_MEMBER | USER_INACTIVE | SAMPLE | BANNED | ALREADY_REGISTERED_ELSEWHERE }]) | TEAM_NOT_ACTIVE | SAMPLE_RESOURCE | IDEMPOTENCY_KEY_REUSED | IDEMPOTENCY_IN_PROGRESS */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  Registrations_updateRoster: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+        registrationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateRegistrationDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RegistrationDto'];
+        };
+      };
+      /** @description VALIDATION_FAILED | ROSTER_INVALID */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /**
+       * @description FORBIDDEN_ROLE | CSRF_FAILED
+       *
+       *     CSRF validation failed
+       */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REGISTRATION_NOT_PENDING | REGISTRATION_CLOSED | ALREADY_REGISTERED | PLAYER_INELIGIBLE (details: [{ field: userId, message: NOT_TEAM_MEMBER | USER_INACTIVE | SAMPLE | BANNED | ALREADY_REGISTERED_ELSEWHERE }]) | TEAM_NOT_ACTIVE | SAMPLE_RESOURCE | IDEMPOTENCY_KEY_REUSED | IDEMPOTENCY_IN_PROGRESS */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  Registrations_withdraw: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Optional; 16-64 chars [A-Za-z0-9_-] (UUIDs fit), scoped per user, retained 24 h. Same key + same request after completion: stored 2xx response with `Idempotency-Replayed: true`; same key + different request: 409 IDEMPOTENCY_KEY_REUSED; still running: 409 IDEMPOTENCY_IN_PROGRESS with `Retry-After: 1`. Error responses are never stored. */
+        'Idempotency-Key'?: string;
+      };
+      path: {
+        id: string;
+        registrationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RegistrationDto'];
+        };
+      };
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description No valid session */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /**
+       * @description FORBIDDEN_ROLE | CSRF_FAILED
+       *
+       *     CSRF validation failed
+       */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REGISTRATION_NOT_PENDING | INVALID_STATE_TRANSITION | SAMPLE_RESOURCE */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   Tournaments_get: {
     parameters: {
       query?: never;
@@ -3057,6 +5450,64 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['TournamentDetailDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  Tournaments_bracket: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BracketDto'];
+        };
+      };
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  Tournaments_teams: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PublicTournamentTeamDto'][];
         };
       };
       404: {

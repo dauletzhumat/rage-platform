@@ -5,7 +5,7 @@
 | M0 Architecture / repository scaffold | **Verified** (local + GitHub CI green; QA gate conditions closed) | See "M0 evidence"; CI run https://github.com/dauletzhumat/rage-platform/actions/runs/43248240833 | — |
 | M1 Steam Login / player accounts | **Verified** (real Steam login 2026-11-13 + GitHub CI green) | See "M1 evidence"; PR https://github.com/dauletzhumat/rage-platform/pull/14; CI runs https://github.com/dauletzhumat/rage-platform/actions/runs/43476165887 and https://github.com/dauletzhumat/rage-platform/actions/runs/43477663040 | — |
 | M2 Team applications / invitation roster | **Verified** (real two-account run 2026-11-14 + GitHub CI green) | See "M2 evidence"; contract `docs/TEAMS.md`, ADR-019; security + QA gates passed, findings fixed | — |
-| M3 Tournament registration / brackets | Not started | | Depends on M2 |
+| M3 Tournament registration / brackets | **In progress — gates passed, fixes in review** (branch `m3-tournaments`) | Contract `docs/TOURNAMENTS.md`, ADR-020; security PASS (4 Low), QA PASS WITH CONDITIONS | Signed-in flows need real Steam accounts (full bracket run needs two 5-player teams) |
 | M4 Server Agent / match control | Not started | | Needs a CS2 dedicated server + MatchZy/CounterStrikeSharp compatibility check |
 | M5 Live stats / match history | Not started | | Depends on M4 (real server events) |
 | M6 Public HLTV-like pages / rankings | Not started | | |

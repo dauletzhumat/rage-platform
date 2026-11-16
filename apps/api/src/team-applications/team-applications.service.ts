@@ -120,7 +120,7 @@ export class TeamApplicationsService {
   async listForAdmin(query: AdminTeamApplicationsQueryDto): Promise<Page<AdminTeamApplicationDto>> {
     const where: Prisma.TeamApplicationWhereInput = { status: query.status };
     const db = this.prisma.client;
-    const [rows, total] = await db.$transaction([
+    const [rows, total] = await Promise.all([
       db.teamApplication.findMany({
         where,
         select: adminApplicationSelect,

@@ -79,10 +79,15 @@ export function randomSlugSuffix(length = 6, random: (n: number) => Buffer = ran
 
 /**
  * Server-side slug base from a team name (TEAMS.md §2): NFKD → strip diacritics → lowercase →
- * runs of non `[a-z0-9]` → `-` → trim `-` → max 48. Empty → `team-<random6>`. A UUID-shaped
- * result is prefixed with `team-` so slugs can never be confused with ids.
+ * runs of non `[a-z0-9]` → `-` → trim `-` → max 48. Empty → `<prefix>-<random6>`. A UUID-shaped
+ * result is prefixed with `<prefix>-` so slugs can never be confused with ids. Tournaments reuse
+ * it with prefix `tournament` (TOURNAMENTS.md §3.1).
  */
-export function slugBaseFromName(name: string, random?: (n: number) => Buffer): string {
+export function slugBaseFromName(
+  name: string,
+  random?: (n: number) => Buffer,
+  prefix = 'team',
+): string {
   let slug = name
     .normalize('NFKD')
     .replace(/\p{M}+/gu, '')
@@ -90,14 +95,18 @@ export function slugBaseFromName(name: string, random?: (n: number) => Buffer): 
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
   slug = slug.slice(0, SLUG_BASE_MAX).replace(/-+$/g, '');
-  if (!slug) return `team-${randomSlugSuffix(6, random)}`;
-  if (isUuidShaped(slug)) slug = `team-${slug}`.slice(0, SLUG_BASE_MAX).replace(/-+$/g, '');
+  if (!slug) return `${prefix}-${randomSlugSuffix(6, random)}`;
+  if (isUuidShaped(slug)) slug = `${prefix}-${slug}`.slice(0, SLUG_BASE_MAX).replace(/-+$/g, '');
   return slug;
 }
 
 /** First free slug: `base`, `base-2`, `base-3`, … given the set of taken slugs. */
-export function pickFreeSlug(base: string, taken: ReadonlySet<string>): string {
-  const isFree = (s: string) => !taken.has(s) && !RESERVED_TEAM_SLUGS.has(s);
+export function pickFreeSlug(
+  base: string,
+  taken: ReadonlySet<string>,
+  reserved: ReadonlySet<string> = RESERVED_TEAM_SLUGS,
+): string {
+  const isFree = (s: string) => !taken.has(s) && !reserved.has(s);
   if (isFree(base)) return base;
   for (let n = 2; n < 10_000; n++) {
     const candidate = `${base}-${n}`;

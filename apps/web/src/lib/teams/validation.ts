@@ -18,12 +18,12 @@ export const TEAM_TAG_MAX = 6;
 export const TEAM_DESCRIPTION_MAX = 500;
 export const NOTE_MAX = 500;
 
-const NAME_PATTERN = /^[\p{L}\p{N}][\p{L}\p{N} ._-]*$/u;
+export const NAME_PATTERN = /^[\p{L}\p{N}][\p{L}\p{N} ._-]*$/u;
 const TAG_PATTERN = /^[A-Za-z0-9]+$/;
 const COUNTRY_PATTERN = /^[A-Z]{2}$/;
 /** C0/C1 controls except \t and \n; bidi embeddings/overrides/isolates and marks. */
-const FORBIDDEN_TEXT_CHARS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f؜‎‏‪-‮⁦-⁩]/;
-const FORBIDDEN_NAME_CHARS = /[\u0000-\u001f\u007f-\u009f؜‎‏‪-‮⁦-⁩]/;
+export const FORBIDDEN_TEXT_CHARS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f؜‎‏‪-‮⁦-⁩]/;
+export const FORBIDDEN_NAME_CHARS = /[\u0000-\u001f\u007f-\u009f؜‎‏‪-‮⁦-⁩]/;
 
 /** Code points, not UTF-16 units (matches the API's length rules). */
 export function textLength(value: string): number {

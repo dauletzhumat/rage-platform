@@ -132,6 +132,7 @@ function me(roles: Array<[MeDto['roles'][number]['role'], MeDto['roles'][number]
       role,
       scopeType,
       scopeId: null,
+      scopeSlug: null,
       issuedAt: '2026-11-12T00:00:00.000Z',
     })),
   } satisfies MeDto;

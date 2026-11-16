@@ -18,10 +18,13 @@ export function AdminShell({
   children,
   viewer = null,
   showNav = false,
+  superAdmin = false,
 }: {
   children: ReactNode;
   viewer?: Viewer | null;
   showNav?: boolean;
+  /** Shows SUPER_ADMIN-only links (e.g. Bans). */
+  superAdmin?: boolean;
 }) {
   const t = useTranslations('admin');
   return (
@@ -50,7 +53,7 @@ export function AdminShell({
       <div className="flex flex-1 flex-col lg:flex-row">
         {showNav ? (
           <aside className="border-b border-border bg-surface/60 px-3 py-3 lg:w-60 lg:shrink-0 lg:border-b-0 lg:border-r lg:py-6">
-            <AdminNav />
+            <AdminNav superAdmin={superAdmin} />
           </aside>
         ) : null}
         <main id={MAIN_CONTENT_ID} tabIndex={-1} className="min-w-0 flex-1 focus:outline-none">

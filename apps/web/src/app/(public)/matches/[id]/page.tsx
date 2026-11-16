@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { BarChart3, Map as MapIcon } from 'lucide-react';
+import { BarChart3, Map as MapIcon, ShieldAlert, Vote } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Container } from '@/components/ui/container';
@@ -21,13 +21,21 @@ import { FormattedDate, InitialsAvatar } from '@/components/domain/formatting';
 import { DetailSection, EmptySection, Facts } from '@/components/domain/section';
 import { MatchStatusPill } from '@/components/domain/status';
 import { ApiErrorState } from '@/components/states/api-error-state';
-import { getMatch } from '@/lib/api/server';
-import type { TeamRef } from '@/lib/api/types';
+import { DemoModeBanner } from '@/components/states/demo-mode-banner';
+import { RefreshButton } from '@/components/tournaments/refresh-button';
+import { ResultSourceBadge } from '@/components/tournaments/status-badges';
+import { VetoBoard } from '@/components/tournaments/veto-board';
+import { getDemoMode, getMatch, getMatchVeto, getMe } from '@/lib/api/server';
+import { sampleActionsAllowed } from '@/lib/demo-mode';
+import type { MatchDetailM3, MatchTeamRefM3 } from '@/lib/api/types';
+import { isSuperAdmin } from '@/lib/auth/roles';
+import { operatedTeamIds } from '@/lib/tournaments/access';
+import { winnerSide } from '@/lib/tournaments/bracket';
 import { cn } from '@/lib/utils';
 
 type Props = { params: Promise<{ id: string }> };
 
-function teamLabel(team: TeamRef | null, tbd: string): string {
+function teamLabel(team: MatchTeamRefM3 | null, tbd: string): string {
   return team ? team.name : tbd;
 }
 
@@ -49,7 +57,7 @@ function TeamCard({
   tbd,
   winnerLabel,
 }: {
-  team: TeamRef | null;
+  team: MatchTeamRefM3 | null;
   isWinner: boolean;
   tbd: string;
   winnerLabel: string;
@@ -87,9 +95,81 @@ function Score({ value }: { value: number | null }) {
   return value === null ? <span className="text-muted">–</span> : <span>{value}</span>;
 }
 
+/** Series score, or a dash when no result exists (forfeits have no scores). */
+function SeriesScore({ match, label, vs }: { match: MatchDetailM3; label: string; vs: string }) {
+  if (match.teamAScore === null || match.teamBScore === null) {
+    return (
+      <span aria-hidden="true" className="text-sm font-semibold uppercase text-muted">
+        {vs}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="font-mono text-3xl font-bold tabular-nums"
+      aria-label={label}
+      data-testid="series-score"
+    >
+      {match.teamAScore}
+      <span className="mx-1 text-muted">:</span>
+      {match.teamBScore}
+    </span>
+  );
+}
+
+/** Explains where the result came from (M3: never server-verified). */
+async function ResultNote({ match }: { match: MatchDetailM3 }) {
+  const t = await getTranslations('matches');
+  const side = winnerSide(match);
+  if (match.resultSource === 'ADMIN_OVERRIDE') {
+    return (
+      <p
+        role="note"
+        data-testid="result-note"
+        className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm"
+      >
+        <ShieldAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning" />
+        {t('adminResultNote')}
+      </p>
+    );
+  }
+  if (match.resultSource === 'FORFEIT') {
+    const loser = side === 'A' ? match.teamB : side === 'B' ? match.teamA : null;
+    return (
+      <p
+        role="note"
+        data-testid="result-note"
+        className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm"
+      >
+        {loser ? t('forfeitNote', { team: loser.name }) : t('forfeitNoteUnknown')}
+      </p>
+    );
+  }
+  if (match.status === 'CANCELLED' && match.statusReason === 'tournament_cancelled') {
+    return (
+      <p role="note" className="rounded-md border border-border bg-raised p-3 text-sm text-muted">
+        {t('tournamentCancelledNote')}
+      </p>
+    );
+  }
+  if (match.status === 'CANCELLED' && match.statusReason === 'bye') {
+    return (
+      <p role="note" className="rounded-md border border-border bg-raised p-3 text-sm text-muted">
+        {t('byeNote')}
+      </p>
+    );
+  }
+  return null;
+}
+
 export default async function MatchPage({ params }: Props) {
   const { id } = await params;
-  const [result, t] = await Promise.all([getMatch(id), getTranslations('matches')]);
+  const [result, t, tv, tms] = await Promise.all([
+    getMatch(id),
+    getTranslations('matches'),
+    getTranslations('veto'),
+    getTranslations('matchMapStatus'),
+  ]);
 
   if (!result.ok) {
     if (result.kind === 'not_found') notFound();
@@ -103,14 +183,30 @@ export default async function MatchPage({ params }: Props) {
 
   const match = result.data;
   const maps = [...match.maps].sort((a, b) => a.mapOrder - b.mapOrder);
-  const winA = match.winnerTeamSlug !== null && match.winnerTeamSlug === match.teamA?.slug;
-  const winB = match.winnerTeamSlug !== null && match.winnerTeamSlug === match.teamB?.slug;
+  const side = winnerSide(match);
+  const isBye = match.status === 'CANCELLED' && match.statusReason === 'bye';
+  const veto = match.tournament && !isBye ? await getMatchVeto(match.id) : null;
+  const matchOpen = match.status === 'CREATED' && match.teamA !== null && match.teamB !== null;
+  const vetoActive =
+    veto !== null && veto.ok && veto.data.pool.length > 0 && !veto.data.complete && matchOpen;
+  const me = vetoActive ? await getMe() : null;
+  const operated = me && me.ok && !match.isSample ? [...operatedTeamIds(me.data)] : [];
+  // SUPER_ADMIN may veto for the acting team as an audited override (labelled in the board).
+  // Sample matches only in dev-only demo mode (sample captains cannot sign in).
+  const demoMode = match.isSample ? await getDemoMode() : false;
+  const canOverride = Boolean(
+    me && me.ok && isSuperAdmin(me.data.roles) && sampleActionsAllowed(match.isSample, demoMode),
+  );
+  const showDemoBanner = demoMode && canOverride;
+  const nameA = teamLabel(match.teamA, t('tbd'));
+  const nameB = teamLabel(match.teamB, t('tbd'));
 
   return (
     <Container className="space-y-8 py-8">
       <h1 className="sr-only">
-        {teamLabel(match.teamA, t('tbd'))} {t('vs')} {teamLabel(match.teamB, t('tbd'))}
+        {nameA} {t('vs')} {nameB}
       </h1>
+      {showDemoBanner ? <DemoModeBanner /> : null}
       <Card>
         <CardContent className="space-y-6 p-5">
           <div className="flex flex-wrap items-center justify-center gap-2">
@@ -118,15 +214,37 @@ export default async function MatchPage({ params }: Props) {
             <span className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-xs">
               {match.format}
             </span>
+            <ResultSourceBadge
+              source={match.resultSource ?? null}
+              verifiedAt={match.resultVerifiedAt}
+            />
             {match.isSample ? <SampleDataBadge /> : null}
           </div>
           <div className="flex items-center gap-4">
-            <TeamCard team={match.teamA} isWinner={winA} tbd={t('tbd')} winnerLabel={t('winner')} />
-            <span aria-hidden="true" className="text-sm font-semibold uppercase text-muted">
-              {t('vs')}
-            </span>
-            <TeamCard team={match.teamB} isWinner={winB} tbd={t('tbd')} winnerLabel={t('winner')} />
+            <TeamCard
+              team={match.teamA}
+              isWinner={side === 'A'}
+              tbd={t('tbd')}
+              winnerLabel={t('winner')}
+            />
+            <SeriesScore
+              match={match}
+              vs={t('vs')}
+              label={t('seriesScoreLabel', {
+                teamA: nameA,
+                scoreA: match.teamAScore ?? 0,
+                teamB: nameB,
+                scoreB: match.teamBScore ?? 0,
+              })}
+            />
+            <TeamCard
+              team={match.teamB}
+              isWinner={side === 'B'}
+              tbd={t('tbd')}
+              winnerLabel={t('winner')}
+            />
           </div>
+          <ResultNote match={match} />
           <div className="border-t border-border pt-4">
             <Facts
               items={[
@@ -147,7 +265,14 @@ export default async function MatchPage({ params }: Props) {
                     <span className="text-muted">{t('standalone')}</span>
                   ),
                 },
-                { label: t('format'), value: match.format },
+                {
+                  label: t('round'),
+                  value: match.round ? (
+                    t('roundNumber', { round: match.round.roundNumber })
+                  ) : (
+                    <span className="text-muted">—</span>
+                  ),
+                },
                 {
                   label: t('openMatchroom'),
                   value: (
@@ -165,37 +290,105 @@ export default async function MatchPage({ params }: Props) {
         </CardContent>
       </Card>
 
+      {veto ? (
+        <DetailSection id="veto" title={tv('title')}>
+          {veto.ok && veto.data.pool.length > 0 ? (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs text-muted">{tv('noLiveUpdates')}</p>
+                {!veto.data.complete ? <RefreshButton label={tv('refresh')} /> : null}
+              </div>
+              <VetoBoard
+                matchId={match.id}
+                format={match.format}
+                teamA={match.teamA}
+                teamB={match.teamB}
+                state={veto.data}
+                operatedTeamIds={operated}
+                canOverride={canOverride}
+                matchOpen={matchOpen}
+              />
+            </>
+          ) : veto.ok || veto.kind === 'not_found' ? (
+            <EmptyState compact headingLevel="h3" icon={Vote} title={tv('notAvailable')} />
+          ) : (
+            <ApiErrorState failure={veto} headingLevel="h3" />
+          )}
+        </DetailSection>
+      ) : null}
+
       <DetailSection id="maps" title={t('maps')}>
         {maps.length === 0 ? (
           <EmptyState compact headingLevel="h3" icon={MapIcon} title={t('mapsEmpty')} />
         ) : (
-          <Table>
-            <TableCaption srOnly>{t('mapsCaption')}</TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12">{t('mapNumber')}</TableHead>
-                <TableHead>{t('map')}</TableHead>
-                <TableHead className="text-right">{teamLabel(match.teamA, t('tbd'))}</TableHead>
-                <TableHead className="text-right">{teamLabel(match.teamB, t('tbd'))}</TableHead>
-                <TableHead>{t('mapStatus')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {maps.map((map) => (
-                <TableRow key={map.mapOrder}>
-                  <TableCell className="text-muted">{map.mapOrder}</TableCell>
-                  <TableCell className="font-medium">{map.mapName}</TableCell>
-                  <TableCell className="text-right font-semibold">
-                    <Score value={map.teamAScore} />
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">
-                    <Score value={map.teamBScore} />
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-muted">{map.status}</TableCell>
+          <>
+            {match.resultSource && match.resultSource !== 'SERVER' ? (
+              <div data-testid="maps-result-source">
+                <ResultSourceBadge
+                  source={match.resultSource}
+                  verifiedAt={match.resultVerifiedAt}
+                />
+              </div>
+            ) : null}
+            <Table>
+              <TableCaption srOnly>{t('mapsCaption')}</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">{t('mapNumber')}</TableHead>
+                  <TableHead>{t('map')}</TableHead>
+                  <TableHead className="text-right">{nameA}</TableHead>
+                  <TableHead className="text-right">{nameB}</TableHead>
+                  <TableHead>{t('mapWinner')}</TableHead>
+                  <TableHead>{t('mapStatus')}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {maps.map((map) => {
+                  const notPlayed = map.status === 'CANCELLED';
+                  const winner =
+                    map.winnerTeamId && match.teamA?.id === map.winnerTeamId
+                      ? match.teamA
+                      : map.winnerTeamId && match.teamB?.id === map.winnerTeamId
+                        ? match.teamB
+                        : null;
+                  return (
+                    <TableRow key={map.mapOrder} data-map-status={map.status}>
+                      <TableCell className="text-muted">{map.mapOrder}</TableCell>
+                      <TableCell className="font-mono font-medium">{map.mapName}</TableCell>
+                      {notPlayed ? (
+                        <TableCell colSpan={2} className="text-right text-xs text-muted">
+                          {t('mapNotPlayed')}
+                        </TableCell>
+                      ) : (
+                        <>
+                          <TableCell
+                            className={cn(
+                              'text-right font-semibold tabular-nums',
+                              winner && winner === match.teamA && 'text-accent-text',
+                            )}
+                          >
+                            <Score value={map.teamAScore} />
+                          </TableCell>
+                          <TableCell
+                            className={cn(
+                              'text-right font-semibold tabular-nums',
+                              winner && winner === match.teamB && 'text-accent-text',
+                            )}
+                          >
+                            <Score value={map.teamBScore} />
+                          </TableCell>
+                        </>
+                      )}
+                      <TableCell className="text-sm">
+                        {winner ? winner.name : <span className="text-muted">—</span>}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted">{tms(map.status)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </>
         )}
       </DetailSection>
 

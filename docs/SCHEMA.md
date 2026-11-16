@@ -26,7 +26,8 @@ Use UUID keys, timestamptz, foreign keys, partial unique indexes where supported
 - tournament_roster_entries(id, roster_id, user_id, steam_id64_snapshot, nickname_snapshot, role, UNIQUE(roster_id,user_id))
 - brackets(id, tournament_stage_id, generation_version, created_at)
 - bracket_slots(id, bracket_id, round_number, slot_number, next_slot_id, source_match_id)
-- matches(id, tournament_id, stage_id, bracket_slot_id, team_a_id, team_b_id, format, status, winner_team_id, scheduled_at, started_at, completed_at, result_verified_at)
+- matches(id, tournament_id, stage_id, bracket_slot_id, team_a_id, team_b_id, format, status, winner_team_id, scheduled_at, started_at, completed_at, result_verified_at, result_source) — M3: see below
+- match_state_transitions, banned_steam_ids — M3: see below
 - match_rosters(id, match_id, team_id, tournament_roster_id, frozen_at)
 - match_maps(id, match_id, map_order, map_name, status, team_a_score, team_b_score, winner_team_id, started_at, completed_at)
 - match_map_players(id, match_map_id, user_id, team_id, steam_id64_snapshot, nickname_snapshot, side_initial)
@@ -88,3 +89,106 @@ Notes
   team_memberships_team_id_joined_at_id_idx;` and `ALTER TABLE … DROP CONSTRAINT` for the five CHECKs,
   with the matching `schema.prisma` revert. Dropping `idempotency_keys` loses only ≤ 24 h of replay
   data, no business data.
+
+## M3 additions (migration `20261114000000_m3_tournaments`, ADR-020, ADR-018 Q5, `docs/TOURNAMENTS.md`)
+Forward-only; no table, column or row is dropped. Constraint names are exported as `DB_CONSTRAINTS`
+from `@rage/db`.
+
+- banned_steam_ids(id, steam_id64, reason, created_by → users, created_at, lifted_at, lifted_by → users, lift_reason) — new
+- match_state_transitions(id, match_id → matches, from_status NULL, to_status, source ADMIN|SYSTEM|SERVER, actor_user_id NULL, reason NULL, created_at) — new, **append-only**
+- matches.result_source `MatchResultSource` (SERVER | ADMIN_OVERRIDE | FORFEIT), nullable — new column
+- `MatchStatus` = CREATED, SERVER_ASSIGNED, PREPARING, WARMUP, READY_CHECK, LIVE, PAUSED, COMPLETED, CANCELLED, FAILED, DISPUTED (KNIFE / MAP_FINISHED removed; map-level states stay in `MatchMapStatus`)
+
+| Object | Rule | Name |
+|---|---|---|
+| `banned_steam_ids` | one active ban per SteamID64 (also the ban lookup index) | partial unique `banned_steam_ids_one_active_per_steam_id_uniq` (`steam_id64` WHERE `lifted_at IS NULL`) |
+| | `^[0-9]{17}$`; reason not blank | `banned_steam_ids_steam_id64_format_chk`, `banned_steam_ids_reason_not_blank_chk` |
+| | lifted_at / lifted_by / non-blank lift_reason all set or all NULL; lifted_at ≥ created_at | `banned_steam_ids_lifted_fields_chk`, `banned_steam_ids_lifted_after_created_chk` |
+| `match_state_transitions` | to ≠ from; ADMIN ⇒ actor set; reason not blank | `match_state_transitions_changes_status_chk`, `…_admin_actor_chk`, `…_reason_not_blank_chk` |
+| | append-only (UPDATE/DELETE/TRUNCATE rejected; `rage_app` SELECT/INSERT only) | triggers `match_state_transitions_append_only`, `…_append_only_truncate`; `APPEND_ONLY_TABLES` in `grants.ts` |
+| | history per match | index `match_state_transitions_match_id_created_at_idx` |
+| `matches` | COMPLETED ⇒ `result_source` and `winner_team_id` set | `matches_completed_result_chk` |
+| | ADMIN_OVERRIDE / FORFEIT ⇒ `result_verified_at IS NULL` | `matches_admin_result_unverified_chk` |
+| | FORFEIT ⇒ no scores | `matches_forfeit_no_scores_chk` |
+| | one match per bracket slot (init) | `matches_bracket_slot_id_key` |
+| `tournaments` | `max_teams` NULL or 2..64 (was ≥ 2; redefined under the same name) | `tournaments_max_teams_chk` |
+| | name unique case-insensitively; not blank | unique index `tournaments_name_ci_uniq` (`lower(name)`), `tournaments_name_not_blank_chk` |
+| `tournament_registrations` | seed ≥ 1 (init) | `tournament_registrations_seed_chk` |
+| | seed unique among APPROVED of a tournament | partial unique `tournament_registrations_approved_seed_uniq` |
+| `tournament_rosters` | one current (DRAFT or LOCKED) roster per registration | partial unique `tournament_rosters_one_current_per_registration_uniq` (init `…_one_locked_per_registration_uniq` kept) |
+| | LOCKED ⇒ `locked_at`; DRAFT ⇒ `locked_at`, `locked_by` NULL (replaces init `tournament_rosters_locked_at_chk`, which forbade DRAFT → SUPERSEDED) | `tournament_rosters_locked_fields_chk` |
+| | change_reason not blank | `tournament_rosters_change_reason_not_blank_chk` |
+| | status only DRAFT → LOCKED/SUPERSEDED, LOCKED → SUPERSEDED; registration/version/id/created_at immutable; supersedes_roster_id set once; lock fields frozen after DRAFT; only DRAFT rows deletable | trigger `tournament_rosters_immutable` (fn `rage_guard_tournament_roster`) |
+| `tournament_roster_entries` | never updated (no-op UPDATE tolerated); entries of a non-DRAFT roster never deleted; no TRUNCATE | triggers `tournament_roster_entries_immutable`, `…_immutable_truncate` (fn `rage_guard_tournament_roster_entry`) |
+| | nickname snapshot not blank | `tournament_roster_entries_nickname_not_blank_chk` |
+| `map_veto_actions` | map_name `^de_[a-z0-9_]{2,30}$` | `map_veto_actions_map_name_format_chk` |
+| | BAN/PICK/DECIDER once per map (init; SIDE_PICK excluded on purpose); one action per sequence (init) | `map_veto_actions_map_once_per_match_uniq`, `map_veto_actions_match_id_sequence_key` |
+| `match_maps` | a map once per match | unique `match_maps_match_id_map_name_key` |
+| `bracket_slots` | round/slot ≥ 1, no self-link, one winner per (next slot, position) (all init) | `bracket_slots_numbers_chk`, `bracket_slots_not_self_chk`, `bracket_slots_next_position_uniq` |
+
+Notes for writers (API)
+- **Roster versions:** mark the previous version `SUPERSEDED` *before* inserting the next `DRAFT` /
+  `LOCKED` version (the one-current index is checked per row). Never UPDATE entries; create a new version.
+- **Re-seeding:** the seed unique index is not deferrable; clear the tournament's seeds
+  (`UPDATE … SET seed = NULL WHERE tournament_id = $1 AND status = 'APPROVED'`) and assign the new ones in
+  the same transaction.
+- **Results:** `COMPLETED` must be written together with `result_source` and `winner_team_id` in the same
+  UPDATE. Forfeits leave `team_a_score` / `team_b_score` NULL.
+- `getDbViolation()` returns `kind: 'immutable'` for the roster guards and `'append_only'` for
+  `match_state_transitions` (both SQLSTATE P0001).
+- A ban is keyed by SteamID64, not `users.id`, so a SteamID can be banned before it ever signs in.
+- Maintenance on any guarded table: in one transaction, `SET LOCAL rage.allow_append_only_maintenance = 'on'`
+  (owner only; `rage_app` lacks UPDATE/DELETE on append-only tables regardless).
+- No format CHECK on `match_maps.map_name`: maps reported by a real server (M4) may use other prefixes.
+
+Query plans (dev, PostgreSQL 18.6, `enable_seqscan = off` because the tables are tiny; 2026-11-14):
+eligibility ("already on another team's current roster in this tournament") →
+`tournament_registrations_tournament_id_team_id_key` → `tournament_rosters_one_current_per_registration_uniq`
+→ index-only `tournament_roster_entries_roster_id_user_id_key`; active-ban lookup → index-only
+`banned_steam_ids_one_active_per_steam_id_uniq`; approved count → `tournament_registrations_tournament_id_team_id_key`
+(+ status filter); transition history → `match_state_transitions_match_id_created_at_idx`; name check →
+`tournaments_name_ci_uniq`.
+
+### Deploy / rollback
+- Deploy (as owner): `pnpm --filter @rage/db migrate:deploy`, then **always** `pnpm --filter @rage/db db:grants`
+  (adds `match_state_transitions` to the append-only privilege set). The file runs as one implicit
+  transaction. It starts with a pre-flight `DO` block that aborts if any `matches.status` is KNIFE or
+  MAP_FINISHED (or if another column uses `MatchStatus`); fix such rows first (series state in
+  `matches.status`, map state in `match_maps.status`). Other pre-flight queries are in the migration header.
+- Enum change: Prisma's swap (create `MatchStatus_new`, `ALTER COLUMN … TYPE … USING status::text::…`,
+  rename, drop old, restore default) runs **inside** the migration transaction — Prisma's own inner
+  `BEGIN/COMMIT` was removed, and `match_state_transitions` is created after the swap.
+  `ALTER COLUMN TYPE` rewrites `matches` under an ACCESS EXCLUSIVE lock (fine at current size; schedule a
+  window for large tables). Verified by `m3-tournaments.int.test.ts`, which replays init → M2 in an
+  isolated schema, proves the pre-flight aborts atomically, then applies M3 without row loss.
+- Rollback is a new forward migration: drop `match_state_transitions`, `banned_steam_ids`,
+  `matches.result_source` (export first: it is result provenance), the two new enum types, the roster
+  triggers and guard functions, and the new indexes/CHECKs above; re-add `tournament_rosters_locked_at_chk`
+  only after confirming no never-locked SUPERSEDED rows exist; restore `tournaments_max_teams_chk` as
+  `>= 2`. Re-adding KNIFE / MAP_FINISHED is `ALTER TYPE "MatchStatus" ADD VALUE …` (non-destructive).
+
+## M3 hardening (migration `20261115000000_m3_hardening`, security gate L-1 / L-2)
+Raw SQL only (no `schema.prisma` change); forward-only, no data rewritten.
+
+| Object | Rule | Name |
+|---|---|---|
+| `tournament_roster_entries` | INSERT only when the parent roster is DRAFT **or** the parent roster row was written by the current transaction (`xmin = pg_current_xact_id()::xid`; parent read `FOR SHARE`) — a substitution inserts a LOCKED roster and its entries in one transaction | trigger `tournament_roster_entries_insert_guard` (fn `rage_guard_tournament_roster_entry_insert`) |
+| `tournament_rosters` | additionally: `change_reason` and `supersedes_roster_id` frozen once the roster left DRAFT (the API sets both at INSERT) | `rage_guard_tournament_roster` (replaced via `CREATE OR REPLACE`) |
+| `matches` | winner is team A or B | `matches_winner_is_participant_chk` (exists since init; now in `DB_CONSTRAINTS`) |
+| | COMPLETED with `result_source = 'SERVER'` ⇒ `result_verified_at` set | `matches_server_result_verified_chk` |
+| | once COMPLETED: winner, team A/B, scores, `result_source`, `result_verified_at` immutable and status may only stay COMPLETED or become DISPUTED (the move to DISPUTED may carry corrected result fields) | trigger `matches_completed_result_immutable` (fn `rage_guard_completed_match`) |
+| `map_veto_actions` | append-only (owner trigger; `rage_app` SELECT/INSERT only via `APPEND_ONLY_TABLES`) | triggers `map_veto_actions_append_only`, `…_append_only_truncate` |
+
+Notes
+- All guards honour `SET LOCAL rage.allow_append_only_maintenance = 'on'` (owner maintenance only).
+- `xmin` equality with the running top-level xid is wraparound-safe for live rows. The insert guard
+  fails closed if the roster was inserted inside a savepoint (sub-transaction xid). A DRAFT roster
+  locked earlier in the same transaction also passes; the API never inserts entries after locking.
+- Violations surface as SQLSTATE P0001; `getDbViolation()` → `kind: 'immutable'` (rosters, entries,
+  completed matches) or `'append_only'` (veto log).
+- Deploy: `migrate:deploy`, then **`db:grants`** (adds `map_veto_actions` to the append-only privilege
+  set). Pre-flight: `SELECT count(*) FROM matches WHERE status = 'COMPLETED' AND result_source = 'SERVER'
+  AND result_verified_at IS NULL` must be 0 (dev 2026-11-15: 0).
+- Rollback (new migration): drop the three new triggers and two new functions, restore the M3 body of
+  `rage_guard_tournament_roster`, drop `matches_server_result_verified_chk`, remove `map_veto_actions`
+  from `APPEND_ONLY_TABLES` and re-run `db:grants`. No data is affected.

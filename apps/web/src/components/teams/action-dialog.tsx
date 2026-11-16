@@ -15,6 +15,7 @@ import {
 import { FieldError, FieldHint, Label, Textarea } from '@/components/ui/input';
 import type { ApiFailure, ApiResult } from '@/lib/api/types';
 import { REASON_MAX } from '@/lib/auth/validation';
+import { ReasonPresetChips } from '@/components/tournaments/reason-presets';
 
 export interface ReasonFieldConfig {
   label: string;
@@ -22,6 +23,10 @@ export interface ReasonFieldConfig {
   invalidMessage: string;
   /** Returns true when the (untrimmed) value is acceptable. */
   validate: (value: string) => boolean;
+  /** One-click preset texts that fill the field (still editable). */
+  presets?: readonly string[];
+  /** Value the field starts with each time the dialog opens (e.g. demo-mode prefill). */
+  initialValue?: string;
 }
 
 export interface ActionDialogProps {
@@ -87,6 +92,7 @@ export function ActionDialog({
   function onOpenChange(next: boolean) {
     if (pending) return;
     setOpen(next);
+    if (next) setValue(reason?.initialValue ?? '');
     if (!next) {
       setValue('');
       setInvalid(false);
@@ -140,6 +146,17 @@ export function ActionDialog({
           {reason ? (
             <div className="space-y-1.5">
               <Label htmlFor={reasonId}>{reason.label}</Label>
+              {reason.presets ? (
+                <ReasonPresetChips
+                  presets={reason.presets}
+                  current={value}
+                  onPick={(preset) => {
+                    setValue(preset);
+                    setInvalid(false);
+                    reasonRef.current?.focus();
+                  }}
+                />
+              ) : null}
               <Textarea
                 ref={reasonRef}
                 id={reasonId}

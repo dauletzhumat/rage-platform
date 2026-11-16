@@ -31,7 +31,8 @@ import type {
 export const ROLE_SCOPES: Record<RoleType, readonly RoleScopeType[]> = {
   SUPER_ADMIN: ['GLOBAL'],
   TOURNAMENT_ADMIN: ['GLOBAL', 'TOURNAMENT'],
-  MATCH_ADMIN: ['GLOBAL', 'TOURNAMENT'],
+  // M3: MATCH_ADMIN may also be scoped to one match (TOURNAMENTS.md §2).
+  MATCH_ADMIN: ['GLOBAL', 'TOURNAMENT', 'MATCH'],
   OBSERVER: ['GLOBAL', 'TOURNAMENT', 'MATCH'],
   TEAM_MANAGER: ['TEAM'],
 };
@@ -80,7 +81,7 @@ export class AdminService {
       where = /^\d{17}$/.test(q) ? { OR: [byNickname, { steamId64: q }] } : byNickname;
     }
     const db = this.prisma.client;
-    const [rows, total] = await db.$transaction([
+    const [rows, total] = await Promise.all([
       db.user.findMany({
         where,
         select: {
@@ -273,7 +274,7 @@ export class AdminService {
       ...(query.actorUserId ? { actorUserId: query.actorUserId } : {}),
     };
     const db = this.prisma.client;
-    const [rows, total] = await db.$transaction([
+    const [rows, total] = await Promise.all([
       db.auditLog.findMany({
         where,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],

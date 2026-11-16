@@ -123,7 +123,7 @@ function readServerMessage(body: Partial<ApiErrorBody>): string | undefined {
  *  - 401 → `unauthenticated`
  *  - 403 → `forbidden`
  *  - 404 → `not_found`
- *  - 409 → `conflict` (+ `serverMessage`)
+ *  - 409 → `conflict` (+ `serverMessage`, `details` e.g. PLAYER_INELIGIBLE)
  *  - 429 → `rate_limited` (+ `retryAfterSeconds`)
  *  - network error / timeout / 502 / 503 / 504 → `unavailable`
  *  - anything else (incl. invalid JSON) → `error`
@@ -223,8 +223,11 @@ export async function apiSend<T>(path: string, options: ApiSendOptions): Promise
       const serverMessage = readServerMessage(errorBody);
       // e.g. IDEMPOTENCY_IN_PROGRESS + `Retry-After: 1` (TEAMS.md §7).
       const retryAfterSeconds = parseRetryAfter(response.headers.get('retry-after'));
+      // e.g. PLAYER_INELIGIBLE: [{ field: userId, message: REASON }] (TOURNAMENTS.md §4).
+      const details = readDetails(errorBody);
       return failure('conflict', 'The request conflicts with the current state.', {
         ...extra,
+        ...(details ? { details } : {}),
         ...(serverMessage ? { serverMessage } : {}),
         ...(retryAfterSeconds !== undefined ? { retryAfterSeconds } : {}),
       });

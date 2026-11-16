@@ -28,6 +28,28 @@ import type {
   TeamInvitationDto,
   TransferCaptainRequest,
   UpdateProfileRequest,
+  // M3
+  AdminRegistrationDto,
+  AdminTournamentDto,
+  ApproveRegistrationDto,
+  BannedSteamIdDto,
+  BracketDto,
+  CreateRegistrationDto,
+  CreateSteamBanDto,
+  CreateTournamentDto,
+  ForfeitDto,
+  LiftSteamBanDto,
+  MatchDetailM3,
+  RegistrationDto,
+  RejectRegistrationDto,
+  ResultOverrideDto,
+  SeedsDto,
+  SubmitVetoDto,
+  SubstituteRegistrationDto,
+  TournamentStatusChangeDto,
+  UpdateRegistrationRosterDto,
+  UpdateTournamentDto,
+  VetoStateDto,
 } from './types';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -88,24 +110,25 @@ export function isRetryableIdempotentFailure(failure: ApiFailure): boolean {
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
- * POST with an `Idempotency-Key`. One automatic retry (same key, same body) for transient
+ * POST (or PUT/PATCH, TOURNAMENTS.md §1) with an `Idempotency-Key`. One automatic retry (same key, same body) for transient
  * outcomes; every other result is returned as-is. Never throws.
  */
 async function sendIdempotent<T>(
   path: string,
   body: unknown,
   options: MutationOptions = {},
+  method: Extract<HttpMethod, 'POST' | 'PUT' | 'PATCH'> = 'POST',
 ): Promise<ApiResult<T>> {
   const key =
     options.idempotencyKey && IDEMPOTENCY_KEY_PATTERN.test(options.idempotencyKey)
       ? options.idempotencyKey
       : newIdempotencyKey();
   const headers = { [IDEMPOTENCY_HEADER]: key };
-  const first = await send<T>('POST', path, body, options, headers);
+  const first = await send<T>(method, path, body, options, headers);
   if (first.ok || !isRetryableIdempotentFailure(first)) return first;
   const delayMs = Math.min((first.retryAfterSeconds ?? 1) * 1000, MAX_RETRY_DELAY_MS);
   await (options.sleep ?? defaultSleep)(delayMs);
-  return send<T>('POST', path, body, options, headers);
+  return send<T>(method, path, body, options, headers);
 }
 
 /** `POST /auth/logout` (204, idempotent). */
@@ -250,4 +273,187 @@ export function declineInvitation(
 ): Promise<ApiResult<MyInvitationDto>> {
   if (!UUID.test(invitationId)) return invalidId();
   return sendIdempotent(`/invitations/${invitationId}/decline`, undefined, options);
+}
+
+// ---------- M3: tournaments, registrations, veto, results, bans (docs/TOURNAMENTS.md §10) ----------
+
+const regPath = (tournamentId: string, registrationId: string) =>
+  `/tournaments/${tournamentId}/registrations/${registrationId}`;
+const adminRegPath = (tournamentId: string, registrationId: string) =>
+  `/admin/tournaments/${tournamentId}/registrations/${registrationId}`;
+
+/** `POST /tournaments/:id/registrations` → 201 `RegistrationDto` (PENDING, roster v1 DRAFT). */
+export function createRegistration(
+  tournamentId: string,
+  body: CreateRegistrationDto,
+  options?: MutationOptions,
+): Promise<ApiResult<RegistrationDto>> {
+  if (!UUID.test(tournamentId) || !UUID.test(body.teamId)) return invalidId();
+  return sendIdempotent(`/tournaments/${tournamentId}/registrations`, body, options);
+}
+
+/** `PUT /tournaments/:id/registrations/:registrationId/roster` → `RegistrationDto` (new version). */
+export function updateRegistrationRoster(
+  tournamentId: string,
+  registrationId: string,
+  body: UpdateRegistrationRosterDto,
+  options?: MutationOptions,
+): Promise<ApiResult<RegistrationDto>> {
+  if (!UUID.test(tournamentId) || !UUID.test(registrationId) || !UUID.test(body.teamId)) {
+    return invalidId();
+  }
+  return sendIdempotent(`${regPath(tournamentId, registrationId)}/roster`, body, options, 'PUT');
+}
+
+/** `POST /tournaments/:id/registrations/:registrationId/withdraw` → `RegistrationDto` (WITHDRAWN). */
+export function withdrawRegistration(
+  tournamentId: string,
+  registrationId: string,
+  options?: MutationOptions,
+): Promise<ApiResult<RegistrationDto>> {
+  if (!UUID.test(tournamentId) || !UUID.test(registrationId)) return invalidId();
+  return sendIdempotent(`${regPath(tournamentId, registrationId)}/withdraw`, undefined, options);
+}
+
+/** `POST /matches/:id/veto` (operator of the team whose turn it is) → `VetoStateDto`. */
+export function submitVeto(
+  matchId: string,
+  body: SubmitVetoDto,
+  options?: MutationOptions,
+): Promise<ApiResult<VetoStateDto>> {
+  if (!UUID.test(matchId)) return invalidId();
+  return sendIdempotent(`/matches/${matchId}/veto`, body, options);
+}
+
+/** `POST /admin/tournaments` → 201 `AdminTournamentDto` (DRAFT). */
+export function createTournament(
+  body: CreateTournamentDto,
+  options?: MutationOptions,
+): Promise<ApiResult<AdminTournamentDto>> {
+  return sendIdempotent('/admin/tournaments', body, options);
+}
+
+/** `PATCH /admin/tournaments/:id` (DRAFT or REGISTRATION_OPEN) → `AdminTournamentDto`. */
+export function updateTournament(
+  tournamentId: string,
+  body: UpdateTournamentDto,
+  options?: MutationOptions,
+): Promise<ApiResult<AdminTournamentDto>> {
+  if (!UUID.test(tournamentId)) return invalidId();
+  return sendIdempotent(`/admin/tournaments/${tournamentId}`, body, options, 'PATCH');
+}
+
+/** `POST /admin/tournaments/:id/status` `{ to, reason? }` → `AdminTournamentDto`. */
+export function changeTournamentStatus(
+  tournamentId: string,
+  body: TournamentStatusChangeDto,
+  options?: MutationOptions,
+): Promise<ApiResult<AdminTournamentDto>> {
+  if (!UUID.test(tournamentId)) return invalidId();
+  return sendIdempotent(`/admin/tournaments/${tournamentId}/status`, body, options);
+}
+
+/** `POST /admin/tournaments/:id/registrations/:registrationId/approve` `{ note? }`. */
+export function approveRegistration(
+  tournamentId: string,
+  registrationId: string,
+  body: ApproveRegistrationDto,
+  options?: MutationOptions,
+): Promise<ApiResult<AdminRegistrationDto>> {
+  if (!UUID.test(tournamentId) || !UUID.test(registrationId)) return invalidId();
+  return sendIdempotent(`${adminRegPath(tournamentId, registrationId)}/approve`, body, options);
+}
+
+/** `POST /admin/tournaments/:id/registrations/:registrationId/reject` `{ reason }`. */
+export function rejectRegistration(
+  tournamentId: string,
+  registrationId: string,
+  body: RejectRegistrationDto,
+  options?: MutationOptions,
+): Promise<ApiResult<AdminRegistrationDto>> {
+  if (!UUID.test(tournamentId) || !UUID.test(registrationId)) return invalidId();
+  return sendIdempotent(`${adminRegPath(tournamentId, registrationId)}/reject`, body, options);
+}
+
+/** `POST /admin/tournaments/:id/registrations/:registrationId/substitute`. */
+export function substituteRegistrationPlayer(
+  tournamentId: string,
+  registrationId: string,
+  body: SubstituteRegistrationDto,
+  options?: MutationOptions,
+): Promise<ApiResult<AdminRegistrationDto>> {
+  if (
+    !UUID.test(tournamentId) ||
+    !UUID.test(registrationId) ||
+    !UUID.test(body.outUserId) ||
+    !UUID.test(body.inUserId)
+  ) {
+    return invalidId();
+  }
+  return sendIdempotent(`${adminRegPath(tournamentId, registrationId)}/substitute`, body, options);
+}
+
+/** `PUT /admin/tournaments/:id/seeds` `{ seeds: [{ registrationId, seed }] }`. */
+export function setTournamentSeeds(
+  tournamentId: string,
+  body: SeedsDto,
+  options?: MutationOptions,
+): Promise<ApiResult<unknown>> {
+  if (!UUID.test(tournamentId) || !body.seeds.every((s) => UUID.test(s.registrationId))) {
+    return invalidId();
+  }
+  return sendIdempotent(`/admin/tournaments/${tournamentId}/seeds`, body, options, 'PUT');
+}
+
+/** `POST /admin/tournaments/:id/generate-bracket` → `BracketDto` (tournament → IN_PROGRESS). */
+export function generateBracket(
+  tournamentId: string,
+  options?: MutationOptions,
+): Promise<ApiResult<BracketDto>> {
+  if (!UUID.test(tournamentId)) return invalidId();
+  return sendIdempotent(`/admin/tournaments/${tournamentId}/generate-bracket`, undefined, options);
+}
+
+/**
+ * `POST /admin/matches/:id/result-override` → `MatchDetailDto` (ADMIN_OVERRIDE, not verified).
+ * Body: per-map round scores `{ maps, reason }` (the API derives the series) or, before the veto
+ * is complete, series-only `{ winnerTeamId, teamAScore, teamBScore, reason }`.
+ */
+export function overrideMatchResult(
+  matchId: string,
+  body: ResultOverrideDto,
+  options?: MutationOptions,
+): Promise<ApiResult<MatchDetailM3>> {
+  if (!UUID.test(matchId) || (body.winnerTeamId !== undefined && !UUID.test(body.winnerTeamId))) {
+    return invalidId();
+  }
+  return sendIdempotent(`/admin/matches/${matchId}/result-override`, body, options);
+}
+
+/** `POST /admin/matches/:id/forfeit` → `MatchDetailDto` (FORFEIT, winner = the other team). */
+export function forfeitMatch(
+  matchId: string,
+  body: ForfeitDto,
+  options?: MutationOptions,
+): Promise<ApiResult<MatchDetailM3>> {
+  if (!UUID.test(matchId) || !UUID.test(body.forfeitingTeamId)) return invalidId();
+  return sendIdempotent(`/admin/matches/${matchId}/forfeit`, body, options);
+}
+
+/** `POST /admin/banned-steam-ids` `{ steamId64, reason }` (SUPER_ADMIN) → 201 `BannedSteamIdDto`. */
+export function banSteamId(
+  body: CreateSteamBanDto,
+  options?: MutationOptions,
+): Promise<ApiResult<BannedSteamIdDto>> {
+  return sendIdempotent('/admin/banned-steam-ids', body, options);
+}
+
+/** `POST /admin/banned-steam-ids/:id/lift` `{ reason }` (SUPER_ADMIN) → `BannedSteamIdDto`. */
+export function liftSteamBan(
+  banId: string,
+  body: LiftSteamBanDto,
+  options?: MutationOptions,
+): Promise<ApiResult<BannedSteamIdDto>> {
+  if (!UUID.test(banId)) return invalidId();
+  return sendIdempotent(`/admin/banned-steam-ids/${banId}/lift`, body, options);
 }

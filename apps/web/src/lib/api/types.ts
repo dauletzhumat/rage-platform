@@ -63,22 +63,31 @@ const tournamentStatuses = [
 export const TOURNAMENT_STATUSES: Exhaustive<TournamentStatus, typeof tournamentStatuses> =
   tournamentStatuses;
 
+/**
+ * Series statuses (docs/TOURNAMENTS.md §7). `KNIFE` and `MAP_FINISHED` are removed from
+ * `MatchStatus` in M3 (they are map states). Until the client is regenerated the generated union
+ * may still contain them; `SeriesMatchStatus` excludes them so this tuple stays exhaustive both
+ * before and after regeneration, and they are never rendered as series states.
+ */
+export type SeriesMatchStatus = Exclude<MatchStatus, 'KNIFE' | 'MAP_FINISHED'>;
 const matchStatuses = [
   'CREATED',
   'SERVER_ASSIGNED',
   'PREPARING',
   'WARMUP',
   'READY_CHECK',
-  'KNIFE',
   'LIVE',
   'PAUSED',
-  'MAP_FINISHED',
   'COMPLETED',
   'CANCELLED',
   'FAILED',
   'DISPUTED',
 ] as const;
-export const MATCH_STATUSES: Exhaustive<MatchStatus, typeof matchStatuses> = matchStatuses;
+export const MATCH_STATUSES: Exhaustive<SeriesMatchStatus, typeof matchStatuses> = matchStatuses;
+
+export function isSeriesMatchStatus(value: string): value is SeriesMatchStatus {
+  return (MATCH_STATUSES as readonly string[]).includes(value);
+}
 
 const matchFormats = ['BO1', 'BO3', 'BO5'] as const;
 export const MATCH_FORMATS: Exhaustive<MatchFormat, typeof matchFormats> = matchFormats;
@@ -185,7 +194,7 @@ export interface ApiFailure {
   /** Safe, user-presentable summary (never a stack trace). */
   message: string;
   requestId?: string;
-  /** Field errors from a 400 response (`ApiErrorDto.details`). */
+  /** Field errors from a 400 response, or per-item reasons of a 409 (`ApiErrorDto.details`). */
   details?: ApiFieldError[];
   /** The API's own `message` for 400/409 (documented as safe to display; English). */
   serverMessage?: string;
@@ -270,3 +279,106 @@ export interface AdminTeamApplicationListParams {
   pageSize?: number;
 }
 // ---- end M2 types ----
+
+// ---- M3 types (generated, docs/TOURNAMENTS.md §10) ----
+import type { components as GeneratedComponents } from '@rage/api-client';
+
+type Schemas = GeneratedComponents['schemas'];
+
+export type BracketFormat = Schemas['BracketFormat'];
+export type RegistrationStatus = Schemas['RegistrationStatus'];
+export type TournamentRosterStatus = Schemas['RosterStatus'];
+export type RosterEntryRole = Schemas['RosterEntryRole'];
+export type MatchResultSource = Schemas['MatchResultSource'];
+export type VetoActionType = Schemas['VetoAction'];
+export type VetoTurnAction = Schemas['VetoTurnAction'];
+
+/** PLAYER_INELIGIBLE `details[].message` reasons (§4) — not an OpenAPI schema (error details). */
+export type PlayerIneligibleReason =
+  'NOT_TEAM_MEMBER' | 'USER_INACTIVE' | 'SAMPLE' | 'BANNED' | 'ALREADY_REGISTERED_ELSEWHERE';
+
+const registrationStatuses = ['PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN'] as const;
+export const REGISTRATION_STATUSES: Exhaustive<RegistrationStatus, typeof registrationStatuses> =
+  registrationStatuses;
+
+const rosterEntryRoles = ['STARTER', 'SUBSTITUTE'] as const;
+export const ROSTER_ENTRY_ROLES: Exhaustive<RosterEntryRole, typeof rosterEntryRoles> =
+  rosterEntryRoles;
+
+const rosterStatuses = ['DRAFT', 'LOCKED', 'SUPERSEDED'] as const;
+export const ROSTER_STATUSES: Exhaustive<TournamentRosterStatus, typeof rosterStatuses> =
+  rosterStatuses;
+
+const resultSources = ['SERVER', 'ADMIN_OVERRIDE', 'FORFEIT'] as const;
+export const RESULT_SOURCES: Exhaustive<MatchResultSource, typeof resultSources> = resultSources;
+
+const vetoActions = ['BAN', 'PICK', 'DECIDER'] as const;
+export const VETO_ACTIONS: Exhaustive<VetoActionType, typeof vetoActions> = vetoActions;
+
+export const PLAYER_INELIGIBLE_REASONS = [
+  'NOT_TEAM_MEMBER',
+  'USER_INACTIVE',
+  'SAMPLE',
+  'BANNED',
+  'ALREADY_REGISTERED_ELSEWHERE',
+] as const satisfies readonly PlayerIneligibleReason[];
+
+export type MatchTeamRefM3 = Schemas['MatchTeamRefDto'];
+export type TournamentDetailM3 = Schemas['TournamentDetailDto'];
+export type PublicTournamentTeamDto = Schemas['PublicTournamentTeamDto'];
+export type TournamentRosterEntryDto = Schemas['TournamentRosterEntryDto'];
+export type TournamentRosterDto = Schemas['TournamentRosterDto'];
+export type RegistrationDto = Schemas['RegistrationDto'];
+export type AdminRegistrationDto = Schemas['AdminRegistrationDto'];
+export type CreateRegistrationDto = Schemas['CreateRegistrationDto'];
+/** `PUT …/registrations/:registrationId/roster` takes the same body (§4). */
+export type UpdateRegistrationRosterDto = Schemas['CreateRegistrationDto'];
+export type ApproveRegistrationDto = Schemas['ApproveRegistrationDto'];
+export type RejectRegistrationDto = Schemas['RejectRegistrationDto'];
+export type SubstituteRegistrationDto = Schemas['SubstituteRegistrationDto'];
+export type SeedsDto = Schemas['SeedsDto'];
+export type AdminTournamentDto = Schemas['AdminTournamentDto'];
+export type CreateTournamentDto = Schemas['CreateTournamentDto'];
+export type UpdateTournamentDto = Schemas['UpdateTournamentDto'];
+export type TournamentStatusChangeDto = Schemas['TournamentStatusChangeDto'];
+export type MatchSummaryM3 = Schemas['MatchSummaryDto'];
+export type MatchDetailM3 = Schemas['MatchDetailDto'];
+export type BracketMatchDto = Schemas['BracketMatchDto'];
+export type BracketRoundDto = Schemas['BracketRoundDto'];
+export type BracketDto = Schemas['BracketDto'];
+export type VetoActionDto = Schemas['VetoActionDto'];
+export type VetoStateDto = Schemas['VetoStateDto'];
+export type SubmitVetoDto = Schemas['SubmitVetoDto'];
+export type ResultOverrideDto = Schemas['ResultOverrideDto'];
+export type MapResultInputDto = Schemas['MapResultInputDto'];
+export type ForfeitDto = Schemas['ForfeitDto'];
+export type BannedSteamIdDto = Schemas['BannedSteamIdDto'];
+export type CreateSteamBanDto = Schemas['CreateSteamBanDto'];
+export type LiftSteamBanDto = Schemas['LiftSteamBanDto'];
+
+export interface AdminTournamentListParams {
+  status?: TournamentStatus;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface AdminRegistrationListParams {
+  status?: RegistrationStatus;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface AdminMatchListParams {
+  tournamentId?: string;
+  status?: SeriesMatchStatus;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface BannedSteamIdListParams {
+  active?: boolean;
+  page?: number;
+  pageSize?: number;
+}
+// ---- end M3 types ----

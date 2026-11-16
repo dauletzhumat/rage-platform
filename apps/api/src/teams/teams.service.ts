@@ -96,7 +96,7 @@ export class TeamsService {
         : {}),
     };
     const db = this.prisma.client;
-    const [rows, total] = await db.$transaction([
+    const [rows, total] = await Promise.all([
       db.team.findMany({
         where,
         select: summarySelect,
@@ -143,7 +143,7 @@ export class TeamsService {
       user: { status: 'ACTIVE' },
     };
     const db = this.prisma.client;
-    const [rows, total] = await db.$transaction([
+    const [rows, total] = await Promise.all([
       db.teamMembership.findMany({
         where,
         orderBy: [{ joinedAt: 'desc' }, { id: 'desc' }],

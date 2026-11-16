@@ -89,7 +89,12 @@ describe('db:grants application role (ADR-016)', () => {
     expect(firstRun.database).toMatch(/_test$/);
     expect(firstRun.owner).not.toBe(ROLE);
     expect(firstRun.dmlTables).toBeGreaterThan(30);
-    expect(firstRun.appendOnlyTables).toEqual(['audit_logs', 'match_events']);
+    expect(firstRun.appendOnlyTables).toEqual([
+      'audit_logs',
+      'match_events',
+      'match_state_transitions',
+      'map_veto_actions',
+    ]);
   });
 
   it('role has no elevated attributes and stores only a SCRAM verifier', async () => {
@@ -212,14 +217,42 @@ describe('db:grants application role (ADR-016)', () => {
     });
   });
 
-  it.each(['audit_logs', 'match_events'])(
+  it('can INSERT and SELECT match_state_transitions (M3), but not UPDATE them', async () => {
+    await withAppClient(async (app) => {
+      await inRolledBackTx(app, async () => {
+        const matchId = randomUUID();
+        await app.query(`INSERT INTO matches (id, updated_at) VALUES ($1, now())`, [matchId]);
+        const id = randomUUID();
+        await app.query(
+          `INSERT INTO match_state_transitions (id, match_id, from_status, to_status, source, reason)
+           VALUES ($1, $2, NULL, 'CREATED', 'SYSTEM', 'roles.it')`,
+          [id, matchId],
+        );
+        const r = await app.query(`SELECT 1 FROM match_state_transitions WHERE id = $1`, [id]);
+        expect(r.rowCount).toBe(1);
+        await expectDenied(
+          app,
+          `UPDATE match_state_transitions SET reason = 'x' WHERE id = '${id}'`,
+        );
+      });
+    });
+  });
+
+  it.each(['audit_logs', 'match_events', 'match_state_transitions', 'map_veto_actions'])(
     'UPDATE, DELETE and TRUNCATE on %s are denied, even with the maintenance GUC',
     async (table) => {
       await withAppClient(async (app) => {
         for (const maintenance of [false, true]) {
           await inRolledBackTx(app, async () => {
             if (maintenance) await app.query(`SET LOCAL rage.allow_append_only_maintenance = 'on'`);
-            const col = table === 'audit_logs' ? 'action' : 'event_type';
+            const col =
+              table === 'audit_logs'
+                ? 'action'
+                : table === 'match_events'
+                  ? 'event_type'
+                  : table === 'map_veto_actions'
+                    ? 'map_name'
+                    : 'reason';
             await expectDenied(app, `UPDATE ${table} SET ${col} = 'x'`);
             await expectDenied(app, `DELETE FROM ${table}`);
             await expectDenied(app, `TRUNCATE ${table}`);
@@ -268,12 +301,24 @@ describe('db:grants application role (ADR-016)', () => {
     expect(before).toContain('audit_logs:INSERT');
     expect(before).toContain('audit_logs:SELECT');
     expect(
-      before.filter((x) => x.startsWith('audit_logs:') || x.startsWith('match_events:')).sort(),
+      before
+        .filter(
+          (x) =>
+            x.startsWith('audit_logs:') ||
+            x.startsWith('match_events:') ||
+            x.startsWith('match_state_transitions:') ||
+            x.startsWith('map_veto_actions:'),
+        )
+        .sort(),
     ).toEqual([
       'audit_logs:INSERT',
       'audit_logs:SELECT',
+      'map_veto_actions:INSERT',
+      'map_veto_actions:SELECT',
       'match_events:INSERT',
       'match_events:SELECT',
+      'match_state_transitions:INSERT',
+      'match_state_transitions:SELECT',
     ]);
     expect(before.some((x) => x.startsWith('_prisma_migrations:'))).toBe(false);
     expect(before.some((x) => /:(TRUNCATE|REFERENCES|TRIGGER|MAINTAIN)$/.test(x))).toBe(false);

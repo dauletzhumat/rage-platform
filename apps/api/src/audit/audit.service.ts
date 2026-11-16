@@ -3,7 +3,7 @@ import { type Prisma } from '@rage/db';
 import type { RequestWithIds } from '../common/http/request-id.js';
 import { PrismaService } from '../infra/prisma/prisma.service.js';
 
-/** Audit action codes: M1 (docs/AUTH.md §10) and M2 (docs/TEAMS.md §9). */
+/** Audit action codes: M1 (docs/AUTH.md §10), M2 (docs/TEAMS.md §9), M3 (TOURNAMENTS.md §12). */
 export type AuditAction =
   | 'auth.login'
   | 'auth.logout'
@@ -26,7 +26,25 @@ export type AuditAction =
   | 'team_invitation.expire'
   | 'team_membership.join'
   | 'team_membership.leave'
-  | 'team_membership.remove';
+  | 'team_membership.remove'
+  // M3 (docs/TOURNAMENTS.md §12)
+  | 'tournament.create'
+  | 'tournament.update'
+  | 'tournament.status_change'
+  | 'registration.submit'
+  | 'registration.roster_update'
+  | 'registration.withdraw'
+  | 'registration.approve'
+  | 'registration.reject'
+  | 'registration.substitute'
+  | 'tournament.seeds'
+  | 'bracket.generate'
+  | 'match.veto'
+  | 'match.result_override'
+  | 'match.forfeit'
+  | 'match.advance'
+  | 'steam_ban.create'
+  | 'steam_ban.lift';
 
 export interface AuditEntry {
   action: AuditAction;

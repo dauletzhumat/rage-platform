@@ -14,7 +14,13 @@ export async function generateMetadata(): Promise<Metadata> {
 
 /** Admin landing page (guarded by the layout). Shows only the viewer's own roles — no fabricated metrics. */
 export default async function AdminDashboardPage() {
-  const [me, t] = await Promise.all([getMe(), getTranslations('admin')]);
+  const [me, t, tt, tm, tb] = await Promise.all([
+    getMe(),
+    getTranslations('admin'),
+    getTranslations('adminTournaments'),
+    getTranslations('adminMatches'),
+    getTranslations('adminBans'),
+  ]);
   if (!me.ok) return null; // the layout already rendered the appropriate state
   const superAdmin = isSuperAdmin(me.data.roles);
 
@@ -28,10 +34,11 @@ export default async function AdminDashboardPage() {
           },
           { href: '/admin/users', label: t('users'), note: t('usersDescription') },
           { href: '/admin/audit', label: t('auditLog'), note: t('auditDescription') },
+          { href: '/admin/bans', label: t('bans'), note: tb('description') },
         ]
       : []),
-    { href: '/admin/tournaments', label: t('tournaments'), note: t('tournamentsComing') },
-    { href: '/admin/matches', label: t('matches'), note: t('matchesComing') },
+    { href: '/admin/tournaments', label: t('tournaments'), note: tt('description') },
+    { href: '/admin/matches', label: t('matches'), note: tm('description') },
     { href: '/admin/servers', label: t('servers'), note: t('serversComing') },
   ];
 

@@ -8,13 +8,14 @@ import {
   LayoutDashboard,
   ScrollText,
   Server,
+  ShieldBan,
   Swords,
   Trophy,
   Users,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { adminNavItems, isActivePath, type AdminNavKey } from './nav-items';
+import { isActivePath, visibleAdminNavItems, type AdminNavKey } from './nav-items';
 
 const icons: Record<AdminNavKey, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -24,16 +25,17 @@ const icons: Record<AdminNavKey, LucideIcon> = {
   servers: Server,
   users: Users,
   auditLog: ScrollText,
+  bans: ShieldBan,
 };
 
 /** Vertical sidebar on large screens, horizontally scrollable strip on small ones. */
-export function AdminNav() {
+export function AdminNav({ superAdmin = false }: { superAdmin?: boolean }) {
   const t = useTranslations('admin');
   const pathname = usePathname() ?? '/admin';
   return (
     <nav aria-label={t('navLabel')}>
       <ul className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
-        {adminNavItems.map((item) => {
+        {visibleAdminNavItems(superAdmin).map((item) => {
           const Icon = icons[item.key];
           const active = isActivePath(pathname, item.href);
           return (

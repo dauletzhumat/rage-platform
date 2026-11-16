@@ -386,3 +386,30 @@ variable does not revoke the grant.
 - Secret rotation schedule and the leaked-secret incident procedure (revoke sessions, rotate, review
   audit log) are written and rehearsed in M7. WebAuthn step-up for SUPER_ADMIN is planned for M7
   (ADR-018 Q8).
+
+## 11. Demo tournament on sample data (development only, M3)
+Lets one SUPER_ADMIN click through the whole tournament flow without 10 real Steam accounts.
+Everything it creates is `is_sample` (reserved SteamIDs 76561190000000101–140), labelled "Sample
+data" in the UI, and results stay `ADMIN_OVERRIDE`/`FORFEIT` (never server-verified). **Demo runs
+are not verification evidence** (ACCEPTANCE: no fabricated data counts).
+
+1. In the repo-root `.env` (never in production — the API refuses to start with the flag when
+   `NODE_ENV=production`):
+   ```
+   ALLOW_SAMPLE_MUTATIONS=true
+   ALLOW_DEMO_SEED=true
+   ```
+2. `pnpm db:seed:demo` — upserts 8 sample teams (`demo-alpha` … `demo-hotel`, 5 players each) and
+   creates a new `Demo Cup #N` (slug printed, e.g. `demo-cup-1`) in REGISTRATION_OPEN with 8 PENDING
+   registrations and the map pool `de_sample_alpha` … `de_sample_golf`. Safe next to real data:
+   it aborts if a slug/SteamID belongs to a non-sample row. Each run adds a new tournament.
+3. Restart the API; `GET /api/v1/meta` → `features.sampleMutations.status = "enabled"`; the web
+   shows a "Demo mode" banner on admin/match pages.
+4. As SUPER_ADMIN: `/admin/tournaments` → Demo Cup #N → approve the 8 registrations → status
+   REGISTRATION_CLOSED → (optional) seeds → Generate bracket → on each match do the veto (as an
+   audited admin override) and enter a result or forfeit → the final completes the tournament.
+5. Turn the flags off again when done (`ALLOW_SAMPLE_MUTATIONS` unset ⇒ sample data is read-only).
+
+Limits: sample captains cannot sign in, so captain registration is not part of the demo (test it
+with real accounts); M1/M2 rules on sample data (roles, applications, invitations, member removal)
+stay blocked even in demo mode.

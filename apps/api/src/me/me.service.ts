@@ -41,6 +41,7 @@ export class MeService {
     // A session always belongs to a user with a profile (created at first login).
     if (!user?.playerProfile) throw new UnauthorizedException('Authentication required');
     const membership = user.memberships[0];
+    const scopeSlugs = await this.scopeSlugs(user.roleGrants);
     return {
       user: {
         id: user.id,
@@ -62,6 +63,7 @@ export class MeService {
         role: g.role,
         scopeType: g.scopeType,
         scopeId: g.scopeId,
+        scopeSlug: g.scopeId ? (scopeSlugs.get(g.scopeId) ?? null) : null,
         issuedAt: g.issuedAt.toISOString(),
       })),
       membership: membership
@@ -74,6 +76,29 @@ export class MeService {
           }
         : null,
     };
+  }
+
+  /** Slugs of TEAM / TOURNAMENT grant scopes (TOURNAMENTS.md §15.9); MATCH scopes have none. */
+  private async scopeSlugs(
+    grants: ReadonlyArray<{ scopeType: string; scopeId: string | null }>,
+  ): Promise<Map<string, string>> {
+    const ids = (type: string) =>
+      grants.filter((g) => g.scopeType === type && g.scopeId).map((g) => g.scopeId!);
+    const teamIds = ids('TEAM');
+    const tournamentIds = ids('TOURNAMENT');
+    const db = this.prisma.client;
+    const [teams, tournaments] = await Promise.all([
+      teamIds.length
+        ? db.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, slug: true } })
+        : [],
+      tournamentIds.length
+        ? db.tournament.findMany({
+            where: { id: { in: tournamentIds } },
+            select: { id: true, slug: true },
+          })
+        : [],
+    ]);
+    return new Map([...teams, ...tournaments].map((r) => [r.id, r.slug]));
   }
 
   async updateProfile(

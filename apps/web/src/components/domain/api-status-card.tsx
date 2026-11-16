@@ -6,6 +6,7 @@ import { StatusPill, type StatusTone } from '@/components/ui/status-pill';
 import { RetryButton } from '@/components/states/retry-button';
 import { getMeta, getReadiness } from '@/lib/api/server';
 import type { DependencyStatus, FeatureStatus } from '@/lib/api/types';
+import { DISPLAY_TIMEZONE_LABEL } from '@/lib/display-time';
 
 type Overall = 'operational' | 'degraded' | 'unreachable';
 
@@ -115,7 +116,10 @@ export async function ApiStatusCard() {
           ))}
         </dl>
         <p className="text-xs text-muted">
-          {t('checkedAt', { time: format.dateTime(new Date(), { timeStyle: 'medium' }) })}
+          {t('checkedAt', {
+            time: format.dateTime(new Date(), { timeStyle: 'medium' }),
+            tz: DISPLAY_TIMEZONE_LABEL,
+          })}
         </p>
       </CardContent>
     </Card>

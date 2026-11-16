@@ -107,7 +107,7 @@ Standing gates for every milestone: A9 (security) and A11 (CI: fresh-DB migrate,
 
 **Planned files:** `apps/api/src/{tournaments,registrations,brackets,matches,map-veto,ready-check}/**`, `apps/api/src/matches/state-machine.ts` (pure, unit-tested); `packages/db/prisma/migrations/*_tournaments/**`; web routes above.
 
-**API endpoints:** `GET/POST /tournaments`, `GET /tournaments/:slug`, `POST /tournaments/:id/register`, `GET /admin/tournaments/:id/registrations`, `POST /admin/tournaments/:id/registrations/:registrationId/approve|reject` (added), `POST /tournaments/:id/generate-bracket`, `GET /tournaments/:id/bracket`, `GET/POST /matches`, `GET /matches/:id`, `POST /matches/:id/veto` (added; body `{action, mapName}`), `POST /matches/:id/ready` (added), `POST /matches/:id/forfeit` (added, admin, reason), `POST /matches/:id/result-override` (added, admin, reason, audited).
+**API endpoints (as built):** see `docs/TOURNAMENTS.md` §10 and §15 — public tournaments/teams/bracket/matches/veto reads, operator registrations (`/tournaments/:id/registrations`, roster PUT, withdraw), `POST /matches/:id/veto`, admin tournaments/registrations/seeds/generate-bracket, `GET /admin/matches`, result-override, forfeit, SteamID bans. Ready-check moved to M4 (ADR-020); per-map result rollup moves to M4/M5 with real servers.
 
 **DB tables:** `tournaments`, `tournament_stages`, `tournament_registrations`, `tournament_rosters`, `tournament_roster_entries`, `brackets`, `bracket_slots`, `matches`, `match_rosters`, `match_maps`, `match_map_players`, `map_veto_actions`, `audit_logs`, `outbox_events`. Needed additions (see Q-list): banned SteamID list, roster substitution history, match state transition log, optimistic `version` column on `matches`.
 

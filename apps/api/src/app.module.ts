@@ -20,9 +20,13 @@ import { MeModule } from './me/me.module.js';
 import { MatchesModule } from './matches/matches.module.js';
 import { MetaModule } from './meta/meta.module.js';
 import { PlayersModule } from './players/players.module.js';
+import { RegistrationsModule } from './registrations/registrations.module.js';
+import { SteamBansModule } from './steam-bans/steam-bans.module.js';
 import { TeamApplicationsModule } from './team-applications/team-applications.module.js';
 import { TeamManagementModule } from './team-management/team-management.module.js';
 import { TeamsModule } from './teams/teams.module.js';
+import { SamplePolicyModule } from './tournament-domain/sample-policy.js';
+import { TournamentAdminModule } from './tournament-admin/tournament-admin.module.js';
 import { TournamentsModule } from './tournaments/tournaments.module.js';
 
 type RequestWithId = Omit<IncomingMessage, 'id'> & { id?: string };
@@ -71,6 +75,7 @@ export class AppModule {
         ]),
         InfraModule,
         AuditModule,
+        SamplePolicyModule,
         AuthModule,
         MeModule,
         AdminModule,
@@ -82,6 +87,9 @@ export class AppModule {
         TeamManagementModule,
         InvitationsModule,
         TournamentsModule,
+        RegistrationsModule,
+        TournamentAdminModule,
+        SteamBansModule,
         MatchesModule,
       ],
       providers: [
